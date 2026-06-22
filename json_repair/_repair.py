@@ -18,7 +18,6 @@ Handles common LLM output issues:
 from __future__ import annotations
 
 import json
-import re
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
@@ -289,8 +288,12 @@ class _Repairer:
         """Strip trailing markdown fences and text after JSON."""
         result = "".join(self.out)
 
-        # Strip trailing markdown code fence
-        result = re.sub(r"\n```\s*$", "", result)
+        # Strip trailing markdown code fence manually (avoid regex overhead)
+        idx = result.rfind("\n```")
+        if idx != -1:
+            rest = result[idx + 4 :]
+            if rest.strip() in ("", "```"):
+                result = result[:idx]
 
         # Find the last structural close bracket at depth 0,
         #  skipping brackets that appear inside quoted strings.
@@ -322,7 +325,8 @@ class _Repairer:
             if after.strip() and not after.startswith("```"):
                 result = result[: last_close + 1]
 
-        self.out = [result]
+        self.out.clear()
+        self.out.append(result)
 
     # ── value dispatch ────────────────────────────────────────────────────
 

@@ -22,7 +22,7 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 | Extra text before/after | `Here is JSON: {...}` | `{...}` |
 | Invalid escape sequences (v0.1.1) | `"\*keeper, \(d_i\)"` | `"\\*keeper, \\(d_i\\)"` |
 | JS literals (v0.1.2) | `NaN, Infinity, undefined` | `null` |
-| Implicit object sequence (v0.1.3) | `{...}, {...}, {...}` | `[{...}, {...}, {...}]` |
+| Implicit object sequence (v0.1.3, ≥8KB) | `{...}, {...}, {...}` | `[{...}, {...}, {...}]` |
 | Trailing junk data (v0.1.4) | `{"a":1}-lnd\nuser\n...` | `{"a":1}` |
 
 ## Install
@@ -59,7 +59,7 @@ print(obj)
 State machine with a single heuristic:
 
 > Inside a string, `"` is only treated as closing if the next non-whitespace
-> character is `,` `}` `]` or `:`. Everything else is escaped.
+> character is `,` `}` `]` `:` `\n` or another `"`. Everything else is escaped.
 
 This is tuned for the natural-language embedded quotes common in LLM output.
 
