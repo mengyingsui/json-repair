@@ -1,0 +1,400 @@
+
+============================================================
+[2026-06-22 11:14:48] json parse error: Invalid \escape: line 1 column 160 (char 159)
+
+============================================================
+{
+    "facts": [
+        {
+            "what": "The team needs to find the first branch holding the mystical flower on the Tree of Life.",
+            "when": "2023-05-23",
+            "where": "Tree of Life",
+            "who": "\*keeper, dwarf, bear, user",
+            "why": "To stop loggers from cutting down trees and destroying their home",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-23T06:33:00Z",
+            "occurred_end": "2023-05-23T06:33:00Z",
+            "entities": ["\*keeper", "dwarf", "bear", "user", "Tree of Life", "mystical flower", "loggers", "forest", "home"],
+            "causal_relations": null
+        },
+        {
+            "what": "The team needs to find the mystical flower to stop the loggers from harming the forest.",
+            "when": "2023-05-23",
+            "where": "Forest",
+            "who": "\*keeper, dwarf, worker, bear, elf, warlock",
+            "why": "To protect their home and the forest",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-23T06:33:00Z",
+            "occurred_end": "2023-05-23T06:33:00Z",
+            "entities": ["\*keeper", "dwarf", "worker", "bear", "elf", "warlock", "loggers", "forest", "home", "mystical flower"],
+            "causal_relations": [
+                {
+                    "target_index": 0,
+                    "relation_type": "caused_by"
+                }
+            ]
+        }
+    ]
+}
+
+============================================================
+[2026-06-22 11:14:48] json parse error: Invalid \escape: line 1 column 79 (char 78)
+
+============================================================
+{
+    "facts": [
+        {
+            "what": "In the Denavit-Hartenberg (DH) convention, the link offset \(d_i\) refers to the distance along the common normal between the previous z-axis and the current z-axis.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the position of the current frame relative to the previous frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "z-axis", "frame"],
+            "causal_relations": null
+        },
+        {
+            "what": "The link parameters in the DH convention include \(a_i\), \(\theta_i\), \(d_i\), and \(\phi_i\), which describe the relative orientation and position of each link frame with respect to its preceding frame.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To provide a comprehensive description of the relative orientation and position of each link frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link parameters", "relative orientation", "position", "frame"],
+            "causal_relations": [
+                {
+                    "target_index": 0,
+                    "relation_type": "caused_by"
+                }
+            ]
+        }
+    ]
+}
+
+============================================================
+[2026-06-22 11:14:56] json parse error: Invalid \escape: line 1 column 160 (char 159)
+
+============================================================
+{
+    "facts": [
+        {
+            "what": "The team needs to find the first branch holding the mystical flower on the Tree of Life.",
+            "when": "2023-05-23",
+            "where": "Tree of Life",
+            "who": "\*keeper, dwarf, bear, user",
+            "why": "To stop loggers from cutting down the trees and destroying their home",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-23T06:33:00Z",
+            "occurred_end": "2023-05-23T06:33:00Z",
+            "entities": ["\*keeper", "dwarf", "bear", "user", "Tree of Life", "mystical flower", "loggers", "forest", "home"],
+            "causal_relations": null
+        },
+        {
+            "what": "The team must find the mystical flower hidden on the highest branch of the Tree of Life to stop the loggers.",
+            "when": "2023-05-23",
+            "where": "Tree of Life",
+            "who": "\*keeper, dwarf, worker, bear, elf, dwarf, warlock",
+            "why": "The flower has the power to stop anyone who wishes to harm the forest",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-23T06:33:00Z",
+            "occurred_end": "2023-05-23T06:33:00Z",
+            "entities": ["\*keeper", "dwarf", "worker", "bear", "elf", "dwarf", "warlock", "Tree of Life", "mystical flower", "loggers", "forest"],
+            "causal_relations": [
+                {
+                    "target_index": 0,
+                    "relation_type": "caused_by"
+                }
+            ]
+        }
+    ]
+}
+
+============================================================
+[2026-06-22 11:14:56] json parse error: Invalid \escape: line 1 column 79 (char 78)
+
+============================================================
+{
+    "facts": [
+        {
+            "what": "In the Denavit-Hartenberg (DH) convention, the link offset \(d_i\) refers to the distance along the common normal between the previous z-axis and the current z-axis.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the position of the current frame relative to the previous frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "common normal", "z-axis"],
+            "causal_relations": null
+        },
+        {
+            "what": "The link parameters in the DH convention include \(a_i\), \(\theta_i\), \(d_i\), and \(\phi_i\), which describe the relative orientation and position of each link frame with respect to its preceding frame.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the relative orientation and position of each link frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link parameters", "\(a_i\)", "\(\theta_i\)", "\(d_i\)", "\(\phi_i\)", "link frame", "preceding frame"],
+            "causal_relations": [
+                {
+                    "target_index": 0,
+                    "relation_type": "caused_by"
+                }
+            ]
+        }
+    ]
+}
+
+============================================================
+[2026-06-22 11:15:04] json parse error: Invalid \escape: line 1 column 160 (char 159)
+
+============================================================
+{
+    "facts": [
+        {
+            "what": "The team needs to find the first branch holding the mystical flower on the Tree of Life.",
+            "when": "2023-05-23",
+            "where": "Tree of Life",
+            "who": "\*keeper, dwarf, bear, user",
+            "why": "To stop loggers from cutting down the trees and destroying their home",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-23T06:33:00Z",
+            "occurred_end": "2023-05-23T06:33:00Z",
+            "entities": ["\*keeper", "dwarf", "bear", "user", "Tree of Life", "mystical flower", "loggers", "forest", "home"],
+            "causal_relations": null
+        },
+        {
+            "what": "The team needs to find the mystical flower to stop the loggers from harming the forest.",
+            "when": "2023-05-23",
+            "where": "highest branch of the Tree of Life",
+            "who": "\*keeper, dwarf, worker, bear, elf, warlock",
+            "why": "The flower has magical properties to prevent harm to the forest",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-23T06:33:00Z",
+            "occurred_end": "2023-05-23T06:33:00Z",
+            "entities": ["\*keeper", "dwarf", "worker", "bear", "elf", "warlock", "mystical flower", "loggers", "forest"],
+            "causal_relations": [
+                {
+                    "target_index": 0,
+                    "relation_type": "caused_by"
+                }
+            ]
+        }
+    ]
+}
+
+============================================================
+[2026-06-22 11:15:04] json parse error: Invalid \escape: line 1 column 79 (char 78)
+
+============================================================
+{
+    "facts": [
+        {
+            "what": "In the Denavit-Hartenberg (DH) convention, the link offset \(d_i\) refers to the distance along the common normal between the previous z-axis and the current z-axis.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the position of the current frame relative to the previous frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "common normal", "z-axis"],
+            "causal_relations": null
+        },
+        {
+            "what": "The link parameters in the DH convention include \(a_i\), \(\theta_i\), \(d_i\), and \(\phi_i\), which describe the relative orientation and position of each link frame with respect to its preceding frame.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the relative orientation and position of each link frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link parameters", "\(a_i\)", "\(\theta_i\)", "\(d_i\)", "\(\phi_i\)", "link frame", "preceding frame"],
+            "causal_relations": [
+                {
+                    "target_index": 0,
+                    "relation_type": "caused_by"
+                }
+            ]
+        }
+    ]
+}
+
+============================================================
+[2026-06-22 11:15:14] json parse error: Invalid \escape: line 1 column 79 (char 78)
+
+============================================================
+{
+    "facts": [
+        {
+            "what": "In the Denavit-Hartenberg (DH) convention, the link offset \(d_i\) refers to the distance along the common normal (perpendicular to both the previous and the current z-axis) between the previous z-axis and the current z-axis.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the position of the current frame relative to the previous frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "common normal", "previous z-axis", "current z-axis"],
+            "causal_relations": null
+        },
+        {
+            "what": "The link offset \(d_i\) is one of the four parameters in the DH convention, used to describe the position of the current frame along the common normal with respect to the previous frame.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the relative orientation and position of each link frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "four parameters", "relative orientation and position", "link frame"],
+            "causal_relations": [
+                {
+                    "target_index": 0,
+                    "relation_type": "caused_by"
+                }
+            ]
+        }
+    ]
+}
+
+============================================================
+[2026-06-22 11:15:22] json parse error: Invalid \escape: line 1 column 79 (char 78)
+
+============================================================
+{
+    "facts": [
+        {
+            "what": "In the Denavit-Hartenberg (DH) convention, the link offset \(d_i\) refers to the distance along the common normal (perpendicular to both the previous and the current z-axis) between the previous z-axis and the current z-axis.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the position of the current frame relative to the previous frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "common normal", "previous z-axis", "current z-axis"],
+            "causal_relations": null
+        },
+        {
+            "what": "The link offset \(d_i\) is one of the four parameters in the DH convention, used to describe the position of the current frame along the common normal with respect to the previous frame.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the relative orientation and position of each link frame with respect to its preceding frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "four parameters", "relative orientation and position", "link frame", "preceding frame"],
+            "causal_relations": [
+                {
+                    "target_index": 0,
+                    "relation_type": "caused_by"
+                }
+            ]
+        }
+    ]
+}
+
+============================================================
+[2026-06-22 11:15:31] json parse error: Invalid \escape: line 1 column 79 (char 78)
+
+============================================================
+{
+    "facts": [
+        {
+            "what": "In the Denavit-Hartenberg (DH) convention, the link offset \(d_i\) refers to the distance along the common normal (perpendicular to both the previous and the current z-axis) between the previous z-axis and the current z-axis.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the position of the current frame relative to the previous frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "common normal", "previous z-axis", "current z-axis"],
+            "causal_relations": null
+        },
+        {
+            "what": "The link offset \(d_i\) is one of the four parameters in the DH convention, used to describe the position of the current frame along the common normal with respect to the previous frame.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the relative orientation and position of each link frame with respect to its preceding frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "four parameters", "relative orientation and position", "link frame", "preceding frame"],
+            "causal_relations": [
+                {
+                    "target_index": 0,
+                    "relation_type": "caused_by"
+                }
+            ]
+        }
+    ]
+}
+
+============================================================
+[2026-06-22 11:15:39] json parse error: Invalid \escape: line 1 column 79 (char 78)
+
+============================================================
+{
+    "facts": [
+        {
+            "what": "In the Denavit-Hartenberg (DH) convention, the link offset \(d_i\) refers to the distance along the common normal (perpendicular to both the previous and the current z-axis) between the previous z-axis and the current z-axis.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the position of the current frame relative to the previous frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "common normal", "previous z-axis", "current z-axis"],
+            "causal_relations": null
+        },
+        {
+            "what": "The link offset \(d_i\) is one of the four parameters in the DH convention, used to describe the position of the current frame along the common normal with respect to the previous frame.",
+            "when": "2023-05-25T16:37:00Z",
+            "where": "N/A",
+            "who": "assistant",
+            "why": "To describe the relative orientation and position of each link frame with respect to its preceding frame",
+            "fact_kind": "event",
+            "fact_type": "assistant",
+            "occurred_start": "2023-05-25T16:37:00Z",
+            "occurred_end": "2023-05-25T16:37:00Z",
+            "entities": ["Denavit-Hartenberg (DH) convention", "link offset \(d_i\)", "four parameters", "relative orientation and position", "link frame", "preceding frame"],
+            "causal_relations": [
+                {
+                    "target_index": 0,
+                    "relation_type": "caused_by"
+                }
+            ]
+        }
+    ]
+}

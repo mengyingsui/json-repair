@@ -130,6 +130,27 @@ class _Repairer:
         while self.brackets:
             self._emit(self.brackets.pop())
 
+    # valid JSON escape characters (without the leading backslash)
+    _VALID_ESCAPES = frozenset('"\\/bfnrt')
+
+    def _emit_escape(self, ch: str) -> None:
+        """Emit a backslash escape sequence.
+
+        If ``ch`` is a valid JSON escape character, emit ``\\ch`` as-is.
+        Otherwise emit ``\\\\ch`` (escape the backslash itself).
+        """
+        if ch in self._VALID_ESCAPES:
+            self._emit("\\")
+            self._emit(ch)
+        elif ch == "u" and self._peek(1) in "0123456789abcdefABCDEF":
+            # Likely a unicode escape — pass through the backslash and 'u'
+            self._emit("\\")
+            self._emit("u")
+        else:
+            # Invalid escape — double-escape the backslash
+            self._emit("\\\\")
+            self._emit(ch)
+
     # ── prefix / suffix junk ──────────────────────────────────────────────
 
     def _skip_prefix_junk(self) -> None:
@@ -389,12 +410,12 @@ class _Repairer:
             ch = self.text[self.i]
 
             if ch == "\\":
-                # Valid escape sequence — pass through
-                self._emit("\\")
                 self.i += 1
                 if self.i < self.n:
-                    self._emit(self.text[self.i])
+                    self._emit_escape(self.text[self.i])
                     self.i += 1
+                else:
+                    self._emit("\\\\")
                 continue
 
             if ch == '"':
@@ -523,11 +544,12 @@ class _Repairer:
             ch = self.text[self.i]
 
             if ch == "\\":
-                self._emit("\\")
                 self.i += 1
                 if self.i < self.n:
-                    self._emit(self.text[self.i])
+                    self._emit_escape(self.text[self.i])
                     self.i += 1
+                else:
+                    self._emit("\\\\")
                 continue
 
             if ch == '"':
@@ -574,17 +596,17 @@ class _Repairer:
 
             if ch == "\\":
                 # Escape sequence inside single-quoted string.
-                # If followed by ', emit a literal ' (not \').
-                # Otherwise pass through.
                 if self._peek(1) == "'":
+                    # \' → literal apostrophe
                     self._emit("'")
                     self.i += 2
                     continue
-                self._emit("\\")
                 self.i += 1
                 if self.i < self.n:
-                    self._emit(self.text[self.i])
+                    self._emit_escape(self.text[self.i])
                     self.i += 1
+                else:
+                    self._emit("\\\\")
                 continue
 
             if ch == "'":

@@ -430,7 +430,68 @@ class TestEdgeCases:
         _check('{"path": "C:\\\\Users\\\\test"}', {"path": "C:\\Users\\test"})
 
 
-# ── 18. return_object=True ────────────────────────────────────────────────────
+# ── 18. Invalid escape sequences (\\*, \\(, etc.) ──────────────────────────────
+
+
+class TestInvalidEscape:
+    def test_backslash_star(self) -> None:
+        _check('{"who": "\\*keeper, dwarf"}', {"who": "\\*keeper, dwarf"})
+
+    def test_latex_parens(self) -> None:
+        _check(
+            '{"what": "the link offset \\(d_i\\) refers to"}',
+            {"what": "the link offset \\(d_i\\) refers to"},
+        )
+
+    def test_latex_subscripts(self) -> None:
+        # \t inside \theta is a valid JSON tab escape — preserved as-is.
+        # \( \) and \p are invalid — their backslashes get escaped.
+        _check(
+            '{"params": "\\(a_i\\), \\(\\theta_i\\), \\(d_i\\), \\(\\phi_i\\)"}',
+            {"params": "\\(a_i\\), \\(\theta_i\\), \\(d_i\\), \\(\\phi_i\\)"},
+        )
+
+    def test_valid_escapes_preserved(self) -> None:
+        _check('{"a": "hello\\nworld\\t!"}', {"a": "hello\nworld\t!"})
+
+    def test_backslash_quote_escape(self) -> None:
+        _check('{"a": "he said \\"hello\\""}', {"a": 'he said "hello"'})
+
+    def test_mixed_valid_invalid(self) -> None:
+        _check(
+            '{"text": "newline\\nhere and star\\*there"}',
+            {"text": "newline\nhere and star\\*there"},
+        )
+
+    def test_invalid_escape_in_entities(self) -> None:
+        _check(
+            '{"entities": ["\\*keeper", "\\*dwarf", "normal"]}',
+            {"entities": ["\\*keeper", "\\*dwarf", "normal"]},
+        )
+
+    def test_full_llm_failure(self) -> None:
+        text = """{
+            "facts": [{
+                "what": "The team needs to find the first branch.",
+                "who": "\\*keeper, dwarf, bear, user",
+                "entities": ["\\*keeper", "dwarf", "Tree of Life"]
+            }]
+        }"""
+        _check(
+            text,
+            {
+                "facts": [
+                    {
+                        "what": "The team needs to find the first branch.",
+                        "who": "\\*keeper, dwarf, bear, user",
+                        "entities": ["\\*keeper", "dwarf", "Tree of Life"],
+                    }
+                ]
+            },
+        )
+
+
+# ── 19. return_object=True ────────────────────────────────────────────────────
 
 
 class TestReturnObject:
