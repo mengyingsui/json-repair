@@ -78,8 +78,8 @@ def _corrupt_strings(text: str, num_corruptions: int = 3) -> str:
 # ── Data fixtures ──────────────────────────────────────────────────────────────
 
 
-_SMALL_VALID = '{"name": "Alice", "age": 30, "city": "New York"}'
-_MEDIUM_VALID = json.dumps(
+SMALL_VALID = '{"name": "Alice", "age": 30, "city": "New York"}'
+MEDIUM_VALID = json.dumps(
     {
         "users": [
             {
@@ -94,17 +94,17 @@ _MEDIUM_VALID = json.dumps(
         "meta": {"page": 1, "total": 20, "query": "search term"},
     }
 )
-_LARGE_VALID = _generate_valid_json(depth=3, width=8)
+LARGE_VALID = _generate_valid_json(depth=3, width=8)
 
-_SMALL_CORRUPT = _corrupt_strings(_SMALL_VALID)
-_MEDIUM_CORRUPT = _corrupt_strings(_MEDIUM_VALID, num_corruptions=8)
-_LARGE_CORRUPT = _corrupt_strings(_LARGE_VALID, num_corruptions=20)
+SMALL_CORRUPT = _corrupt_strings(SMALL_VALID)
+MEDIUM_CORRUPT = _corrupt_strings(MEDIUM_VALID, num_corruptions=8)
+LARGE_CORRUPT = _corrupt_strings(LARGE_VALID, num_corruptions=20)
 
-_TRIPLE_QUOTED = (
+TRIPLE_QUOTED = (
     '{"code": """def hello():\n    print("Hello, World!")\n    return 42\n"""}'
 )
 
-_MANY_EMBEDDED = (
+MANY_EMBEDDED = (
     '{"dialogue": "'
     + 'He said "hello" and she replied "hi there" then he asked '
     + '"how are you" and she said "I\'m fine" '
@@ -112,7 +112,7 @@ _MANY_EMBEDDED = (
     + '"}'
 )
 
-_DEEP_NESTED = """\
+DEEP_NESTED = """\
 {
     "level1": {
         "level2": {
@@ -127,7 +127,7 @@ _DEEP_NESTED = """\
     }
 }"""
 
-_REALISTIC_LLM = (
+REALISTIC_LLM = (
     "Here is the JSON you requested:\n\n"
     "```json\n"
     "{\n"
@@ -152,20 +152,20 @@ class TestPassthroughPerf:
     """Valid JSON should be processed with near-zero overhead."""
 
     def test_small_valid(self) -> None:
-        t = _bench(_SMALL_VALID, iterations=2000)
-        _assert_ok(_SMALL_VALID)
+        t = _bench(SMALL_VALID, iterations=2000)
+        _assert_ok(SMALL_VALID)
         assert t < 1.0, f"Small valid JSON too slow: {t:.3f} ms"
 
     def test_medium_valid(self) -> None:
-        t = _bench(_MEDIUM_VALID, iterations=500)
-        _assert_ok(_MEDIUM_VALID)
+        t = _bench(MEDIUM_VALID, iterations=500)
+        _assert_ok(MEDIUM_VALID)
         assert t < 10.0, f"Medium valid JSON too slow: {t:.3f} ms"
 
     def test_large_valid(self) -> None:
-        t = _bench(_LARGE_VALID, iterations=100)
-        _assert_ok(_LARGE_VALID)
+        t = _bench(LARGE_VALID, iterations=100)
+        _assert_ok(LARGE_VALID)
         # Large JSON: should process ~1 MB/s at minimum
-        kb = len(_LARGE_VALID) / 1024
+        kb = len(LARGE_VALID) / 1024
         throughput = (kb / (t / 1000)) / 1024  # MB/s
         assert throughput > 0.5, f"Throughput too low: {throughput:.1f} MB/s"
 
@@ -177,19 +177,19 @@ class TestCorruptedPerf:
     """Malformed JSON with unescaped embedded quotes — the main use case."""
 
     def test_small_corrupted(self) -> None:
-        t = _bench(_SMALL_CORRUPT, iterations=2000)
-        _assert_ok(_SMALL_CORRUPT)
+        t = _bench(SMALL_CORRUPT, iterations=2000)
+        _assert_ok(SMALL_CORRUPT)
         assert t < 2.0, f"Small corrupted too slow: {t:.3f} ms"
 
     def test_medium_corrupted(self) -> None:
-        t = _bench(_MEDIUM_CORRUPT, iterations=500)
-        _assert_ok(_MEDIUM_CORRUPT)
+        t = _bench(MEDIUM_CORRUPT, iterations=500)
+        _assert_ok(MEDIUM_CORRUPT)
         assert t < 15.0, f"Medium corrupted too slow: {t:.3f} ms"
 
     def test_large_corrupted(self) -> None:
-        t = _bench(_LARGE_CORRUPT, iterations=100)
-        _assert_ok(_LARGE_CORRUPT)
-        kb = len(_LARGE_CORRUPT) / 1024
+        t = _bench(LARGE_CORRUPT, iterations=100)
+        _assert_ok(LARGE_CORRUPT)
+        kb = len(LARGE_CORRUPT) / 1024
         throughput = (kb / (t / 1000)) / 1024
         assert throughput > 0.3, f"Throughput too low: {throughput:.1f} MB/s"
 
@@ -199,23 +199,23 @@ class TestCorruptedPerf:
 
 class TestSpecificPatterns:
     def test_triple_quoted(self) -> None:
-        t = _bench(_TRIPLE_QUOTED, iterations=2000)
-        _assert_ok(_TRIPLE_QUOTED)
+        t = _bench(TRIPLE_QUOTED, iterations=2000)
+        _assert_ok(TRIPLE_QUOTED)
         assert t < 2.0, f"Triple-quoted too slow: {t:.3f} ms"
 
     def test_many_embedded_quotes(self) -> None:
-        t = _bench(_MANY_EMBEDDED, iterations=2000)
-        _assert_ok(_MANY_EMBEDDED)
+        t = _bench(MANY_EMBEDDED, iterations=2000)
+        _assert_ok(MANY_EMBEDDED)
         assert t < 3.0, f"Many embedded quotes too slow: {t:.3f} ms"
 
     def test_deep_nested(self) -> None:
-        t = _bench(_DEEP_NESTED, iterations=2000)
-        _assert_ok(_DEEP_NESTED)
+        t = _bench(DEEP_NESTED, iterations=2000)
+        _assert_ok(DEEP_NESTED)
         assert t < 2.0, f"Deep nested too slow: {t:.3f} ms"
 
     def test_realistic_llm_output(self) -> None:
-        t = _bench(_REALISTIC_LLM, iterations=1000)
-        _assert_ok(_REALISTIC_LLM)
+        t = _bench(REALISTIC_LLM, iterations=1000)
+        _assert_ok(REALISTIC_LLM)
         assert t < 5.0, f"Realistic LLM output too slow: {t:.3f} ms"
 
 
@@ -302,16 +302,16 @@ class TestReport:
     def test_print_report(self) -> None:
         cases: list[tuple[str, str, int]] = [
             ("empty object", "{}", 5000),
-            ("small valid", _SMALL_VALID, 2000),
-            ("small corrupt", _SMALL_CORRUPT, 2000),
-            ("medium valid", _MEDIUM_VALID, 500),
-            ("medium corrupt", _MEDIUM_CORRUPT, 500),
-            ("large valid", _LARGE_VALID, 100),
-            ("large corrupt", _LARGE_CORRUPT, 100),
-            ("triple-quoted", _TRIPLE_QUOTED, 2000),
-            ("many embedded", _MANY_EMBEDDED, 2000),
-            ("deep nested", _DEEP_NESTED, 2000),
-            ("realistic LLM", _REALISTIC_LLM, 1000),
+            ("small valid", SMALL_VALID, 2000),
+            ("small corrupt", SMALL_CORRUPT, 2000),
+            ("medium valid", MEDIUM_VALID, 500),
+            ("medium corrupt", MEDIUM_CORRUPT, 500),
+            ("large valid", LARGE_VALID, 100),
+            ("large corrupt", LARGE_CORRUPT, 100),
+            ("triple-quoted", TRIPLE_QUOTED, 2000),
+            ("many embedded", MANY_EMBEDDED, 2000),
+            ("deep nested", DEEP_NESTED, 2000),
+            ("realistic LLM", REALISTIC_LLM, 1000),
         ]
         print("\n" + "=" * 72)
         print(f"{'Case':<22} {'Size':>8} {'Time (ms)':>10} {'Throughput':>14}")

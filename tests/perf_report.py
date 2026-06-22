@@ -9,36 +9,36 @@ import timeit
 
 from json_repair import repair_json
 from tests.test_performance import (
-    _DEEP_NESTED,
-    _LARGE_CORRUPT,
-    _LARGE_VALID,
-    _MANY_EMBEDDED,
-    _MEDIUM_CORRUPT,
-    _MEDIUM_VALID,
-    _REALISTIC_LLM,
-    _SMALL_CORRUPT,
-    _SMALL_VALID,
-    _TRIPLE_QUOTED,
+    DEEP_NESTED,
+    LARGE_CORRUPT,
+    LARGE_VALID,
+    MANY_EMBEDDED,
+    MEDIUM_CORRUPT,
+    MEDIUM_VALID,
+    REALISTIC_LLM,
+    SMALL_CORRUPT,
+    SMALL_VALID,
+    TRIPLE_QUOTED,
 )
 
-_INVALID_ESCAPE = (
+INVALID_ESCAPE = (
     '{"entities": ["\\*keeper", "\\*dwarf"],'
     '"what": "the link offset \\(d_i\\) refers to"}'
 )
 
 cases: list[tuple[str, str, int]] = [
     ("empty object", "{}", 5000),
-    ("small valid", _SMALL_VALID, 2000),
-    ("small corrupt", _SMALL_CORRUPT, 2000),
-    ("medium valid (2 KB)", _MEDIUM_VALID, 500),
-    ("medium corrupt", _MEDIUM_CORRUPT, 500),
-    ("large valid (12 KB)", _LARGE_VALID, 100),
-    ("large corrupt", _LARGE_CORRUPT, 100),
-    ("triple-quoted", _TRIPLE_QUOTED, 2000),
-    ("many embedded", _MANY_EMBEDDED, 2000),
-    ("deep nested", _DEEP_NESTED, 2000),
-    ("realistic LLM", _REALISTIC_LLM, 1000),
-    ("invalid escape", _INVALID_ESCAPE, 2000),
+    ("small valid", SMALL_VALID, 2000),
+    ("small corrupt", SMALL_CORRUPT, 2000),
+    ("medium valid (2 KB)", MEDIUM_VALID, 500),
+    ("medium corrupt", MEDIUM_CORRUPT, 500),
+    ("large valid (12 KB)", LARGE_VALID, 100),
+    ("large corrupt", LARGE_CORRUPT, 100),
+    ("triple-quoted", TRIPLE_QUOTED, 2000),
+    ("many embedded", MANY_EMBEDDED, 2000),
+    ("deep nested", DEEP_NESTED, 2000),
+    ("realistic LLM", REALISTIC_LLM, 1000),
+    ("invalid escape", INVALID_ESCAPE, 2000),
 ]
 
 print()
