@@ -1,0 +1,8 @@
+{"input": "{\"who\": \"\\*keeper, dwarf\"}", "expected": {"who": "\\*keeper, dwarf"}}
+{"input": "{\"what\": \"the link offset \\(d_i\\) refers to\"}", "expected": {"what": "the link offset \\(d_i\\) refers to"}}
+{"input": "{\"params\": \"\\(a_i\\), \\(\\theta_i\\), \\(d_i\\), \\(\\phi_i\\)\"}", "expected": {"params": "\\(a_i\\), \\(\theta_i\\), \\(d_i\\), \\(\\phi_i\\)"}}
+{"input": "{\"a\": \"hello\\nworld\\t!\"}", "expected": {"a": "hello\nworld\t!"}}
+{"input": "{\"a\": \"he said \\\"hello\\\"\"}", "expected": {"a": "he said \"hello\""}}
+{"input": "{\"text\": \"newline\\nhere and star\\*there\"}", "expected": {"text": "newline\nhere and star\\*there"}}
+{"input": "{\"entities\": [\"\\*keeper\", \"\\*dwarf\", \"normal\"]}", "expected": {"entities": ["\\*keeper", "\\*dwarf", "normal"]}}
+{"input": "{\n            \"facts\": [{\n                \"what\": \"The team needs to find the first branch.\",\n                \"who\": \"\\*keeper, dwarf, bear, user\",\n                \"entities\": [\"\\*keeper\", \"dwarf\", \"Tree of Life\"]\n            }]\n        }", "expected": {"facts": [{"what": "The team needs to find the first branch.", "who": "\\*keeper, dwarf, bear, user", "entities": ["\\*keeper", "dwarf", "Tree of Life"]}]}}

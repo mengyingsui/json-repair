@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from hypothesis import assume
@@ -59,26 +60,13 @@ _json_value: st.SearchStrategy[Any] = st.recursive(
     max_leaves=20,
 )
 
-_BROKEN_PATTERNS = st.sampled_from(
-    [
-        '{"key": "value with "embedded" quotes"}',
-        '{"key": """triple quoted"""}',
-        "{'key': 'single quoted'}",
-        '{key: "unquoted key"}',
-        '{"a": 1,}',
-        '{"a": 1 "b": 2}',
-        '{"key" "value"}',
-        '{\n  // comment\n  "key": 1\n}',
-        '{"text": "line1\nline2"}',
-        '{"who": "\\*keeper"}',
-        '{"what": "link offset \\(d_i\\)"}',
-        '{"a": True, "b": False, "c": None}',
-        '{"val": NaN}',
-        '{"val": Infinity}',
-        '{"val": undefined}',
-        'Here is JSON: {"a": 1}',
-    ]
-)
+_BROKEN_RAW: list[str] = []
+_path = Path(__file__).parent / "cases" / "broken_patterns.jsonl"
+for _line in _path.read_text(encoding="utf-8").strip().splitlines():
+    if _line.strip():
+        _BROKEN_RAW.append(json.loads(_line)["input"])
+
+_BROKEN_PATTERNS = st.sampled_from(_BROKEN_RAW)
 
 
 # ── Property: identity round-trip ─────────────────────────────────────────────

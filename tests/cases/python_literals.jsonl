@@ -1,0 +1,3 @@
+{"input": "{\"a\": True}", "expected": {"a": true}}
+{"input": "{\"a\": False}", "expected": {"a": false}}
+{"input": "{\"a\": None}", "expected": {"a": null}}

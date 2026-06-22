@@ -1,0 +1,3 @@
+{"input": "{'key': 'value'}", "expected": {"key": "value"}}
+{"input": "{'key': 'it has \"double\" quotes inside'}", "expected": {"key": "it has \"double\" quotes inside"}}
+{"input": "{'outer': {'inner': 'val'}}", "expected": {"outer": {"inner": "val"}}}

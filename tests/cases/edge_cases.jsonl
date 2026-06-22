@@ -1,0 +1,8 @@
+{"input": "{}", "expected": {}}
+{"input": "[]", "expected": []}
+{"input": "\"just a string\"", "expected": "just a string"}
+{"input": "123", "expected": 123}
+{"input": "true", "expected": true}
+{"input": "{\"key\": \"你好世界\"}", "expected": {"key": "你好世界"}}
+{"input": "{\"key\": \"!@#$%^&*()_+-=[]{}|;:,.<>?/\"}", "expected": {"key": "!@#$%^&*()_+-=[]{}|;:,.<>?/"}}
+{"input": "{\"path\": \"C:\\\\Users\\\\test\"}", "expected": {"path": "C:\\Users\\test"}}

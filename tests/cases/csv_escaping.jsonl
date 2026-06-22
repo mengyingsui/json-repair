@@ -1,0 +1,2 @@
+{"input": "{\"data\": \"Column1\"\"Data\"\"More\"}", "expected": {"data": "Column1\"Data\"More"}}
+{"input": "{\"key\": \"\"\"\"quoted text\"\" extra\"}", "expected": {"key": "\"\"quoted text\" extra"}}

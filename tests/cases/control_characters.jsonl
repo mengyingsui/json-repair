@@ -1,0 +1,2 @@
+{"input": "{\"text\": \"line1\nline2\"}", "expected": {"text": "line1\nline2"}}
+{"input": "{\"text\": \"col1\tcol2\"}", "expected": {"text": "col1\tcol2"}}

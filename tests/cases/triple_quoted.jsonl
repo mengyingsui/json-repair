@@ -1,0 +1,5 @@
+{"input": "{\"key\": \"\"\"triple quoted value\"\"\"}", "expected": {"key": "triple quoted value"}}
+{"input": "{\"key\": \"\"\"value with \"inner\" quotes\"\"\"}", "expected": {"key": "value with \"inner\" quotes"}}
+{"input": "{\"key\": \"\"\"line1\nline2\nline3\"\"\"}", "expected": {"key": "line1\nline2\nline3"}}
+{"input": "{\"code\": \"\"\"def foo():\n    return \"bar\"\n\"\"\"}", "expected": {"code": "def foo():\n    return \"bar\"\n"}}
+{"input": "{\"key\": \"\"\"\"\"\"}", "expected": {"key": ""}}

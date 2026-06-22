@@ -1,0 +1,2 @@
+{"input": "{\n  // this is a comment\n  \"key\": \"value\"\n}", "expected": {"key": "value"}}
+{"input": "{\"key\": /* inline comment */ \"value\"}", "expected": {"key": "value"}}

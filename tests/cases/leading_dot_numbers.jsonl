@@ -1,0 +1,5 @@
+{"input": "[.5]", "expected": [0.5]}
+{"input": "[-.5]", "expected": [-0.5]}
+{"input": "[5.]", "expected": [5.0]}
+{"input": "{\"x\": .75}", "expected": {"x": 0.75}}
+{"input": "[42., .5, 3.]", "expected": [42.0, 0.5, 3.0]}

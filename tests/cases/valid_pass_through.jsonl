@@ -1,0 +1,5 @@
+{"input": "{\"a\": 1}", "expected": {"a": 1}}
+{"input": "{\"a\": {\"b\": [1, 2, 3]}}", "expected": {"a": {"b": [1, 2, 3]}}}
+{"input": "{\"a\": \"hello \\\"world\\\"\"}", "expected": {"a": "hello \"world\""}}
+{"input": "[1, \"two\", true, null]", "expected": [1, "two", true, null]}
+{"input": "[1, -2, 3.14, 1.5e10]", "expected": [1, -2, 3.14, 15000000000.0]}

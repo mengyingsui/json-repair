@@ -1,0 +1,3 @@
+{"input": "{\"event_type\":\"X\",\"role_argument_pairs\":[{\"role\":\"r\",\"argument\":\"text.\"}]}-lnd", "expected": {"event_type": "X", "role_argument_pairs": [{"role": "r", "argument": "text."}]}}
+{"input": "{\"event_type\":\"X\",\"role_argument_pairs\":[{\"role\":\"r\",\"argument\":\"text.\"}]}junk", "expected": {"event_type": "X", "role_argument_pairs": [{"role": "r", "argument": "text."}]}}
+{"input": "{\"a\":1}-lnd\nuser\nCRITICAL: more text\n[TEXT_START]\ncontent\n[TEXT_END]", "expected": {"a": 1}}

@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.1.6 (2026-06-23)
+
+### Changed
+- All code consolidated into single `_Repairer` class in `_repair.py`;
+  removed `_core.py`, `_string.py`, `_value.py` mixin split.
+- Test cases (80+) moved from `test_repair.py` into 22 `.jsonl` files
+  under `tests/cases/`, one per category.
+- Hypothesis broken-patterns list moved to `tests/cases/broken_patterns.jsonl`.
+- `_extract_blocks` renamed to `extract_blocks` for cross-module import.
+
+### Removed
+- Dead function `_load_cases` from `test_repair.py`.
+
+### Fixed
+- All Pylance `reportUnusedClass` / `reportUnknownVariableType` / `reportUnknownArgumentType`
+  diagnostics eliminated (use `cast` instead of suppression).
+
 ## v0.1.5 (2026-06-23)
 
 ### Added

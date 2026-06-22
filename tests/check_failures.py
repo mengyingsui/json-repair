@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 from json_repair import repair_json
 
 FAILURES_PATH = Path(__file__).parent.parent / "json_failures.txt"
 
 
-def _extract_blocks(text: str) -> list[str]:
+def extract_blocks(text: str) -> list[str]:
     """Extract JSON blocks from the failures file."""
     lines = text.splitlines(keepends=True)
     blocks: list[str] = []
@@ -43,7 +44,7 @@ def main() -> None:
         return
 
     text = FAILURES_PATH.read_text(encoding="utf-8")
-    blocks = _extract_blocks(text)
+    blocks = extract_blocks(text)
     print(f"Found {len(blocks)} JSON blocks\n")
 
     success = 0
@@ -57,9 +58,9 @@ def main() -> None:
             assert isinstance(repaired, str)
             obj = json.loads(repaired)
             if isinstance(obj, list):
-                label = f"{len(obj)} items"
+                label = f"{len(cast(list[object], obj))} items"
             elif isinstance(obj, dict):
-                label = f"{len(obj.get('facts', []))} facts"
+                label = f"{len(cast(list[object], obj.get('facts', [])))} facts"
             else:
                 label = "scalar"
             elapsed = len(block)

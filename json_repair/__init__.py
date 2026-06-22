@@ -24,4 +24,4 @@ Usage::
 from json_repair._repair import repair_json as repair_json
 
 __all__ = ["repair_json"]
-__version__ = "0.1.5"
+__version__ = "0.1.6"

@@ -1,0 +1,4 @@
+{"input": "{\"a\": 1, \"b\": 2", "expected": {"a": 1, "b": 2}}
+{"input": "[1, 2, 3", "expected": [1, 2, 3]}
+{"input": "{\"key\": \"unclosed", "expected": {"key": "unclosed"}}
+{"input": "{\"a\": {\"b\": [1, 2", "expected": {"a": {"b": [1, 2]}}}

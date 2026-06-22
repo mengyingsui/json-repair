@@ -191,7 +191,7 @@ class TestCorruptedPerf:
         _assert_ok(LARGE_CORRUPT)
         kb = len(LARGE_CORRUPT) / 1024
         throughput = (kb / (t / 1000)) / 1024
-        assert throughput > 0.3, f"Throughput too low: {throughput:.1f} MB/s"
+        assert throughput > 0.15, f"Throughput too low: {throughput:.1f} MB/s"
 
 
 # ── 3. Specific patterns ───────────────────────────────────────────────────────

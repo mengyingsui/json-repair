@@ -1,0 +1,5 @@
+{"input": "{\"key\": \"value with \"embedded\" quotes\"}", "expected": {"key": "value with \"embedded\" quotes"}}
+{"input": "{\"text\": \"He said \"hello\" to \"world\"\"}", "expected": {"text": "He said \"hello\" to \"world\""}}
+{"input": "{\"key\": \"\"start\" with quote\"}", "expected": {"key": "\"start\" with quote"}}
+{"input": "{\"outer\": {\"inner\": \"say \"yes\" please\"}}", "expected": {"outer": {"inner": "say \"yes\" please"}}}
+{"input": "[\"normal\", \"with \"quote\"\", \"another\"]", "expected": ["normal", "with \"quote\"", "another"]}

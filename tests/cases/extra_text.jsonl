@@ -1,0 +1,3 @@
+{"input": "Here is your JSON: {\"a\": 1}", "expected": {"a": 1}}
+{"input": "{\"a\": 1} Some trailing text", "expected": {"a": 1}}
+{"input": "Sure! Here is the JSON you requested:\n\n{\"name\": \"test\"}", "expected": {"name": "test"}}

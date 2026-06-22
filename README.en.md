@@ -24,6 +24,9 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 | JS literals (v0.1.2) | `NaN, Infinity, undefined` | `null` |
 | Implicit object sequence (v0.1.3, ≥8KB) | `{...}, {...}, {...}` | `[{...}, {...}, {...}]` |
 | Trailing junk data (v0.1.4) | `{"a":1}-lnd\nuser\n...` | `{"a":1}` |
+| Leading comma skip (v0.1.5) | `[,1]` | `[1]` |
+| Dot-number normalization (v0.1.5) | `.5` / `5.` | `0.5` / `5.0` |
+| Adjacent-object wrapping (v0.1.5) | `}{` (≥8KB, ≥3 transitions) | `[{...},{...}]` |
 
 ## Install
 
@@ -80,6 +83,7 @@ Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhea
 
 | Version | Description |
 |---------|-------------|
+| v0.1.6 | Single-file `_Repairer` class; test cases moved to 22 `.jsonl` files; Pylance strict-mode clean |
 | v0.1.5 | Leading comma skip, dot-number normalization, adjacent-object `}{` array wrap |
 | v0.1.4 | Trailing junk detection, depth-tracked implicit arrays, 16/17 json_failures.txt |
 | v0.1.3 | Implicit object sequence auto-wrapped, massive array stress test |

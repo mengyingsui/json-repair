@@ -1,0 +1,16 @@
+{"input": "{\"key\": \"value with \"embedded\" quotes\"}"}
+{"input": "{\"key\": \"\"\"triple quoted\"\"\"}"}
+{"input": "{'key': 'single quoted'}"}
+{"input": "{key: \"unquoted key\"}"}
+{"input": "{\"a\": 1,}"}
+{"input": "{\"a\": 1 \"b\": 2}"}
+{"input": "{\"key\" \"value\"}"}
+{"input": "{\n  // comment\n  \"key\": 1\n}"}
+{"input": "{\"text\": \"line1\nline2\"}"}
+{"input": "{\"who\": \"\\*keeper\"}"}
+{"input": "{\"what\": \"link offset \\(d_i\\)\"}"}
+{"input": "{\"a\": True, \"b\": False, \"c\": None}"}
+{"input": "{\"val\": NaN}"}
+{"input": "{\"val\": Infinity}"}
+{"input": "{\"val\": undefined}"}
+{"input": "Here is JSON: {\"a\": 1}"}
