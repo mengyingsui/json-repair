@@ -80,6 +80,7 @@ Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhea
 
 | Version | Description |
 |---------|-------------|
+| v0.1.5 | Leading comma skip, dot-number normalization, adjacent-object `}{` array wrap |
 | v0.1.4 | Trailing junk detection, depth-tracked implicit arrays, 16/17 json_failures.txt |
 | v0.1.3 | Implicit object sequence auto-wrapped, massive array stress test |
 | v0.1.2 | JS literal support, Hypothesis property tests, defensive fixes |

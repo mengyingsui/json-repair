@@ -593,6 +593,69 @@ class TestTrailingJunk:
         )
 
 
+# ── 21. Leading comma in array / object ─────────────────────────────────────
+
+
+class TestLeadingComma:
+    def test_leading_comma_array(self) -> None:
+        _check("[,1]", [1])
+
+    def test_leading_comma_array_multiple(self) -> None:
+        _check("[,1,2,3]", [1, 2, 3])
+
+    def test_leading_comma_nested(self) -> None:
+        _check('{"a": [,1, 2]}', {"a": [1, 2]})
+
+    def test_leading_and_trailing_commas(self) -> None:
+        _check("[,1, 2,]", [1, 2])
+
+
+# ── 22. Leading-dot numbers (JSON5 style) ──────────────────────────────────
+
+
+class TestLeadingDotNumbers:
+    def test_leading_dot(self) -> None:
+        _check("[.5]", [0.5])
+
+    def test_negative_leading_dot(self) -> None:
+        _check("[-.5]", [-0.5])
+
+    def test_trailing_dot(self) -> None:
+        _check("[5.]", [5.0])
+
+    def test_leading_dot_in_object(self) -> None:
+        _check('{"x": .75}', {"x": 0.75})
+
+    def test_trailing_dot_in_array(self) -> None:
+        _check("[42., .5, 3.]", [42.0, 0.5, 3.0])
+
+
+# ── 23. Adjacent objects without commas (}{) ────────────────────────────────
+
+
+class TestAdjacentObjects:
+    def test_adjacent_objects_wrapped(self) -> None:
+        big_obj = '{"key": "' + "a" * 500 + '", "num": 42}'
+        text = "".join([big_obj] * 20)  # > 10 KB, no commas between objects
+        repaired = repair_json(text)
+        assert isinstance(repaired, str)
+        result = json.loads(repaired)
+        assert isinstance(result, list)
+        assert len(result) == 20
+
+    def test_adjacent_objects_mixed_commas(self) -> None:
+        """Some adjacent, some comma-separated — should still wrap."""
+        big_obj = '{"key": "' + "a" * 500 + '", "num": 42}'
+        # ~523 bytes/object → 20 objects > 10 KB
+        parts = [big_obj] * 7 + ["," + big_obj] + [big_obj] * 12
+        text = "".join(parts)
+        repaired = repair_json(text)
+        assert isinstance(repaired, str)
+        result = json.loads(repaired)
+        assert isinstance(result, list)
+        assert len(result) == 20
+
+
 class TestReturnObject:
     def test_return_object(self) -> None:
         obj = repair_json('{"a": 1}', return_object=True)

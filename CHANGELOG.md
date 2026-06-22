@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.1.5 (2026-06-23)
+
+### Added
+- Leading comma in arrays/objects is now silently skipped (`[,1]` → `[1]`).
+- Leading-dot and trailing-dot numbers are normalized to valid JSON
+  (`.5` → `0.5`, `5.` → `5.0`).
+- Adjacent objects without commas (`}{`) are detected and wrapped in an
+  array, same as comma-separated sequences (≥8 KB, ≥3 transitions).
+- FAQ.md documenting known limitations and development guide.
+- 11 new tests for the above features.
+
+### Changed
+- `_skip_suffix_junk` rewritten to reuse the output list in-place instead
+  of creating a new one; removed `re` dependency.
+
+### Fixed
+- README closing-quote heuristic now lists all possible characters
+  (`,`, `}`, `]`, `:`, `\n`, and another `"`).
+
 ## v0.1.4 (2026-06-22)
 
 ### Added

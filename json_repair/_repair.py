@@ -147,16 +147,19 @@ class _Repairer:
             if ch in "}]":
                 depth -= 1
             # Check for }, { at depth 0 AFTER updating depth for }
-            if ch == "}" and depth == 0 and self.text[j + 1] == ",":
-                k = j + 2
+            if ch == "}" and depth == 0:
+                k = j + 1
+                # Optional comma between objects
+                if k < self.n and self.text[k] == ",":
+                    k += 1
                 while k < self.n and self.text[k] in " \t\r\n":
                     k += 1
                 if k < self.n and self.text[k] == "{":
                     count += 1
                     if count >= 3:
                         return True
-                j = k
-                continue
+                    j = k
+                    continue
             j += 1
         return False
 
@@ -355,7 +358,7 @@ class _Repairer:
             self._parse_single_quoted_string()
         elif ch in "tfnTFNnNiIuU":
             self._parse_literal()
-        elif ch in "-0123456789":
+        elif ch in "-.0123456789":
             self._parse_number()
         elif ch == "/":
             self._skip_comment()
@@ -405,7 +408,8 @@ class _Repairer:
                 return
 
             if ch == ",":
-                self._emit(",")
+                if not first:
+                    self._emit(",")
                 self.i += 1
                 self._expect_key = True
                 continue
@@ -514,7 +518,8 @@ class _Repairer:
                 return
 
             if ch == ",":
-                self._emit(",")
+                if not first:
+                    self._emit(",")
                 self.i += 1
                 continue
 
@@ -862,6 +867,15 @@ class _Repairer:
         while self.i < self.n and self.text[self.i] in "-0123456789.eE+":
             self.i += 1
         num_str = self.text[start : self.i]
+        # Normalize leading/trailing decimal point (JSON5 → JSON)
+        if num_str.startswith("."):
+            num_str = "0" + num_str
+        elif num_str.startswith("-."):
+            num_str = "-0." + num_str[2:]
+        elif num_str.startswith("+."):
+            num_str = "+0." + num_str[2:]
+        if num_str.endswith("."):
+            num_str += "0"
         # Validate and emit
         try:
             float(num_str)
