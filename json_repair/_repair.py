@@ -116,9 +116,12 @@ class _Repairer:
         remaining = self.n - self.i
         if remaining < 8192:
             return False
-        # Count structural `},` → `{` patterns (string-aware).
+        # Count structural `},` → `{` patterns at depth 0 (string-aware).
+        #  Depth-tracking ensures that `}, {` inside a valid `[...]` array
+        #  does not trigger a false positive.
         j = self.i
         count = 0
+        depth = 0
         in_string = False
         esc = False
         while j < self.n - 2:
@@ -138,7 +141,14 @@ class _Repairer:
             if in_string:
                 j += 1
                 continue
-            if ch == "}" and self.text[j + 1] == ",":
+            if ch in "{[":
+                depth += 1
+                j += 1
+                continue
+            if ch in "}]":
+                depth -= 1
+            # Check for }, { at depth 0 AFTER updating depth for }
+            if ch == "}" and depth == 0 and self.text[j + 1] == ",":
                 k = j + 2
                 while k < self.n and self.text[k] in " \t\r\n":
                     k += 1
@@ -147,8 +157,8 @@ class _Repairer:
                     if count >= 3:
                         return True
                 j = k
-            else:
-                j += 1
+                continue
+            j += 1
         return False
 
     def _parse_implicit_array(self) -> None:
@@ -347,8 +357,14 @@ class _Repairer:
             self._skip_comment()
             self._parse_value()  # retry after comment
         elif self._expect_key:
-            # Unquoted key
-            self._parse_unquoted_key()
+            # Only allow unquoted keys that start with a letter or underscore.
+            #  A leading digit, hyphen, or other char signals trailing junk.
+            if ch.isalpha() or ch == "_":
+                self._parse_unquoted_key()
+            else:
+                # Trailing junk after a value — stop here so the caller
+                #  can close brackets and strip suffix.
+                return
         else:
             # Unknown junk — skip char and retry
             self.i += 1
@@ -405,19 +421,34 @@ class _Repairer:
                     self.i += 1
                     continue
 
-            # If we're expecting a key but see a value-like thing,
-            # or if we just emitted a value and see another value,
-            # insert a missing comma
-            if (
-                not first
-                and self._just_emitted_value
-                and self.out
-                and self.out[-1] not in ",{["
-                and ch not in "}],"
-            ):
-                self._emit(",")
-
             if self._expect_key:
+                # Guard: if we have already parsed something and the
+                #  next char can't start a valid key, stop.
+                if not first and ch not in "\"_/'" and not ch.isalpha():
+                    break
+                # If this looks like an unquoted key, verify it is
+                #  followed by ':' within a short distance.
+                if ch.isalpha():
+                    j = self.i + 1
+                    while j < self.n and self.text[j] in (
+                        "abcdefghijklmnopqrstuvwxyz"
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                        "0123456789_"
+                    ):
+                        j += 1
+                    while j < self.n and self.text[j] in " \t\r":
+                        j += 1
+                    if j >= self.n or self.text[j] != ":":
+                        # Not a real key — trailing junk
+                        break
+                # Missing comma before a new key
+                if (
+                    not first
+                    and self._just_emitted_value
+                    and self.out
+                    and self.out[-1] not in ",{["
+                ):
+                    self._emit(",")
                 self._parse_key()
                 self._skip_ws()
                 # Expect colon
@@ -432,6 +463,19 @@ class _Repairer:
                 self._expect_key = True
                 self._just_emitted_value = True
             else:
+                # Junk guard: if not first and the next char can't start
+                #  a JSON value, stop parsing.
+                if not first and ch not in "\"{['tfnTFNnNiIuU-0123456789":
+                    break
+                # Missing comma check: value followed by another value
+                if (
+                    not first
+                    and self._just_emitted_value
+                    and self.out
+                    and self.out[-1] not in ",{["
+                    and ch not in "}],"
+                ):
+                    self._emit(",")
                 self._parse_value()
                 self._just_emitted_value = True
 

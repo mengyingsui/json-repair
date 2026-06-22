@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.1.4 (2026-06-22)
+
+### Added
+- Trailing junk detection: `-lnd`, `junkword` etc. after closing `}` are stripped.
+- Stress test for massive implicit arrays (447 objects, ~51 KB input).
+- Tests for trailing junk scenarios.
+
+### Fixed
+- `_is_implicit_object_sequence`: bracket depth tracking (only triggers at depth 0)
+  to avoid false-positives on `}, {` inside valid `[...]` arrays.
+- `_parse_object`: junk guard before missing-comma check to stop parsing
+  when trailing garbage appears after valid JSON.
+- 16/17 blocks in `json_failures.txt` now repairable.
+
 ## v0.1.3 (2026-06-22)
 
 ### Added

@@ -543,6 +543,55 @@ class TestImplicitArray:
         assert isinstance(result, list), f"Expected list, got {type(result)}"
         assert len(result) == 25
 
+    def test_massive_implicit_array(self) -> None:
+        """Stress test: 447 objects from real LLM output (~51 KB)."""
+        from pathlib import Path
+
+        from tests.check_failures import _extract_blocks
+
+        failures_path = Path(__file__).parent.parent / "json_failures.txt"
+        if not failures_path.exists():
+            pytest.skip("json_failures.txt not found")
+        text = failures_path.read_text(encoding="utf-8")
+        blocks = _extract_blocks(text)
+        real_blocks = [b.strip() for b in blocks if b.strip() and b.strip()[0] == "{"]
+        # Find the 447-item block (~51 KB)
+        large = [b for b in real_blocks if len(b) > 50000]
+        if not large:
+            pytest.skip("no large block found")
+        result = _roundtrip(large[0])
+        assert isinstance(result, list)
+        assert len(result) == 447
+
+
+# ── 20. Trailing junk after valid JSON ──────────────────────────────────────
+
+
+class TestTrailingJunk:
+    def test_hyphen_word_junk(self) -> None:
+        _check(
+            '{"event_type":"X","role_argument_pairs":[{"role":"r","argument":"text."}]}-lnd',
+            {
+                "event_type": "X",
+                "role_argument_pairs": [{"role": "r", "argument": "text."}],
+            },
+        )
+
+    def test_word_junk_after_close(self) -> None:
+        _check(
+            '{"event_type":"X","role_argument_pairs":[{"role":"r","argument":"text."}]}junk',
+            {
+                "event_type": "X",
+                "role_argument_pairs": [{"role": "r", "argument": "text."}],
+            },
+        )
+
+    def test_multiline_junk(self) -> None:
+        _check(
+            '{"a":1}-lnd\nuser\nCRITICAL: more text\n[TEXT_START]\ncontent\n[TEXT_END]',
+            {"a": 1},
+        )
+
 
 class TestReturnObject:
     def test_return_object(self) -> None:
