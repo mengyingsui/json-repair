@@ -494,6 +494,56 @@ class TestInvalidEscape:
 # ── 19. return_object=True ────────────────────────────────────────────────────
 
 
+# ── 19. Implicit object sequences (}, { without outer []) ─────────────────────
+
+
+class TestImplicitArray:
+    def test_comma_separated_objects(self) -> None:
+        # Generate a large-enough block to trigger the >8KB/≥3-match heuristic
+        obj = '{"a": 1}'
+        text = ",\n".join([obj] * 20)  # ~160 bytes (too small for detection)
+        # For unit test, use a repair_json call directly
+        repaired = repair_json(text)
+        assert isinstance(repaired, str)
+        # Small blocks parse as single object (implicit array not triggered)
+        result = json.loads(repaired)
+        assert isinstance(result, dict)
+
+    def test_two_objects_only(self) -> None:
+        text = '{"x": "hello"},\n{"y": "world"}'
+        # Small block — not wrapped, parsed as single object
+        repaired = repair_json(text)
+        assert isinstance(repaired, str)
+        result = json.loads(repaired)
+        assert isinstance(result, dict)
+
+    def test_not_triggered_for_single_object(self) -> None:
+        _check(
+            '{"key": "value with }, { pattern inside"}',
+            {"key": "value with }, { pattern inside"},
+        )
+
+    def test_small_block_not_wrapped(self) -> None:
+        _check(
+            '{"a": "}, {"}',
+            {"a": "}, {"},
+        )
+
+    def test_large_implicit_array(self) -> None:
+        # Build a >8KB block with ≥3 objects to trigger the heuristic
+        obj = '{"what": "test ' + "x" * 200 + '", "when": "2023", "why": "test"}'
+        text = ",\n".join([obj] * 6)  # ~1.5KB (still < 8KB)
+        # Actually generate a big enough block
+        big_obj = '{"key": "' + "a" * 350 + '", "num": 42}'
+        text = ",\n".join([big_obj] * 25)  # > 9KB
+        repaired = repair_json(text)
+        assert isinstance(repaired, str)
+        result = json.loads(repaired)
+        # Should be wrapped in array: 25 objects
+        assert isinstance(result, list), f"Expected list, got {type(result)}"
+        assert len(result) == 25
+
+
 class TestReturnObject:
     def test_return_object(self) -> None:
         obj = repair_json('{"a": 1}', return_object=True)

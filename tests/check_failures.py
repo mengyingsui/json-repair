@@ -56,10 +56,15 @@ def main() -> None:
             repaired = repair_json(block)
             assert isinstance(repaired, str)
             obj = json.loads(repaired)
-            n_facts = len(obj.get("facts", []))
+            if isinstance(obj, list):
+                label = f"{len(obj)} items"
+            elif isinstance(obj, dict):
+                label = f"{len(obj.get('facts', []))} facts"
+            else:
+                label = "scalar"
             elapsed = len(block)
             success += 1
-            print(f"  [{idx + 1}] OK  {elapsed:>5} chars  {n_facts} facts")
+            print(f"  [{idx + 1}] OK  {elapsed:>5} chars  {label}")
         except (json.JSONDecodeError, ValueError) as exc:
             fail += 1
             print(f"  [{idx + 1}] FAIL  {exc}")

@@ -94,10 +94,85 @@ class _Repairer:
         self._skip_prefix_junk()
         if self.i >= self.n:
             return ""
-        self._parse_value()
+        if self._is_implicit_object_sequence():
+            self._parse_implicit_array()
+        else:
+            self._parse_value()
         self._close_brackets()
         self._skip_suffix_junk()
         return "".join(self.out)
+
+    def _is_implicit_object_sequence(self) -> bool:
+        """Check if the text is a comma-separated sequence of objects.
+
+        Pattern: ``{...}, { ... }, { ... }`` without an outer ``[...]``.
+        Only activates for large inputs (> 8 KB) with multiple occurrences
+        of ``},`` followed by ``{``, to avoid false positives from small
+        blocks where ``}, {`` appears inside string content.
+        """
+        if self.i >= self.n or self.text[self.i] != "{":
+            return False
+        # Only check blocks above a size threshold.
+        remaining = self.n - self.i
+        if remaining < 8192:
+            return False
+        # Count structural `},` → `{` patterns (string-aware).
+        j = self.i
+        count = 0
+        in_string = False
+        esc = False
+        while j < self.n - 2:
+            ch = self.text[j]
+            if esc:
+                esc = False
+                j += 1
+                continue
+            if ch == "\\":
+                esc = True
+                j += 1
+                continue
+            if ch == '"':
+                in_string = not in_string
+                j += 1
+                continue
+            if in_string:
+                j += 1
+                continue
+            if ch == "}" and self.text[j + 1] == ",":
+                k = j + 2
+                while k < self.n and self.text[k] in " \t\r\n":
+                    k += 1
+                if k < self.n and self.text[k] == "{":
+                    count += 1
+                    if count >= 3:
+                        return True
+                j = k
+            else:
+                j += 1
+        return False
+
+    def _parse_implicit_array(self) -> None:
+        """Parse ``{...}, {...}, {...}`` as ``[{...}, {...}, {...}]``."""
+        self._emit("[")
+        first = True
+        while self.i < self.n:
+            self._skip_ws()
+            if self.i >= self.n:
+                break
+            if self.text[self.i] != "{":
+                break
+            if not first:
+                self._emit(",")
+            self._parse_value()
+            first = False
+            # Consume trailing comma between objects
+            self._skip_ws()
+            if self.i < self.n and self.text[self.i] == ",":
+                self.i += 1
+        # Remove trailing comma before closing bracket
+        if not first and self.out and self.out[-1] == ",":
+            self.out.pop()
+        self._emit("]")
 
     # ── helpers ───────────────────────────────────────────────────────────
 
@@ -177,8 +252,24 @@ class _Repairer:
         # Prefer { or [ (object/array — 99 % of LLM JSON output).
         # Fall back to the original start for bare values like "string" or 123.
         saved = self.i
-        while self.i < self.n and self.text[self.i] not in "{[":
-            self.i += 1
+        while self.i < self.n:
+            ch = self.text[self.i]
+            if ch in "{[":
+                break
+            if ch == '"':
+                # Skip over a quoted string so we don't mistake an
+                # internal { or [ for a structural character.
+                self.i += 1
+                while self.i < self.n:
+                    if self.text[self.i] == "\\":
+                        self.i += 2  # skip escape sequence
+                    elif self.text[self.i] == '"':
+                        self.i += 1
+                        break
+                    else:
+                        self.i += 1
+            else:
+                self.i += 1
         if self.i >= self.n:
             # No object/array found — restore and let _parse_value handle
             # bare strings, numbers, booleans, null
@@ -191,14 +282,34 @@ class _Repairer:
         # Strip trailing markdown code fence
         result = re.sub(r"\n```\s*$", "", result)
 
-        # If there's text after the last structural close, truncate
-        # Find the last '}' or ']'
-        last_close = max(result.rfind("}"), result.rfind("]"))
+        # Find the last structural close bracket at depth 0,
+        #  skipping brackets that appear inside quoted strings.
+        depth = 0
+        last_close = -1
+        in_string = False
+        esc = False
+        for i, ch in enumerate(result):
+            if esc:
+                esc = False
+                continue
+            if ch == "\\":
+                esc = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch in "{[":
+                depth += 1
+            elif ch in "}]":
+                depth -= 1
+                if depth == 0:
+                    last_close = i
+
         if last_close >= 0:
-            # Check if there's non-whitespace after it
             after = result[last_close + 1 :]
             if after.strip() and not after.startswith("```"):
-                # There's junk after JSON - truncate
                 result = result[: last_close + 1]
 
         self.out = [result]
@@ -228,7 +339,7 @@ class _Repairer:
             self._parse_string()
         elif ch == "'":
             self._parse_single_quoted_string()
-        elif ch in "tfnTFN":
+        elif ch in "tfnTFNnNiIuU":
             self._parse_literal()
         elif ch in "-0123456789":
             self._parse_number()
@@ -300,6 +411,7 @@ class _Repairer:
             if (
                 not first
                 and self._just_emitted_value
+                and self.out
                 and self.out[-1] not in ",{["
                 and ch not in "}],"
             ):
@@ -365,6 +477,7 @@ class _Repairer:
             if (
                 not first
                 and self._just_emitted_value
+                and self.out
                 and self.out[-1] not in ",[:"
                 and ch not in "]"
             ):
@@ -429,7 +542,7 @@ class _Repairer:
                     self.i += 1  # past the first "
                     # Determine fate of the second "
                     j = self.i + 1
-                    while j < self.n and self.text[j] in " \t":
+                    while j < self.n and self.text[j] in " \t\r":
                         j += 1
                     if j < self.n and self.text[j] in ",}:]\n":
                         # Second " is a closing quote — leave for next iteration
@@ -480,7 +593,7 @@ class _Repairer:
             self.i += 1
 
         # Reached end of text — close the string
-        if self.out[-1] != '"':
+        if not self.out or self.out[-1] != '"':
             self._emit('"')
 
     def _is_closing_quote(self) -> bool:
@@ -491,7 +604,7 @@ class _Repairer:
         where embedded natural-language quotes are very common.
         """
         j = self.i + 1
-        while j < self.n and self.text[j] in " \t":
+        while j < self.n and self.text[j] in " \t\r":
             j += 1
 
         if j >= self.n:
@@ -612,7 +725,7 @@ class _Repairer:
             if ch == "'":
                 # Check if this ' is a closing quote or an apostrophe
                 j = self.i + 1
-                while j < self.n and self.text[j] in " \t":
+                while j < self.n and self.text[j] in " \t\r":
                     j += 1
                 if j >= self.n or self.text[j] in ",}:]\n":
                     # Closing quote
@@ -663,8 +776,8 @@ class _Repairer:
     # ── literals & numbers ────────────────────────────────────────────────
 
     def _parse_literal(self) -> None:
-        """Parse true / false / null (case-insensitive for Python-style)."""
-        lower = self.text[self.i : self.i + 5].lower()
+        """Parse true / false / null (case-insensitive, Python/JS-style)."""
+        lower = self.text[self.i : self.i + 9].lower()
 
         if lower.startswith("true"):
             self._emit("true")
@@ -675,6 +788,18 @@ class _Repairer:
         elif lower.startswith("null") or lower.startswith("none"):
             self._emit("null")
             self.i += 4
+        elif lower.startswith("undefined"):
+            self._emit("null")
+            self.i += 9
+        elif lower.startswith("nan"):
+            self._emit("null")
+            self.i += 3
+        elif lower.startswith("infinity") or lower.startswith("+infinity"):
+            self._emit("null")
+            self.i += 8
+        elif lower.startswith("-infinity"):
+            self._emit("null")
+            self.i += 9
         else:
             # Unknown word — consume and skip it
             while self.i < self.n and self.text[self.i].isalpha():
