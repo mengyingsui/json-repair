@@ -20,7 +20,9 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 | Truncated JSON | `{"a": 1` | `{"a": 1}` |
 | Control characters | literal newline / tab | `\n` / `\t` |
 | Extra text before/after | `Here is JSON: {...}` | `{...}` |
-| Invalid escape sequences (v0.1.1) | `"\\*keeper, \\(d_i\\)"` | `"\\\\*keeper, \\\\(d_i\\\\)"` |
+| Invalid escape sequences (v0.1.1) | `"\*keeper, \(d_i\)"` | `"\\*keeper, \\(d_i\\)"` |
+| JS literals (v0.1.2) | `NaN, Infinity, undefined` | `null` |
+| Implicit object sequence (v0.1.3) | `{...}, {...}, {...}` | `[{...}, {...}, {...}]` |
 
 ## Install
 
@@ -65,11 +67,11 @@ This is tuned for the natural-language embedded quotes common in LLM output.
 | Scenario | Size | Time |
 |----------|------|------|
 | Empty `{}` | 2 B | 2 µs |
-| Small JSON | 68 B | 10 µs |
-| Medium JSON | 2.4 KB | 0.4 ms |
-| Large JSON | 9.2 KB | 2.2 ms |
-| Realistic LLM output | 0.3 KB | 50 µs |
-| Invalid escape sequences | 0.1 KB | 15 µs |
+| Small JSON | 68 B | 11 µs |
+| Medium JSON | 2.4 KB | 0.52 ms |
+| Large JSON | 9.2 KB | 3.7 ms |
+| Realistic LLM output | 0.3 KB | 51 µs |
+| Invalid escape sequences | 0.1 KB | 18 µs |
 
 Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhead.
 
@@ -77,6 +79,8 @@ Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhea
 
 | Version | Description |
 |---------|-------------|
+| v0.1.3 | Implicit object sequence auto-wrapped in array |
+| v0.1.2 | JS literal support, Hypothesis property tests, defensive fixes |
 | v0.1.1 | Fix invalid JSON escape sequences (`\*`, `\(`, `\)`, etc.) |
 | v0.1.0 | Initial release — single-pass state machine for LLM JSON |
 

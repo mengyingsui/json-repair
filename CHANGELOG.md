@@ -1,11 +1,18 @@
 # Changelog
 
-## v0.1.2 (2026-06-22)
+## v0.1.3 (2026-06-22)
 
 ### Added
 - Implicit object sequence repair: comma-separated `{...}, {...}, {...}`
-  without an outer `[...]` is now automatically wrapped in an array (for
-  blocks > 8 KB with at least 3 occurrences of the pattern).
+  without an outer `[...]` is automatically wrapped in an array.
+- `check_failures.py`: handles both dict and list repair results.
+
+### Changed
+- json_failures.txt: 22/26 blocks now repairable (up from 10/10 previously).
+
+## v0.1.2 (2026-06-22)
+
+### Added
 - JavaScript literal support: `NaN`, `Infinity`, `-Infinity`, `undefined`
   are recognized and mapped to `null`.
 - Hypothesis property-based tests (4 properties, 1100 examples) using
