@@ -1,39 +1,92 @@
 # json_repair
 
-#### 介绍
-{**以下是 Gitee 平台说明，您可以替换此简介**
-Gitee 是 OSCHINA 推出的基于 Git 的代码托管平台（同时支持 SVN）。专为开发者提供稳定、高效、安全的云端软件开发协作平台
-无论是个人、团队、或是企业，都能够用 Gitee 实现代码托管、项目管理、协作开发。企业项目请看 [https://gitee.com/enterprises](https://gitee.com/enterprises)}
+修复大语言模型输出中格式异常的 JSON，**单次遍历**即可完成。
 
-#### 软件架构
-软件架构说明
+## 解决的问题
 
+LLM 输出的 JSON 常见以下错误，`json_repair` 均可在一次遍历中修复：
 
-#### 安装教程
+| 错误类型 | 输入示例 | 修复结果 |
+|----------|----------|----------|
+| 字符串内未转义引号 | `"He said "hello""` | `"He said \"hello\""` |
+| Python 三引号字符串 | `"""text"""` | `"text"` |
+| CSV 风格 `""` 转义 | `"Col1""Data"` | `"Col1\"Data"` |
+| 单引号字符串 | `{'key': 'val'}` | `{"key": "val"}` |
+| 无引号 key | `{key: "val"}` | `{"key": "val"}` |
+| 尾部逗号 | `{"a": 1,}` | `{"a": 1}` |
+| 缺失逗号/冒号 | `{"a": 1 "b": 2}` | `{"a": 1, "b": 2}` |
+| Python 字面量 | `True / False / None` | `true / false / null` |
+| 注释 | `// comment` | 跳过 |
+| 截断 JSON | `{"a": 1` | `{"a": 1}` |
+| 字符串内控制字符 | 字面换行 / Tab | `\n` / `\t` |
+| 前缀/后缀文本 | `Here is JSON: {...}` | `{...}` |
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+## 安装
 
-#### 使用说明
+```bash
+pip install git+https://gitee.com/mensui/json_repair.git
+```
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+或使用 uv：
 
-#### 参与贡献
+```bash
+uv add git+https://gitee.com/mensui/json_repair.git
+```
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+## 使用
 
+```python
+from json_repair import repair_json
 
-#### 特技
+# 修复 LLM 输出的异常 JSON
+broken = '{"response": "He said "hello" to me"}'
+fixed = repair_json(broken)
+print(fixed)
+# '{"response": "He said \"hello\" to me"}'
 
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+# 直接获取 Python 对象
+obj = repair_json(broken, return_object=True)
+print(obj)
+# {'response': 'He said "hello" to me'}
+```
+
+## 设计
+
+基于**单次遍历状态机**，核心启发式规则：
+
+> 字符串内遇到 `"` 时，仅当紧随其后的非空白字符是 `,` `}` `]` `:` 才视为闭合引号，其余全部转义。
+
+此规则针对 LLM 自然语言输出中频繁内嵌引号的行为优化。
+
+## 性能
+
+| 场景 | 大小 | 耗时 |
+|------|------|------|
+| 空对象 `{}` | 2 B | 2 µs |
+| 小型 JSON | 68 B | 10 µs |
+| 中型 JSON | 2.4 KB | 0.4 ms |
+| 大型 JSON | 9.2 KB | 2.2 ms |
+| 真实 LLM 输出 | 0.3 KB | 50 µs |
+
+损毁 JSON 的修复速度与合法 JSON 几乎相同，接近零额外开销。
+
+## 开发
+
+```bash
+# 克隆
+git clone https://gitee.com/mensui/json_repair.git
+cd json_repair
+
+# 安装依赖
+uv sync
+
+# 运行测试
+uv run pytest tests/ -v
+
+# 运行 pre-commit
+uv run pre-commit run --all-files
+```
+
+## 许可
+
+GNU General Public License v2.0

@@ -1,36 +1,86 @@
 # json_repair
 
-#### Description
-{**When you're done, you can delete the content in this README and update the file with details for others getting started with your repository**}
+Repair malformed JSON from LLM outputs in a **single pass**.
 
-#### Software Architecture
-Software architecture description
+## Problems Solved
 
-#### Installation
+LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+| Issue | Input | Repaired |
+|-------|-------|----------|
+| Unescaped quotes in strings | `"He said "hello""` | `"He said \"hello\""` |
+| Python triple-quoted strings | `"""text"""` | `"text"` |
+| CSV-style `""` escaping | `"Col1""Data"` | `"Col1\"Data"` |
+| Single-quoted strings | `{'key': 'val'}` | `{"key": "val"}` |
+| Unquoted keys | `{key: "val"}` | `{"key": "val"}` |
+| Trailing commas | `{"a": 1,}` | `{"a": 1}` |
+| Missing commas/colons | `{"a": 1 "b": 2}` | `{"a": 1, "b": 2}` |
+| Python literals | `True / False / None` | `true / false / null` |
+| Comments | `// comment` | stripped |
+| Truncated JSON | `{"a": 1` | `{"a": 1}` |
+| Control characters | literal newline / tab | `\n` / `\t` |
+| Extra text before/after | `Here is JSON: {...}` | `{...}` |
 
-#### Instructions
+## Install
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+```bash
+pip install git+https://gitee.com/mensui/json_repair.git
+```
 
-#### Contribution
+Or with uv:
 
-1.  Fork the repository
-2.  Create Feat_xxx branch
-3.  Commit your code
-4.  Create Pull Request
+```bash
+uv add git+https://gitee.com/mensui/json_repair.git
+```
 
+## Usage
 
-#### Gitee Feature
+```python
+from json_repair import repair_json
 
-1.  You can use Readme\_XXX.md to support different languages, such as Readme\_en.md, Readme\_zh.md
-2.  Gitee blog [blog.gitee.com](https://blog.gitee.com)
-3.  Explore open source project [https://gitee.com/explore](https://gitee.com/explore)
-4.  The most valuable open source project [GVP](https://gitee.com/gvp)
-5.  The manual of Gitee [https://gitee.com/help](https://gitee.com/help)
-6.  The most popular members  [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+# Fix broken JSON from LLM output
+broken = '{"response": "He said "hello" to me"}'
+fixed = repair_json(broken)
+print(fixed)
+# '{"response": "He said \"hello\" to me"}'
+
+# Get Python object directly
+obj = repair_json(broken, return_object=True)
+print(obj)
+# {'response': 'He said "hello" to me'}
+```
+
+## Design
+
+State machine with a single heuristic:
+
+> Inside a string, `"` is only treated as closing if the next non-whitespace
+> character is `,` `}` `]` or `:`. Everything else is escaped.
+
+This is tuned for the natural-language embedded quotes common in LLM output.
+
+## Performance
+
+| Scenario | Size | Time |
+|----------|------|------|
+| Empty `{}` | 2 B | 2 µs |
+| Small JSON | 68 B | 10 µs |
+| Medium JSON | 2.4 KB | 0.4 ms |
+| Large JSON | 9.2 KB | 2.2 ms |
+| Realistic LLM output | 0.3 KB | 50 µs |
+
+Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhead.
+
+## Development
+
+```bash
+git clone https://gitee.com/mensui/json_repair.git
+cd json_repair
+uv sync
+uv run pytest tests/ -v
+uv run pre-commit run --all-files
+```
+
+## License
+
+GNU General Public License v2.0
