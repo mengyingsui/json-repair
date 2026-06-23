@@ -51,7 +51,7 @@ def main() -> None:
     fail = 0
     for idx, block in enumerate(blocks):
         block = block.strip()
-        if not block or block[0] != "{":
+        if not block:
             continue
         try:
             repaired = repair_json(block)

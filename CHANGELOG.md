@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.1.7 (2026-06-23)
+
+### Fixed
+- Double-comma regression in `_parse_object` / `_parse_array` — extra `,,`
+  after string values (e.g. `")","source_turn_ids"`) now skipped by checking
+  last emitted character. All 34/34 `json_failures.txt` blocks repairable
+  (up from 30/34).
+- `_is_closing_quote` alpha lookahead — skip `\n` in whitespace so newline
+  before next key is handled correctly.
+
+### Added
+- Unbraced-object detection in `_skip_prefix_junk` — text starting with
+  `"key" : value` (missing outer `{`/`}`) auto-wrapped with `{...}`.
+  Repaired 18 additional `json_failures.txt` blocks (27→30→34 total).
+- `tests/cases/double_commas.jsonl` — 8 test cases for double-comma patterns.
+- `tests/cases/INDEX.md` — catalog of all 24 `.jsonl` test case files.
+
+### Changed
+- `tests/cases/` expanded from 22 to 24 `.jsonl` files.
+
 ## v0.1.6 (2026-06-23)
 
 ### Changed

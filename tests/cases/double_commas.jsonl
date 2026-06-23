@@ -1,0 +1,8 @@
+{"input": "{\"a\": 1,, \"b\": 2}", "expected": {"a": 1, "b": 2}}
+{"input": "{\"a\": \"x\",, \"b\": 2}", "expected": {"a": "x", "b": 2}}
+{"input": "[1,, 2]", "expected": [1, 2]}
+{"input": "{\"a\": \"),\",,\"b\": 2}", "expected": {"a": "),", "b": 2}}
+{"input": "{\"a\": 1,,, \"b\": 2}", "expected": {"a": 1, "b": 2}}
+{"input": "{\"a\": 1,,}", "expected": {"a": 1}}
+{"input": "[1,,]", "expected": [1]}
+{"input": "{\"a\": \")\",, \"b\": 2}", "expected": {"a": ")", "b": 2}}

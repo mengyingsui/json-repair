@@ -229,11 +229,18 @@ class _Repairer:
             self.n = len(self.text)
 
         saved = self.i
+        unbraced_start = -1
         while self.i < self.n:
             ch = self.text[self.i]
             if ch in "{[":
+                if unbraced_start != -1:
+                    self.text = "{" + self.text[unbraced_start:] + "}"
+                    self.n = len(self.text)
+                    self.i = 0
+                    return
                 break
             if ch == '"':
+                str_start = self.i
                 self.i += 1
                 while self.i < self.n:
                     if self.text[self.i] == "\\":
@@ -243,6 +250,11 @@ class _Repairer:
                         break
                     else:
                         self.i += 1
+                j = self.i
+                while j < self.n and self.text[j] in " \t\r\n":
+                    j += 1
+                if j < self.n and self.text[j] == ":" and unbraced_start == -1:
+                    unbraced_start = str_start
             else:
                 self.i += 1
         if self.i >= self.n:
@@ -324,6 +336,17 @@ class _Repairer:
 
                 if self._is_closing_quote():
                     self._emit('"')
+                    nc = self._peek(1)
+                    if nc.isalpha() or nc == "_":
+                        k = self.i + 1
+                        while k < self.n and (
+                            self.text[k].isalnum() or self.text[k] == "_"
+                        ):
+                            k += 1
+                        while k < self.n and self.text[k] in " \t\r\n":
+                            k += 1
+                        if k < self.n and self.text[k] == '"':
+                            return
                     self.i += 1
                     return
                 else:
@@ -370,7 +393,23 @@ class _Repairer:
         if nc in ",}]:\n":
             return True
 
-        return nc == '"'
+        if nc == '"':
+            return True
+
+        if nc.isalpha() or nc == "_":
+            k = j
+            while k < self.n and (self.text[k].isalnum() or self.text[k] == "_"):
+                k += 1
+            while k < self.n and self.text[k] in " \t\r\n":
+                k += 1
+            if k < self.n and self.text[k] == '"':
+                k += 1
+            while k < self.n and self.text[k] in " \t\r\n":
+                k += 1
+            if k < self.n and self.text[k] == ":":
+                return True
+
+        return False
 
     # ── triple-quoted string ──────────────────────────────────────────────
 
@@ -563,7 +602,7 @@ class _Repairer:
                 return
 
             if ch == ",":
-                if not first:
+                if not first and (not self.out or self.out[-1] != ","):
                     self._emit(",")
                 self.i += 1
                 self._expect_key = True
@@ -657,7 +696,7 @@ class _Repairer:
                 return
 
             if ch == ",":
-                if not first:
+                if not first and (not self.out or self.out[-1] != ","):
                     self._emit(",")
                 self.i += 1
                 continue
