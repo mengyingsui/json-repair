@@ -1,6 +1,6 @@
 [project]
 name = "json-repair"
-version = "0.1.7"
+version = "0.1.8"
 description = "Repair malformed JSON from LLM outputs - handles unescaped quotes, triple-quoted strings, and more in a single pass"
 readme = "README.md"
 requires-python = ">=3.12"

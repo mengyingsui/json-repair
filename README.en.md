@@ -29,6 +29,7 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 | Adjacent-object wrapping (v0.1.5) | `}{` (≥8KB, ≥3 transitions) | `[{...},{...}]` |
 | Unbraced object detection (v0.1.6) | `"key": value` | `{"key": value}` |
 | Double-comma skip (v0.1.7) | `"x",,` / `[1,,2]` | `"x",` / `[1,2]` |
+| Misordered-bracket fix (v0.1.8) | `[{"]"}]}` → `[{"..."}]` | Auto-close object when `]` appears before `}` in last array element |
 
 ## Install
 
@@ -85,6 +86,7 @@ Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhea
 
 | Version | Description |
 |---------|-------------|
+| v0.1.8 | Misordered-bracket fix (auto-close object when `]` appears before `}` in last array element); `misordered_brackets.jsonl` test cases |
 | v0.1.7 | Double-comma skip (`",,"`→`","`); 24 `.jsonl` test files; 34/34 `json_failures.txt` all fixed |
 | v0.1.6 | Single-file `_Repairer`; unbraced-object detection; 22 `.jsonl` test files; Pylance strict-mode clean |
 | v0.1.5 | Leading comma skip, dot-number normalization, adjacent-object `}{` array wrap |

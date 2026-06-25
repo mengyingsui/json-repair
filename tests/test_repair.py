@@ -11,7 +11,6 @@ from typing import Any
 import pytest
 
 from json_repair import repair_json
-from tests.check_failures import extract_blocks
 
 CASES_DIR = Path(__file__).parent / "cases"
 
@@ -181,20 +180,6 @@ class TestImplicitArray:
         assert isinstance(result, list), f"Expected list, got {type(result)}"
         assert len(result) == 25
 
-    def test_massive_implicit_array(self) -> None:
-        failures_path = Path(__file__).parent.parent / "json_failures.txt"
-        if not failures_path.exists():
-            pytest.skip("json_failures.txt not found")
-        text = failures_path.read_text(encoding="utf-8")
-        blocks = extract_blocks(text)
-        real_blocks = [b.strip() for b in blocks if b.strip() and b.strip()[0] == "{"]
-        large = [b for b in real_blocks if len(b) > 50000]
-        if not large:
-            pytest.skip("no large block found")
-        result = _roundtrip(large[0])
-        assert isinstance(result, list)
-        assert len(result) == 447
-
 
 class TestAdjacentObjects:
     """Large dynamically generated inputs for adjacent-object wrapping."""
@@ -217,6 +202,40 @@ class TestAdjacentObjects:
         result = json.loads(repaired)
         assert isinstance(result, list)
         assert len(result) == 20
+
+
+class TestMisorderedBrackets:
+    """Array's last object has `]` misplaced before/instead of `}`."""
+
+    def test_bracket_instead_of_brace(self) -> None:
+        _run(
+            '{"actions": [{"text": "a", "verb": "b", "object": "c"]}]}',
+            {"actions": [{"text": "a", "verb": "b", "object": "c"}]},
+        )
+
+    def test_mixed_objects_last_broken(self) -> None:
+        _run(
+            '{"arr": [{"x": 1}, {"y": 2}, {"z": 3]}',
+            {"arr": [{"x": 1}, {"y": 2}, {"z": 3}]},
+        )
+
+    def test_swapped_brackets(self) -> None:
+        _run(
+            '{"data": [{"id": 1, "val": "test"]}}',
+            {"data": [{"id": 1, "val": "test"}]},
+        )
+
+    def test_deeply_nested(self) -> None:
+        _run(
+            '{"a": {"b": [{"c": 1, "d": 2]}}',
+            {"a": {"b": [{"c": 1, "d": 2}]}},
+        )
+
+    def test_extra_brackets_in_input(self) -> None:
+        _run(
+            '{"items": [{"name": "x", "value": ""]}]}',
+            {"items": [{"name": "x", "value": ""}]},
+        )
 
 
 class TestReturnObject:

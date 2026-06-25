@@ -34,6 +34,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `truncated.jsonl` | 4 | Missing closing braces/brackets/quotes — parser infers and closes. |
 | `unescaped_quotes.jsonl` | 5 | Unescaped `"` inside strings — parser deduces delimiter vs content. |
 | `unquoted_keys.jsonl` | 3 | `{key: "value"}` style unquoted object keys. |
+| `misordered_brackets.jsonl` | 11 | Array's last object has `]` misplaced before/instead of `}` — simplified + real-world Chinese-text cases from `json_failures.txt`. |
 | `valid_pass_through.jsonl` | 5 | Already-valid JSON — must pass through unchanged (regression guard). |
 
 ## Quick Reference by Feature

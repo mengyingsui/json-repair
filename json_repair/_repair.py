@@ -620,6 +620,14 @@ class _Repairer:
                     self.i += 1
                     continue
 
+            if ch == "]":
+                if len(self.out) >= 1 and self.out[-1] == ",":
+                    self.out.pop()
+                self._emit("}")
+                self.brackets.pop()
+                self._expect_key = prev_expect
+                return
+
             if self._expect_key:
                 if not first and ch not in "\"_/'" and not ch.isalpha():
                     break
