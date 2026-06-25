@@ -114,7 +114,7 @@ wheels = [
 
 [[package]]
 name = "json-repair"
-version = "0.1.7"
+version = "0.1.9"
 source = { virtual = "." }
 
 [package.optional-dependencies]

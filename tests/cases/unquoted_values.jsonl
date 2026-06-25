@@ -1,0 +1,8 @@
+{"input": "{\"name\": John}", "expected": {"name": "John"}}
+{"input": "{\"name\": Weiss Savage}", "expected": {"name": "Weiss Savage"}}
+{"input": "{\"name\": John, \"age\": 30}", "expected": {"name": "John", "age": 30}}
+{"input": "{\"city\": New York}", "expected": {"city": "New York"}}
+{"input": "{key: value}", "expected": {"key": "value"}}
+{"input": "{\"a\": b, \"c\": d}", "expected": {"a": "b", "c": "d"}}
+{"input": "{\"value\": hello_world}", "expected": {"value": "hello_world"}}
+{"input": "{\"name\": John \"Smith\"}", "expected": {"name": "John \"Smith\""}}

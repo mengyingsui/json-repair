@@ -136,3 +136,9 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# JSON failure logs from external validation
+json_failures.txt
+
+# Temp test scripts
+_test_*.py

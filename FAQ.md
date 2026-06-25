@@ -17,6 +17,10 @@
   other JSON5 features beyond comments and trailing commas are not supported.
 - **Broken Unicode escape sequences** — `\u` followed by non-hex characters
   is treated as an invalid escape (backslash gets escaped to `\\u...`).
+- **Unquoted values with spaces or special chars** — `_parse_unquoted_value`
+  stops at `,`, `}`, `]`, so unquoted strings containing whitespace, colons,
+  or nested braces are not fully captured (e.g. `{"name": John Doe}` yields
+  just `"John"`).
 
 ### Is the output guaranteed to be valid JSON?
 
@@ -51,6 +55,32 @@ After finding the last `}` or `]` at depth 0, the trailing text is
 checked: if it contains non-whitespace and does not start with ` ``` `,
 it is stripped.  This can fail for valid JSON followed by content that
 starts with `{` or `[` (though that case is rare in LLM output).
+
+### Bracket-misorder fixes
+
+Two symmetric fixes handle swapped closing brackets:
+
+| Fix (version) | Pattern | Behavior |
+|---------------|---------|----------|
+| **Object `]` close** (v0.1.8) | `[{"key": value]}` → `[{"key": value}]` | When `]` appears where `}` is expected in an object, the object is closed with `}` first. |
+| **Array `}` close** (v0.1.9) | `{"a":[1}}]}` → `{"a":[1]}` | When `}` appears where `]` is expected in an array, the array is closed with `]` first. |
+
+Both only trigger when the wrong bracket is found at the *expected* closing
+position of a nested construct — they do not rearrange arbitrary bracket
+sequences.
+
+### Unquoted string values
+
+When a value position contains a bare word (no opening `"`), `_parse_unquoted_value`
+collects characters up to the nearest `,`, `}`, or `]` and wraps the result in
+double quotes.  This handles common LLM outputs like `{"name": John}` without
+requiring a full parser.
+
+Limitations:
+- Words with internal spaces, colons, or brackets are truncated at the delimiter.
+- Booleans and numbers are always quoted (never normalized to true/false/numeric).
+- The heuristic does not attempt to distinguish intended unquoted strings from
+  intended JSON literals — everything is wrapped in quotes.
 
 ### Markdown code-fence handling
 
@@ -92,6 +122,9 @@ that the state machine fixes in one pass.
 
 1. Add a new method to `_Repairer` (e.g. `_parse_my_feature`).
 2. Wire it into `_parse_value()` or `_parse_string()` at the right priority.
-3. Add tests to `tests/test_repair.py`.
-4. Run `uv run pytest` to verify.
-5. Run `uv run ruff check && uv run mypy json_repair` to lint and type-check.
+3. Add a `.jsonl` test data file under `tests/cases/` (one JSON object per line
+   with `input` and `expected` keys), or add a standalone test class in
+   `tests/test_*.py`.
+4. For parametrized `.jsonl` tests, add an entry in `tests/cases/INDEX.md`.
+5. Run `uv run pytest` to verify.
+6. Run `uv run ruff check && uv run mypy json_repair tests` to lint and type-check.

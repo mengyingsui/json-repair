@@ -569,6 +569,8 @@ class _Repairer:
                 self._parse_unquoted_key()
             else:
                 return
+        elif ch.isalpha() or ch == "_":
+            self._parse_unquoted_value()
         else:
             self.i += 1
             self._parse_value()
@@ -703,6 +705,15 @@ class _Repairer:
                 self._just_emitted_value = True
                 return
 
+            if ch == "}":
+                if len(self.out) >= 1 and self.out[-1] == ",":
+                    self.out.pop()
+                self._emit("]")
+                self.brackets.pop()
+                self.i += 1
+                self._just_emitted_value = True
+                return
+
             if ch == ",":
                 if not first and (not self.out or self.out[-1] != ","):
                     self._emit(",")
@@ -749,6 +760,22 @@ class _Repairer:
             self.i += 1
         self._emit('"')
 
+    def _parse_unquoted_value(self) -> None:
+        self._emit('"')
+        while self.i < self.n and self.text[self.i] not in ",}]":
+            ch = self.text[self.i]
+            if ch == "\\":
+                self._emit("\\\\")
+            elif ch == '"':
+                self._emit('\\"')
+            elif ord(ch) < 0x20:
+                self._emit("")
+            else:
+                self._emit(ch)
+            self.i += 1
+        self._emit('"')
+        self._just_emitted_value = True
+
     # ── literals & numbers ────────────────────────────────────────────────
 
     def _parse_literal(self) -> None:
@@ -776,8 +803,7 @@ class _Repairer:
             self._emit("null")
             self.i += 9
         else:
-            while self.i < self.n and self.text[self.i].isalpha():
-                self.i += 1
+            self._parse_unquoted_value()
             return
 
         self._just_emitted_value = True

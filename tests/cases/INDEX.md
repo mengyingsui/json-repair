@@ -34,6 +34,8 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `truncated.jsonl` | 4 | Missing closing braces/brackets/quotes — parser infers and closes. |
 | `unescaped_quotes.jsonl` | 5 | Unescaped `"` inside strings — parser deduces delimiter vs content. |
 | `unquoted_keys.jsonl` | 3 | `{key: "value"}` style unquoted object keys. |
+| `unquoted_values.jsonl` | 8 | Unquoted string values like `{"name": John}` — also multi-word values with spaces, values containing escaped quotes. |
+| `brace_as_array_close.jsonl` | 5 | Real entries from `json_failures.txt` — array closed with `}` instead of `]` (`}}]}` → `}]}`) in single/multi-item arrays, including code-fenced variants. |
 | `misordered_brackets.jsonl` | 11 | Array's last object has `]` misplaced before/instead of `}` — simplified + real-world Chinese-text cases from `json_failures.txt`. |
 | `valid_pass_through.jsonl` | 5 | Already-valid JSON — must pass through unchanged (regression guard). |
 
@@ -64,5 +66,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | Control chars in string | `control_characters.jsonl` | `'{"a": "line1\nline2"}'` |
 | Invalid escape | `invalid_escape.jsonl` | `'{"a": "\\*keeper"}'` |
 | Unquoted key | `unquoted_keys.jsonl` | `'{key: "value"}'` |
+| Unquoted value | `unquoted_values.jsonl` | `'{"name": John}'` |
+| Brace as array close | `brace_as_array_close.jsonl` | `'{"items":[{"x":1}}]}'` |
 | Valid passthrough | `valid_pass_through.jsonl` | `'{"a": 1}'` |
 | Edge cases | `edge_cases.jsonl` | empty object, bare string, Unicode, … |

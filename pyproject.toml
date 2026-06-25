@@ -1,6 +1,6 @@
 [project]
 name = "json-repair"
-version = "0.1.8"
+version = "0.1.9"
 description = "Repair malformed JSON from LLM outputs - handles unescaped quotes, triple-quoted strings, and more in a single pass"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -33,8 +33,13 @@ dev = [
 strict = true
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "tests.test_repair"
+disable_error_code = ["untyped-decorator"]
+
 [tool.ruff]
 target-version = "py312"
+extend-exclude = ["tests/cases/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
