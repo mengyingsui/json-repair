@@ -12,7 +12,11 @@
   pattern.
 - `_parse_value` now emits `null` when encountering `}`, `]`, or end-of-input
   in value position — handles truncated JSON after colon (e.g. `{"text":`).
+- `_fix_colon_in_key()` pre-processing step: regex detects `"key:value"` followed
+  by `,` or `}` and splits it into `"key":"value"`. Fixes LLM output where the
+  colon delimiter is misplaced inside the key string.
 - 5 new `truncated.jsonl` cases covering missing-value-after-colon.
+- 1 new `missing_colons.jsonl` case covering colon misplaced inside key.
 - **Caveat** section in both READMEs recommending use with a validator, since
   repair may insert `null` that doesn't match the user's expected schema.
 

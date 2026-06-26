@@ -36,6 +36,20 @@ def _fix_mixed_quotes(text: str) -> str:
     return re.sub(r"','([a-zA-Z_]\w*)\":\"", r'","\1":"', text)
 
 
+def _fix_colon_in_key(text: str) -> str:
+    """Fix keys that contain a colon instead of having it as a delimiter.
+
+    Pattern:  "key:value"  →  "key":"value"
+    Triggered when the string is followed by , or } — meaning the colon
+    was meant to separate key and value, not be part of the key name.
+    """
+    return re.sub(
+        r'"([a-zA-Z_][a-zA-Z0-9_]*):([a-zA-Z_][a-zA-Z0-9_]*)"\s*([,}])',
+        r'"\1":"\2"\3',
+        text,
+    )
+
+
 # ── Public API ────────────────────────────────────────────────────────────
 
 
@@ -62,6 +76,7 @@ def repair_json(text: str, *, return_object: bool = False) -> str | object:
             raise ValueError("empty input")
         return ""
 
+    text = _fix_colon_in_key(text)
     text = _fix_mixed_quotes(text)
     repairer = _Repairer(text)
     result = repairer.repair()

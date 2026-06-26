@@ -1,1 +1,2 @@
 {"input": "{\"key\" \"value\"}", "expected": {"key": "value"}}
+{"input": "{\"entity\":\"周明瑞\",\"type:identity\",\"topic\":\"target\"}", "expected": {"entity": "周明瑞", "type": "identity", "topic": "target"}}

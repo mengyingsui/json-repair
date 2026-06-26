@@ -24,7 +24,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `leading_comma.jsonl` | 4 | Leading comma before first array element removed. |
 | `leading_dot_numbers.jsonl` | 5 | `.5` → `0.5`, `5.` → `5.0` normalization. |
 | `markdown_code_block.jsonl` | 1 | JSON extracted from \`\`\`json … \`\`\` fence. |
-| `missing_colons.jsonl` | 1 | Colon inserted between key and value (`{"key" "value"}`). |
+| `missing_colons.jsonl` | 2 | Colon inserted between key and value (`{"key" "value"}`). Also colon misplaced inside key (`"key:value"` → `"key":"value"`). |
 | `missing_commas.jsonl` | 3 | Commas inserted between elements/key-value pairs. |
 | `python_literals.jsonl` | 3 | `True`/`False`/`None` → `true`/`false`/`null`. |
 | `single_quoted.jsonl` | 3 | Single-quoted keys/values converted to double quotes. |
