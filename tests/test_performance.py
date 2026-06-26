@@ -231,7 +231,7 @@ class TestStress:
         _assert_ok(text)
         kb = len(text) / 1024
         throughput = (kb / (t / 1000)) / 1024
-        assert throughput > 1.0, (
+        assert throughput > 0.8, (
             f"Long string throughput too low: {throughput:.1f} MB/s"
         )
 

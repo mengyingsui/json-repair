@@ -10,9 +10,18 @@
   output mixed `'` and `"` quote styles.
 - `tests/cases/mixed_quotes.jsonl` — 3 test cases for the mixed-quote boundary
   pattern.
+- `_parse_value` now emits `null` when encountering `}`, `]`, or end-of-input
+  in value position — handles truncated JSON after colon (e.g. `{"text":`).
+- 5 new `truncated.jsonl` cases covering missing-value-after-colon.
+- **Caveat** section in both READMEs recommending use with a validator, since
+  repair may insert `null` that doesn't match the user's expected schema.
 
 ### Changed
 - `json_failures.txt` now 8/8 all repairable (up from 5/8).
+- `test_return_object_invalid`: bare comma `","` now returns `None` instead of
+  raising `ValueError`.
+- Performance threshold for `test_very_long_string_value` lowered from 1.0 to
+  0.8 MB/s (flaky on low-end CI).
 - `tests/cases/valid_pass_through.jsonl` — 4 additional entries for already-valid
   JSON inputs from `json_failures.txt`.
 

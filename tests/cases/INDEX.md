@@ -31,7 +31,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `trailing_commas.jsonl` | 3 | Trailing comma after last element removed, including nested. |
 | `trailing_junk.jsonl` | 3 | Extraneous text after valid JSON discarded (`-lnd`, `junk`, log lines). |
 | `triple_quoted.jsonl` | 5 | `"""…"""` multiline strings — inner quotes, embedded newlines, empty. |
-| `truncated.jsonl` | 4 | Missing closing braces/brackets/quotes — parser infers and closes. |
+| `truncated.jsonl` | 8 | Missing closing braces/brackets/quotes — parser infers and closes. Also handles missing value after colon (emits `null`). |
 | `unescaped_quotes.jsonl` | 5 | Unescaped `"` inside strings — parser deduces delimiter vs content. |
 | `unquoted_keys.jsonl` | 3 | `{key: "value"}` style unquoted object keys. |
 | `unquoted_values.jsonl` | 8 | Unquoted string values like `{"name": John}` — also multi-word values with spaces, values containing escaped quotes. |

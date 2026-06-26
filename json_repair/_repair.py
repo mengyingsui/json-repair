@@ -558,6 +558,7 @@ class _Repairer:
     def _parse_value(self) -> None:
         self._skip_ws()
         if self.i >= self.n:
+            self._emit("null")
             return
 
         ch = self.text[self.i]
@@ -582,6 +583,8 @@ class _Repairer:
         elif ch == "/":
             self._skip_comment()
             self._parse_value()
+        elif ch in "}]":
+            self._emit("null")
         elif self._expect_key:
             if ch.isalpha() or ch == "_":
                 self._parse_unquoted_key()

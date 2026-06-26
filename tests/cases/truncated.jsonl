@@ -2,3 +2,7 @@
 {"input": "[1, 2, 3", "expected": [1, 2, 3]}
 {"input": "{\"key\": \"unclosed", "expected": {"key": "unclosed"}}
 {"input": "{\"a\": {\"b\": [1, 2", "expected": {"a": {"b": [1, 2]}}}
+{"input": "{\"text\":", "expected": {"text": null}}
+{"input": "{\"a\":1,\"b\":", "expected": {"a": 1, "b": null}}
+{"input": "{\"a\":1,\"b\":}", "expected": {"a": 1, "b": null}}
+{"input": "{\"items\": [{\"text\": \"hello\"}, {\"text\":", "expected": {"items": [{"text": "hello"}, {"text": null}]}}

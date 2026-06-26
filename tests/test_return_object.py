@@ -15,8 +15,12 @@ class TestReturnObject:
         assert obj == {"a": 1}
 
     def test_return_object_invalid(self) -> None:
+        result = repair_json(",", return_object=True)
+        assert result is None
+
+        # Still raises for truly empty input
         with pytest.raises(ValueError):
-            repair_json(",", return_object=True)
+            repair_json("", return_object=True)
 
     def test_return_object_empty(self) -> None:
         with pytest.raises(ValueError):
