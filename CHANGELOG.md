@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.1.10 (2026-06-26)
+
+### Added
+- `_fix_mixed_quotes()` pre-processing step: recognizes `','word":"` inside
+  double-quoted strings and inserts a closing `"` before `','` so that the
+  parser handles the single-quoted key `'word'` as a separate key-value pair.
+  Fixes 3 real-world Chinese-text inputs from `json_failures.txt` where LLM
+  output mixed `'` and `"` quote styles.
+- `tests/cases/mixed_quotes.jsonl` — 3 test cases for the mixed-quote boundary
+  pattern.
+
+### Changed
+- `json_failures.txt` now 8/8 all repairable (up from 5/8).
+- `tests/cases/valid_pass_through.jsonl` — 4 additional entries for already-valid
+  JSON inputs from `json_failures.txt`.
+
+## v0.1.9 (2026-06-26)
+
+### Added
+- Brace-as-array-close: when `}` is used to close an array instead of `]`,
+  the parser auto-corrects to `]` (e.g. `{"a":[1}}]}` → `{"a":[1]}`).
+- `_parse_unquoted_value()`: unquoted bare-word string values are now
+  detected and wrapped in double quotes (e.g. `{"name": John}` → `{"name": "John"}`).
+- `tests/cases/brace_as_array_close.jsonl` — 5 cases from `json_failures.txt`.
+- `tests/cases/unquoted_values.jsonl` — 8 cases for unquoted string values.
+
+### Changed
+- Test classes split from `test_repair.py` into 7 per-class files under
+  `tests/test_*.py` (`test_adjacent_objects`, `test_complex_scenarios`,
+  `test_control_characters`, `test_edge_cases`, `test_implicit_array`,
+  `test_misordered_brackets`, `test_return_object`).
+- `tests/_helpers.py` extracted for shared test utilities (`roundtrip`,
+  `load_inputs`, `run`, `CASES_DIR`).
+- `json_failures.txt` removed from git tracking (added to `.gitignore`).
+
+## v0.1.8 (2026-06-25)
+
+### Added
+- Misordered-bracket fix: when `]` appears where `}` is expected in the
+  last element of an array, the object is closed with `}` first (e.g.
+  `[{"key": value]}` → `[{"key": value}]`).
+- `tests/cases/misordered_brackets.jsonl` — 11 test cases including
+  real-world Chinese-text entries from `json_failures.txt`.
+
+### Changed
+- `pyproject.toml`: ruff `extend-exclude` for `tests/cases/`.
+
 ## v0.1.7 (2026-06-23)
 
 ### Fixed

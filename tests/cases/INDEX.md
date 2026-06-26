@@ -37,7 +37,8 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `unquoted_values.jsonl` | 8 | Unquoted string values like `{"name": John}` — also multi-word values with spaces, values containing escaped quotes. |
 | `brace_as_array_close.jsonl` | 5 | Real entries from `json_failures.txt` — array closed with `}` instead of `]` (`}}]}` → `}]}`) in single/multi-item arrays, including code-fenced variants. |
 | `misordered_brackets.jsonl` | 11 | Array's last object has `]` misplaced before/instead of `}` — simplified + real-world Chinese-text cases from `json_failures.txt`. |
-| `valid_pass_through.jsonl` | 5 | Already-valid JSON — must pass through unchanged (regression guard). |
+| `mixed_quotes.jsonl` | 3 | Mixed single/double quote boundary: `','word":"` inside a double-quoted value — LLM output where a single-quoted key leaks into the preceding text value. |
+| `valid_pass_through.jsonl` | 9 | Already-valid JSON — must pass through unchanged (regression guard). |
 
 ## Quick Reference by Feature
 
@@ -69,4 +70,5 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | Unquoted value | `unquoted_values.jsonl` | `'{"name": John}'` |
 | Brace as array close | `brace_as_array_close.jsonl` | `'{"items":[{"x":1}}]}'` |
 | Valid passthrough | `valid_pass_through.jsonl` | `'{"a": 1}'` |
+| Mixed quotes | `mixed_quotes.jsonl` | `','word":"` inside double-quoted string |
 | Edge cases | `edge_cases.jsonl` | empty object, bare string, Unicode, … |

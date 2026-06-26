@@ -32,6 +32,7 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 | Misordered-bracket fix (v0.1.8) | `[{"]"}]}` → `[{"..."}]` | Auto-close object when `]` appears before `}` in last array element |
 | Brace-as-array-close (v0.1.9) | `{"a":[1}}]}` → `{"a":[1]}` | Auto-close array when `}` used instead of `]` |
 | Unquoted string values (v0.1.9) | `{"name": John}` → `{"name": "John"}` | Auto-quote unquoted string values |
+| Mixed-quote boundary fix (v0.1.10) | `"text','key":"val"` → `"text","key":"val"` | Splits `','word":"` inside double-quoted text — prevents single-quoted keys leaking into preceding value |
 
 ## Install
 
@@ -75,12 +76,13 @@ This is tuned for the natural-language embedded quotes common in LLM output.
 
 | Scenario | Size | Time |
 |----------|------|------|
-| Empty `{}` | 2 B | 2 µs |
-| Small JSON | 68 B | 11 µs |
-| Medium JSON | 2.4 KB | 0.52 ms |
-| Large JSON | 9.2 KB | 3.7 ms |
-| Realistic LLM output | 0.3 KB | 51 µs |
-| Invalid escape sequences | 0.1 KB | 18 µs |
+| Empty `{}` | 2 B | 3 µs |
+| Small JSON | 48 B | 20 µs |
+| Medium JSON | 2.4 KB | 0.74 ms |
+| Large JSON | 9.2 KB | 4.6 ms |
+| Realistic LLM output | 0.3 KB | 64 µs |
+| Unquoted value repair | 14 B | 6 µs |
+| Misordered-bracket / `}` close | 0.2–0.5 KB | 76–143 µs |
 
 Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhead.
 
@@ -88,6 +90,7 @@ Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhea
 
 | Version | Description |
 |---------|-------------|
+| v0.1.10 | Mixed-quote boundary fix (`','word":"` auto-split); `mixed_quotes.jsonl` (3 cases); 8/8 `json_failures.txt` all fixed |
 | v0.1.9 | Brace-as-array-close (`{"a":[1}}]}` → `{"a":[1]}`); unquoted string value repair (`{"name": John}` → `{"name": "John"}`); tests split into per-class files; `brace_as_array_close.jsonl`, `unquoted_values.jsonl` |
 | v0.1.7 | Double-comma skip (`",,"`→`","`); 24 `.jsonl` test files; 34/34 `json_failures.txt` all fixed |
 | v0.1.6 | Single-file `_Repairer`; unbraced-object detection; 22 `.jsonl` test files; Pylance strict-mode clean |

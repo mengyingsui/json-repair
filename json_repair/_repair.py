@@ -18,6 +18,23 @@ Handles common LLM output issues:
 from __future__ import annotations
 
 import json
+import re
+
+# ── Pre-processing helpers ─────────────────────────────────────────────────
+
+
+def _fix_mixed_quotes(text: str) -> str:
+    """Fix mixed single/double quote boundary leaks.
+
+    LLM output sometimes mixes quote styles: a double-quoted string value
+    contains ','word":" where 'word' was originally a single-quoted key.
+    This pattern inserts a closing " before ',' so the double-quoted string
+    ends properly and 'word' becomes a separate key.
+
+    Pattern:  ,'word":"  →  ","word":"
+    """
+    return re.sub(r"','([a-zA-Z_]\w*)\":\"", r'","\1":"', text)
+
 
 # ── Public API ────────────────────────────────────────────────────────────
 
@@ -45,6 +62,7 @@ def repair_json(text: str, *, return_object: bool = False) -> str | object:
             raise ValueError("empty input")
         return ""
 
+    text = _fix_mixed_quotes(text)
     repairer = _Repairer(text)
     result = repairer.repair()
 

@@ -82,6 +82,21 @@ Limitations:
 - The heuristic does not attempt to distinguish intended unquoted strings from
   intended JSON literals — everything is wrapped in quotes.
 
+### Mixed single/double quote boundary (v0.1.10)
+
+When LLM output uses both `'` and `"` quote styles, a double-quoted string
+value may contain `','word":"` where `'word'` was originally a single-quoted
+key.  The pre-processing regex `','([a-zA-Z_]\w*)\":\"` → `","$1":"` replaces
+this pattern, closing the double-quoted string before `','` so the parser
+correctly treats `word` as the next key.
+
+Limitations:
+- The pattern must match exactly `','<key>":"` (ASCII single quotes, comma,
+  alphanumeric key, double-quote, colon, double-quote).
+- If valid text content ever contains this exact sequence, the regex will
+  incorrectly split it.
+- Smart quotes (`'`, `'` U+2018/U+2019) are not matched.
+
 ### Markdown code-fence handling
 
 Only ```` ``` ```` fences are recognized (not ```` ````` ````).
