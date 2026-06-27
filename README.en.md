@@ -119,23 +119,25 @@ This is tuned for the natural-language embedded quotes common in LLM output.
 
 ## Performance
 
-| Scenario | Size | Time | Throughput |
-|----------|------|------|------|
-| Empty `{}` | 2 B | 2 µs | 0.8 MB/s |
-| Small JSON | 48 B | 13 µs | 3.5 MB/s |
-| Medium JSON | 2.4 KB | 0.53 ms | 4.4 MB/s |
-| Large JSON | 9.2 KB | 3.9 ms | 2.3 MB/s |
-| Realistic LLM output | 0.3 KB | 53 µs | 5.4 MB/s |
-| Deeply nested | 0.2 KB | 29 µs | 8.0 MB/s |
-| Many embedded quotes | 0.2 KB | 38 µs | 4.0 MB/s |
+| Scenario | Size | Time (Cython) | Time (pure Python) | Throughput |
+|----------|------|------|------|------|
+| Empty `{}` | 2 B | 2 µs | 2 µs | 0.8 MB/s |
+| Small JSON | 48 B | 10 µs | 11 µs | 4.6 MB/s |
+| Medium JSON | 2.4 KB | 0.28 ms | 0.38 ms | 8.5 MB/s |
+| Large JSON | 9.2 KB | 4.5 ms | 4.9 ms | 2.0 MB/s |
+| Realistic LLM output | 0.3 KB | 28 µs | 47 µs | 10.4 MB/s |
+| Deeply nested | 0.2 KB | 19 µs | 20 µs | 12.1 MB/s |
+| Many embedded quotes (short) | 0.2 KB | 8 µs | 47 µs | 23.1 MB/s |
+| Many embedded quotes (long) | 12 KB | 168 µs | 1.5 ms | 71.1 MB/s |
 
-Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhead.
+Cython acceleration provides **2–9×** speedup on string-heavy inputs.
+Measured with `pytest-benchmark` — see [Development](#development).
 
 ## Versions
 
 | Version | Date | Description |
 |---------|------|-------------|
-| v0.1.12 | 2026-06-27 | Cython-accelerated `_parse_string` (`_cparse.pyx`); build system migrated to `hatchling` + `hatch-cython`; removed `setup.py` |
+| v0.1.12 | 2026-06-27 | Cython-accelerated `_parse_string` (`_cparse.pyx`); build system migrated to `hatchling` + `hatch-cython`; removed `setup.py`; benchmarks ported to `pytest-benchmark` |
 | v0.1.11 | 2026-06-27 | `_skip_suffix_junk` O(1) depth-tracker (eliminates 15–25% of total time); `IMPLICIT_SEQUENCE_MIN_LENGTH` constant; control chars emit `\uXXXX` |
 | v0.1.10 | 2026-06-27 | Mixed-quote boundary fix; missing-value-after-colon fill (`{"text":` → `{"text":null}`); colon-misplaced-in-key split; `mixed_quotes.jsonl`; 8/8 json_failures.txt |
 | v0.1.9 | 2026-06-26 | Brace-as-array-close; unquoted string value repair; tests split into per-class files |
@@ -156,6 +158,12 @@ git clone https://gitee.com/mensui/json_repair.git
 cd json_repair
 uv sync
 uv run pytest tests/ -v
+
+# Performance benchmarks (pytest-benchmark)
+uv run pytest tests/test_performance.py --benchmark-only
+uv run pytest tests/test_performance.py --benchmark-histogram
+uv run pytest tests/test_performance.py --benchmark-compare
+
 uv run pre-commit run --all-files
 ```
 

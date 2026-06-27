@@ -4,19 +4,24 @@
 
 ### Added
 - Cython-accelerated `_parse_string` via `json_repair/_cparse.pyx` — the hot
-  character loop is compiled to C when Cython is available, yielding 2–3×
-  speedup on large inputs (1 MB JSON drops from ~585 ms to ~265 ms).
+  character loop is compiled to C when Cython is available, yielding 2–9×
+  speedup on string-heavy inputs (e.g. long embedded quotes drop from
+  1.5 ms to 168 µs).
 - Build infrastructure: `hatch-cython` plugin compiles `.pyx` → `.pyd`/`.so`
   during wheel build; pre-generated `_cparse.c` included in sdist for
   environments without Cython.
 - Pure-Python fallback when C extension is unavailable — zero additional
   runtime dependencies.
-- `hatch-c` / `hatch-cython` documented as alternative build routes.
+- `HAS_CYTHON` public constant (`True`/`False`) so callers can detect
+  whether acceleration is active.
 
 ### Changed
 - Build backend switched from `setuptools` back to `hatchling` with
   `hatch-cython` build hook.
 - `setup.py` removed; all build config lives in `pyproject.toml`.
+- Performance tests ported from custom `timeit` to `pytest-benchmark`
+  fixture — run with `--benchmark-histogram` for comparison charts.
+- `TestCythonVsPure` compares Cython vs pure Python on 3 input profiles.
 
 ## v0.1.11 (2026-06-27)
 

@@ -122,8 +122,10 @@ are common, but unusual formatting can still produce false positives.
 ### How fast is it?
 
 Single-pass, O(n) character-by-character.  A 100 KB input typically
-completes in under 1 ms on modern hardware.  See `tests/perf_report.py`
-for micro-benchmarks.
+completes in under 1 ms on modern hardware.  See `tests/test_performance.py`
+for micro-benchmarks (powered by `pytest-benchmark`).  Run:
+
+    uv run pytest tests/test_performance.py --benchmark-histogram
 
 ### Why not use a parser-based approach (e.g. `json.loads` fallback)?
 
@@ -142,4 +144,5 @@ that the state machine fixes in one pass.
    `tests/test_*.py`.
 4. For parametrized `.jsonl` tests, add an entry in `tests/cases/INDEX.md`.
 5. Run `uv run pytest` to verify.
-6. Run `uv run ruff check && uv run mypy json_repair tests` to lint and type-check.
+6. Run `uv run pytest tests/test_performance.py --benchmark-only` to benchmark.
+7. Run `uv run ruff check && uv run mypy json_repair tests` to lint and type-check.

@@ -118,23 +118,24 @@ else:
 
 ## 性能
 
-| 场景 | 大小 | 耗时 | 吞吐 |
-|------|------|------|------|
-| 空对象 `{}` | 2 B | 2 µs | 0.8 MB/s |
-| 小型 JSON | 48 B | 13 µs | 3.5 MB/s |
-| 中型 JSON | 2.4 KB | 0.53 ms | 4.4 MB/s |
-| 大型 JSON | 9.2 KB | 3.9 ms | 2.3 MB/s |
-| 真实 LLM 输出 | 0.3 KB | 53 µs | 5.4 MB/s |
-| 深层嵌套 | 0.2 KB | 29 µs | 8.0 MB/s |
-| 多内嵌引号 | 0.2 KB | 38 µs | 4.0 MB/s |
+| 场景 | 大小 | 耗时 (Cython) | 耗时 (纯 Python) | 吞吐 |
+|------|------|------|------|------|
+| 空对象 `{}` | 2 B | 2 µs | 2 µs | 0.8 MB/s |
+| 小型 JSON | 48 B | 10 µs | 11 µs | 4.6 MB/s |
+| 中型 JSON | 2.4 KB | 0.28 ms | 0.38 ms | 8.5 MB/s |
+| 大型 JSON | 9.2 KB | 4.5 ms | 4.9 ms | 2.0 MB/s |
+| 真实 LLM 输出 | 0.3 KB | 28 µs | 47 µs | 10.4 MB/s |
+| 深层嵌套 | 0.2 KB | 19 µs | 20 µs | 12.1 MB/s |
+| 多内嵌引号 (短) | 0.2 KB | 8 µs | 47 µs | 23.1 MB/s |
+| 多内嵌引号 (长) | 12 KB | 168 µs | 1.5 ms | 71.1 MB/s |
 
-损毁 JSON 的修复速度与合法 JSON 几乎相同，接近零额外开销。
+Cython 加速对字符串密集的场景效果显著（**2–9×**）。测量工具为 `pytest-benchmark`，详见[开发](#开发)一节。
 
 ## 版本
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| v0.1.12 | 2026-06-27 | `_parse_string` Cython 加速 (`_cparse.pyx`)；构建系统迁移至 `hatchling` + `hatch-cython`；`setup.py` 移除 |
+| v0.1.12 | 2026-06-27 | `_parse_string` Cython 加速 (`_cparse.pyx`)；构建系统迁移至 `hatchling` + `hatch-cython`；`setup.py` 移除；性能测试迁移至 `pytest-benchmark` |
 | v0.1.11 | 2026-06-27 | `_skip_suffix_junk` O(1) 深度查表（消除 15–25% 总耗时）；常量 `IMPLICIT_SEQUENCE_MIN_LENGTH` 提取；控制字符 emit `\uXXXX` |
 | v0.1.10 | 2026-06-27 | 混合引号边界修复；冒号后缺失值填充（`{"text":` → `{"text":null}`）；Key 内冒号拆分；`mixed_quotes.jsonl`；8/8 json_failures.txt 全修复 |
 | v0.1.9 | 2026-06-26 | 数组 `}` 闭合校正；无引号字符串值修复；测试拆分为独立文件 |
@@ -160,6 +161,11 @@ uv sync
 
 # 运行测试
 uv run pytest tests/ -v
+
+# 性能基准测试（pytest-benchmark）
+uv run pytest tests/test_performance.py --benchmark-only
+uv run pytest tests/test_performance.py --benchmark-histogram
+uv run pytest tests/test_performance.py --benchmark-compare
 
 # 运行 pre-commit
 uv run pre-commit run --all-files
