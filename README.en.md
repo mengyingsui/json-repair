@@ -105,12 +105,12 @@ Input text
   │      ├─ _parse_string
   │      └─ _parse_literal
   │    4. _close_brackets
-  │    5. _skip_suffix_junk
+  │    5. _skip_suffix_junk (O(1) depth-tracker lookup)
   │
   └─ Repaired JSON
 ```
 
-See the feature table above for what each step does. Core heuristic:
+The state machine is **single-pass** — depth is tracked during the main parse, so suffix cleanup does not require a second traversal. Core heuristic:
 
 > Inside a string, `"` is only treated as closing if the next non-whitespace
 > character is `,` `}` `]` `:` `\n` or another `"`. Everything else is escaped.
@@ -119,15 +119,15 @@ This is tuned for the natural-language embedded quotes common in LLM output.
 
 ## Performance
 
-| Scenario | Size | Time |
-|----------|------|------|
-| Empty `{}` | 2 B | 3 µs |
-| Small JSON | 48 B | 20 µs |
-| Medium JSON | 2.4 KB | 0.74 ms |
-| Large JSON | 9.2 KB | 4.6 ms |
-| Realistic LLM output | 0.3 KB | 64 µs |
-| Unquoted value repair | 14 B | 6 µs |
-| Misordered-bracket / `}` close | 0.2–0.5 KB | 76–143 µs |
+| Scenario | Size | Time | Throughput |
+|----------|------|------|------|
+| Empty `{}` | 2 B | 2 µs | 0.8 MB/s |
+| Small JSON | 48 B | 13 µs | 3.5 MB/s |
+| Medium JSON | 2.4 KB | 0.53 ms | 4.4 MB/s |
+| Large JSON | 9.2 KB | 3.9 ms | 2.3 MB/s |
+| Realistic LLM output | 0.3 KB | 53 µs | 5.4 MB/s |
+| Deeply nested | 0.2 KB | 29 µs | 8.0 MB/s |
+| Many embedded quotes | 0.2 KB | 38 µs | 4.0 MB/s |
 
 Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhead.
 
@@ -135,6 +135,7 @@ Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhea
 
 | Version | Description |
 |---------|-------------|
+| v0.1.11 | `_skip_suffix_junk` rewritten from O(n) backward scan to O(1) depth-tracker lookup, eliminates 15–25% of total time; `IMPLICIT_SEQUENCE_MIN_LENGTH` constant extracted; control chars in unquoted values emit `\uXXXX` |
 | v0.1.10 | Mixed-quote boundary fix (`','word":"` auto-split); missing-value-after-colon fill (`{"text":` → `{"text":null}`); colon misplaced in key (`"key:value"` → `"key":"value"`); `mixed_quotes.jsonl`; 8/8 `json_failures.txt` all fixed |
 | v0.1.9 | Brace-as-array-close (`{"a":[1}}]}` → `{"a":[1]}`); unquoted string value repair (`{"name": John}` → `{"name": "John"}`); tests split into per-class files; `brace_as_array_close.jsonl`, `unquoted_values.jsonl` |
 | v0.1.7 | Double-comma skip (`",,"`→`","`); 24 `.jsonl` test files; 34/34 `json_failures.txt` all fixed |

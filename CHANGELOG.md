@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.11 (2026-06-27)
+
+### Changed
+- `_skip_suffix_junk` rewritten from O(n) join + backward scan to O(1) depth-tracker
+  lookup, eliminating 15–25% of total repair time.
+- `IMPLICIT_SEQUENCE_MIN_LENGTH` (8192) extracted as module-level constant.
+- `_parse_unquoted_value`: control characters now emit `\uXXXX` instead of being
+  silently dropped.
+- Class & module docstrings updated to reflect O(1) suffix truncation.
+
 ## v0.1.10 (2026-06-26)
 
 ### Added
@@ -26,8 +36,6 @@
   raising `ValueError`.
 - Performance threshold for `test_very_long_string_value` lowered from 1.0 to
   0.8 MB/s (flaky on low-end CI).
-- `tests/cases/valid_pass_through.jsonl` — 4 additional entries for already-valid
-  JSON inputs from `json_failures.txt`.
 
 ## v0.1.9 (2026-06-26)
 

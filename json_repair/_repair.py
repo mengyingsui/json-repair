@@ -1,6 +1,6 @@
 """
-Character-by-character state machine for repairing malformed JSON,
-with a final suffix-cleanup pass (join + backward scan).
+Single-pass character-by-character state machine for repairing malformed JSON.
+Depth tracking during parse enables O(1) suffix-junk truncation.
 
 Handles common LLM output issues:
 - Unescaped double quotes inside strings (the core problem)
@@ -105,7 +105,7 @@ def repair_json(text: str, *, return_object: bool = False) -> str | object:
 
 
 class _Repairer:
-    """Character-by-character state machine, with a suffix-cleanup pass."""
+    """Single-pass state machine with O(1) suffix-junk truncation via depth tracking."""
 
     __slots__ = (
         "text",
@@ -115,6 +115,8 @@ class _Repairer:
         "brackets",
         "_expect_key",
         "_just_emitted_value",
+        "_out_chars",
+        "_last_depth0_pos",
     )
 
     def __init__(self, text: str) -> None:
@@ -125,6 +127,8 @@ class _Repairer:
         self.brackets: list[str] = []
         self._expect_key: bool = False
         self._just_emitted_value: bool = False
+        self._out_chars: int = 0
+        self._last_depth0_pos: int = 0
 
     # ── top-level ─────────────────────────────────────────────────────────
 
@@ -158,6 +162,7 @@ class _Repairer:
                 self.i += 1
         if not first and self.out and self.out[-1] == ",":
             self.out.pop()
+            self._out_chars -= 1
         self._emit("]")
 
     # ── implicit object sequence detection ────────────────────────────────
@@ -224,6 +229,7 @@ class _Repairer:
 
     def _emit(self, s: str) -> None:
         self.out.append(s)
+        self._out_chars += len(s)
 
     def _skip_ws(self) -> None:
         while self.i < self.n and self.text[self.i] in " \t\r\n":
@@ -237,6 +243,7 @@ class _Repairer:
     def _close_brackets(self) -> None:
         while self.brackets:
             self._emit(self.brackets.pop())
+        self._last_depth0_pos = self._out_chars
 
     _VALID_ESCAPES = frozenset('"\\/bfnrt')
 
@@ -302,41 +309,10 @@ class _Repairer:
 
     def _skip_suffix_junk(self) -> None:
         result = "".join(self.out)
-
-        idx = result.rfind("\n```")
-        if idx != -1:
-            rest = result[idx + 4 :]
-            if rest.strip() in ("", "```"):
-                result = result[:idx]
-
-        depth = 0
-        last_close = -1
-        in_string = False
-        esc = False
-        for i, ch in enumerate(result):
-            if esc:
-                esc = False
-                continue
-            if ch == "\\":
-                esc = True
-                continue
-            if ch == '"':
-                in_string = not in_string
-                continue
-            if in_string:
-                continue
-            if ch in "{[":
-                depth += 1
-            elif ch in "}]":
-                depth -= 1
-                if depth == 0:
-                    last_close = i
-
-        if last_close >= 0:
-            after = result[last_close + 1 :]
-            if after.strip() and not after.startswith("```"):
-                result = result[: last_close + 1]
-
+        if self._last_depth0_pos < len(result):
+            tail = result[self._last_depth0_pos :]
+            if tail.strip():
+                result = result[: self._last_depth0_pos]
         self.out.clear()
         self.out.append(result)
 
@@ -639,8 +615,11 @@ class _Repairer:
             if ch == "}":
                 if len(self.out) >= 1 and self.out[-1] == ",":
                     self.out.pop()
+                    self._out_chars -= 1
                 self._emit("}")
                 self.brackets.pop()
+                if not self.brackets:
+                    self._last_depth0_pos = self._out_chars
                 self.i += 1
                 self._expect_key = prev_expect
                 self._just_emitted_value = True
@@ -668,8 +647,11 @@ class _Repairer:
             if ch == "]":
                 if len(self.out) >= 1 and self.out[-1] == ",":
                     self.out.pop()
+                    self._out_chars -= 1
                 self._emit("}")
                 self.brackets.pop()
+                if not self.brackets:
+                    self._last_depth0_pos = self._out_chars
                 self._expect_key = prev_expect
                 return
 
@@ -742,8 +724,11 @@ class _Repairer:
             if ch == "]":
                 if len(self.out) >= 1 and self.out[-1] == ",":
                     self.out.pop()
+                    self._out_chars -= 1
                 self._emit("]")
                 self.brackets.pop()
+                if not self.brackets:
+                    self._last_depth0_pos = self._out_chars
                 self.i += 1
                 self._just_emitted_value = True
                 return
@@ -751,8 +736,11 @@ class _Repairer:
             if ch == "}":
                 if len(self.out) >= 1 and self.out[-1] == ",":
                     self.out.pop()
+                    self._out_chars -= 1
                 self._emit("]")
                 self.brackets.pop()
+                if not self.brackets:
+                    self._last_depth0_pos = self._out_chars
                 self.i += 1
                 self._just_emitted_value = True
                 return
