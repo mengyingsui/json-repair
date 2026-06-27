@@ -89,7 +89,28 @@ else:
 
 ## Design
 
-State machine with a single heuristic:
+```
+Input text
+  │
+  ├─ Pre-processing (regex)
+  │    _fix_colon_in_key
+  │    _fix_mixed_quotes
+  │
+  ├─ _Repairer state machine
+  │    1. _skip_prefix_junk
+  │    2. >=8KB {..}{..} → wrap as array
+  │    3. _parse_value
+  │      ├─ _parse_object
+  │      ├─ _parse_array
+  │      ├─ _parse_string
+  │      └─ _parse_literal
+  │    4. _close_brackets
+  │    5. _skip_suffix_junk
+  │
+  └─ Repaired JSON
+```
+
+See the feature table above for what each step does. Core heuristic:
 
 > Inside a string, `"` is only treated as closing if the next non-whitespace
 > character is `,` `}` `]` `:` `\n` or another `"`. Everything else is escaped.

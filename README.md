@@ -89,7 +89,28 @@ else:
 
 ## 设计
 
-基于**单次遍历状态机**，核心启发式规则：
+```
+输入文本
+  │
+  ├─ pre-process (regex)
+  │    _fix_colon_in_key
+  │    _fix_mixed_quotes
+  │
+  ├─ _Repairer
+  │    1. _skip_prefix_junk
+  │    2. >=8KB {..}{..} → 包为数组
+  │    3. _parse_value
+  │      ├─ _parse_object
+  │      ├─ _parse_array
+  │      ├─ _parse_string
+  │      └─ _parse_literal
+  │    4. _close_brackets
+  │    5. _skip_suffix_junk
+  │
+  └─ 修复后 JSON
+```
+
+功能说明见上方特性表。核心启发式规则：
 
 > 字符串内遇到 `"` 时，仅当紧随其后的非空白字符是 `,` `}` `]` `:` `\n` 或另一个 `"` 才视为闭合引号，其余全部转义。
 

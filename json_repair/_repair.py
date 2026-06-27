@@ -1,5 +1,6 @@
 """
-Single-pass state machine for repairing malformed JSON.
+Character-by-character state machine for repairing malformed JSON,
+with a final suffix-cleanup pass (join + backward scan).
 
 Handles common LLM output issues:
 - Unescaped double quotes inside strings (the core problem)
@@ -19,6 +20,12 @@ from __future__ import annotations
 
 import json
 import re
+
+# ── Constants ──────────────────────────────────────────────────────────────
+
+
+IMPLICIT_SEQUENCE_MIN_LENGTH: int = 8192
+
 
 # ── Pre-processing helpers ─────────────────────────────────────────────────
 
@@ -98,7 +105,7 @@ def repair_json(text: str, *, return_object: bool = False) -> str | object:
 
 
 class _Repairer:
-    """Character-by-character state machine that repairs JSON in one pass."""
+    """Character-by-character state machine, with a suffix-cleanup pass."""
 
     __slots__ = (
         "text",
@@ -159,7 +166,7 @@ class _Repairer:
         if self.i >= self.n or self.text[self.i] != "{":
             return False
         remaining = self.n - self.i
-        if remaining < 8192:
+        if remaining < IMPLICIT_SEQUENCE_MIN_LENGTH:
             return False
         j = self.i
         count = 0
@@ -805,7 +812,7 @@ class _Repairer:
             elif ch == '"':
                 self._emit('\\"')
             elif ord(ch) < 0x20:
-                self._emit("")
+                self._emit(f"\\u{ord(ch):04x}")
             else:
                 self._emit(ch)
             self.i += 1
