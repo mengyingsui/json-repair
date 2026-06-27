@@ -133,19 +133,21 @@ Corrupted JSON is repaired at the same speed as valid JSON — near-zero overhea
 
 ## Versions
 
-| Version | Description |
-|---------|-------------|
-| v0.1.11 | `_skip_suffix_junk` rewritten from O(n) backward scan to O(1) depth-tracker lookup, eliminates 15–25% of total time; `IMPLICIT_SEQUENCE_MIN_LENGTH` constant extracted; control chars in unquoted values emit `\uXXXX` |
-| v0.1.10 | Mixed-quote boundary fix (`','word":"` auto-split); missing-value-after-colon fill (`{"text":` → `{"text":null}`); colon misplaced in key (`"key:value"` → `"key":"value"`); `mixed_quotes.jsonl`; 8/8 `json_failures.txt` all fixed |
-| v0.1.9 | Brace-as-array-close (`{"a":[1}}]}` → `{"a":[1]}`); unquoted string value repair (`{"name": John}` → `{"name": "John"}`); tests split into per-class files; `brace_as_array_close.jsonl`, `unquoted_values.jsonl` |
-| v0.1.7 | Double-comma skip (`",,"`→`","`); 24 `.jsonl` test files; 34/34 `json_failures.txt` all fixed |
-| v0.1.6 | Single-file `_Repairer`; unbraced-object detection; 22 `.jsonl` test files; Pylance strict-mode clean |
-| v0.1.5 | Leading comma skip, dot-number normalization, adjacent-object `}{` array wrap |
-| v0.1.4 | Trailing junk detection, depth-tracked implicit arrays, 16/17 json_failures.txt |
-| v0.1.3 | Implicit object sequence auto-wrapped, massive array stress test |
-| v0.1.2 | JS literal support, Hypothesis property tests, defensive fixes |
-| v0.1.1 | Fix invalid JSON escape sequences (`\*`, `\(`, `\)`, etc.) |
-| v0.1.0 | Initial release — single-pass state machine for LLM JSON |
+| Version | Date | Description |
+|---------|------|-------------|
+| v0.1.12 | 2026-06-27 | Cython-accelerated `_parse_string` (`_cparse.pyx`); build system migrated to `hatchling` + `hatch-cython`; removed `setup.py` |
+| v0.1.11 | 2026-06-27 | `_skip_suffix_junk` O(1) depth-tracker (eliminates 15–25% of total time); `IMPLICIT_SEQUENCE_MIN_LENGTH` constant; control chars emit `\uXXXX` |
+| v0.1.10 | 2026-06-27 | Mixed-quote boundary fix; missing-value-after-colon fill (`{"text":` → `{"text":null}`); colon-misplaced-in-key split; `mixed_quotes.jsonl`; 8/8 json_failures.txt |
+| v0.1.9 | 2026-06-26 | Brace-as-array-close; unquoted string value repair; tests split into per-class files |
+| v0.1.8 | 2026-06-25 | Misordered-bracket fix; `misordered_brackets.jsonl` |
+| v0.1.7 | 2026-06-23 | Unbraced-object detection; double-comma skip; 24 `.jsonl` files; 34/34 json_failures.txt |
+| v0.1.6 | 2026-06-23 | Single-file `_Repairer`; 22 `.jsonl` test files; Pylance strict-mode clean |
+| v0.1.5 | 2026-06-23 | Leading comma skip; dot-number normalization; adjacent-object `}{` array wrap; FAQ.md |
+| v0.1.4 | 2026-06-22 | Trailing junk detection; depth-tracked implicit arrays; 16/17 json_failures.txt |
+| v0.1.3 | 2026-06-22 | Implicit object sequence auto-wrap in array |
+| v0.1.2 | 2026-06-22 | JS literal support; Hypothesis property tests; defensive fixes |
+| v0.1.1 | 2026-06-22 | Fix invalid JSON escape sequences (`\*`, `\(`, `\)`, etc.) |
+| v0.1.0 | 2026-06-22 | Initial release — single-pass state machine for LLM JSON |
 
 ## Development
 

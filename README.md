@@ -132,19 +132,21 @@ else:
 
 ## 版本
 
-| 版本 | 说明 |
-|------|------|
-| v0.1.11 | `_skip_suffix_junk` 从 O(n) 二次扫描改为 O(1) 深度查表，消除 15–25% 总耗时；常量 `IMPLICIT_SEQUENCE_MIN_LENGTH` 提取；控制字符 emit `\uXXXX` |
-| v0.1.10 | 混合引号边界修复（`','word":"` 自动断开）；冒号后缺失值填充（`{"text":` → `{"text":null}`）；Key 内冒号拆分（`"key:value"` → `"key":"value"`）；新增 `mixed_quotes.jsonl`；8/8 `json_failures.txt` 全修复 |
-| v0.1.9 | 数组 `}` 闭合校正（`{"a":[1}}]}` → `{"a":[1]}`）；无引号字符串值修复（`{"name": John}` → `{"name": "John"}`）；测试拆分为独立文件；新增 `brace_as_array_close.jsonl`、`unquoted_values.jsonl` |
-| v0.1.7 | 多余逗号跳过（`",,"` → `","`）；更新到 24 个 `.jsonl` 文件；34/34 `json_failures.txt` 全修复 |
-| v0.1.6 | 单 `_Repairer` 类；无大括号对象检测；22 个 `.jsonl` 测试文件；Pylance 严格模式 0 警告 |
-| v0.1.5 | 前导逗号跳过、`.` 数字归一化、相邻对象 `}{` 检测包裹为数组 |
-| v0.1.4 | 尾部垃圾检测、隐式数组深度追踪、16/17 json_failures.txt 可修复 |
-| v0.1.3 | 隐含对象序列自动包裹为数组，大规模隐式数组压力测试 |
-| v0.1.2 | JS 字面量支持、Hypothesis 属性测试、防御性修复 |
-| v0.1.1 | 修复无效 JSON 转义序列 (`\*`, `\(`, `\)` 等) |
-| v0.1.0 | 初始版本，单次遍历状态机修复 LLM JSON |
+| 版本 | 日期 | 说明 |
+|------|------|------|
+| v0.1.12 | 2026-06-27 | `_parse_string` Cython 加速 (`_cparse.pyx`)；构建系统迁移至 `hatchling` + `hatch-cython`；`setup.py` 移除 |
+| v0.1.11 | 2026-06-27 | `_skip_suffix_junk` O(1) 深度查表（消除 15–25% 总耗时）；常量 `IMPLICIT_SEQUENCE_MIN_LENGTH` 提取；控制字符 emit `\uXXXX` |
+| v0.1.10 | 2026-06-27 | 混合引号边界修复；冒号后缺失值填充（`{"text":` → `{"text":null}`）；Key 内冒号拆分；`mixed_quotes.jsonl`；8/8 json_failures.txt 全修复 |
+| v0.1.9 | 2026-06-26 | 数组 `}` 闭合校正；无引号字符串值修复；测试拆分为独立文件 |
+| v0.1.8 | 2026-06-25 | 括号错序修复；`misordered_brackets.jsonl` |
+| v0.1.7 | 2026-06-23 | 无大括号对象检测；多余逗号跳过；24 个 `.jsonl` 文件；34/34 json_failures.txt 全修复 |
+| v0.1.6 | 2026-06-23 | 单 `_Repairer` 类；22 个 `.jsonl` 测试文件；Pylance 严格模式 0 警告 |
+| v0.1.5 | 2026-06-23 | 前导逗号跳过；`.` 数字归一化；相邻对象 `}{` 数组包裹；FAQ.md |
+| v0.1.4 | 2026-06-22 | 尾部垃圾检测；隐式数组深度追踪；16/17 json_failures.txt |
+| v0.1.3 | 2026-06-22 | 隐含对象序列自动包裹为数组 |
+| v0.1.2 | 2026-06-22 | JS 字面量支持；Hypothesis 属性测试；防御性修复 |
+| v0.1.1 | 2026-06-22 | 修复无效 JSON 转义序列 (`\*`, `\(`, `\)` 等) |
+| v0.1.0 | 2026-06-22 | 初始版本，单次遍历状态机修复 LLM JSON |
 
 ## 开发
 

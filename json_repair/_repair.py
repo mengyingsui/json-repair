@@ -21,6 +21,18 @@ from __future__ import annotations
 import json
 import re
 
+# ── Cython acceleration (optional) ─────────────────────────────────────────
+
+
+try:
+    from json_repair._cparse import parse_string as _parse_string_fast
+
+    _HAS_CYTHON = True
+except ImportError:
+    _parse_string_fast = None
+    _HAS_CYTHON = False
+
+
 # ── Constants ──────────────────────────────────────────────────────────────
 
 
@@ -319,6 +331,12 @@ class _Repairer:
     # ── string (double-quoted) ────────────────────────────────────────────
 
     def _parse_string(self) -> None:
+        if _parse_string_fast is not None:
+            new_i, added = _parse_string_fast(self.text, self.i, self.n, self.out)
+            self.i = new_i
+            self._out_chars += added
+            return
+
         self._emit('"')
         self.i += 1
 

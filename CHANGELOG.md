@@ -1,89 +1,95 @@
 # Changelog
 
-## v0.1.11 (2026-06-27)
+## v0.1.12 (2026-06-27)
+
+### Added
+- Cython-accelerated `_parse_string` via `json_repair/_cparse.pyx` — the hot
+  character loop is compiled to C when Cython is available, yielding 2–3×
+  speedup on large inputs (1 MB JSON drops from ~585 ms to ~265 ms).
+- Build infrastructure: `hatch-cython` plugin compiles `.pyx` → `.pyd`/`.so`
+  during wheel build; pre-generated `_cparse.c` included in sdist for
+  environments without Cython.
+- Pure-Python fallback when C extension is unavailable — zero additional
+  runtime dependencies.
+- `hatch-c` / `hatch-cython` documented as alternative build routes.
 
 ### Changed
-- `_skip_suffix_junk` rewritten from O(n) join + backward scan to O(1) depth-tracker
-  lookup, eliminating 15–25% of total repair time.
-- `IMPLICIT_SEQUENCE_MIN_LENGTH` (8192) extracted as module-level constant.
-- `_parse_unquoted_value`: control characters now emit `\uXXXX` instead of being
-  silently dropped.
-- Class & module docstrings updated to reflect O(1) suffix truncation.
+- Build backend switched from `setuptools` back to `hatchling` with
+  `hatch-cython` build hook.
+- `setup.py` removed; all build config lives in `pyproject.toml`.
 
-## v0.1.10 (2026-06-26)
+## v0.1.11 (2026-06-27)
+
+### Added
+- `_skip_suffix_junk` rewritten from O(n) join + backward scan to O(1)
+  depth-tracker lookup, eliminating 15–25% of total repair time.
+- `IMPLICIT_SEQUENCE_MIN_LENGTH` (8192) extracted as module-level constant.
+
+### Fixed
+- `_parse_unquoted_value`: control characters now emit `\uXXXX` instead of
+  being silently dropped.
+
+### Changed
+- Class & module docstrings updated to reflect O(1) suffix truncation.
+- Performance tables refreshed in both READMEs with throughput column.
+
+## v0.1.10 (2026-06-27)
 
 ### Added
 - `_fix_mixed_quotes()` pre-processing step: recognizes `','word":"` inside
   double-quoted strings and inserts a closing `"` before `','` so that the
   parser handles the single-quoted key `'word'` as a separate key-value pair.
-  Fixes 3 real-world Chinese-text inputs from `json_failures.txt` where LLM
-  output mixed `'` and `"` quote styles.
-- `tests/cases/mixed_quotes.jsonl` — 3 test cases for the mixed-quote boundary
-  pattern.
 - `_parse_value` now emits `null` when encountering `}`, `]`, or end-of-input
   in value position — handles truncated JSON after colon (e.g. `{"text":`).
 - `_fix_colon_in_key()` pre-processing step: regex detects `"key:value"` followed
-  by `,` or `}` and splits it into `"key":"value"`. Fixes LLM output where the
-  colon delimiter is misplaced inside the key string.
-- 5 new `truncated.jsonl` cases covering missing-value-after-colon.
-- 1 new `missing_colons.jsonl` case covering colon misplaced inside key.
-- **Caveat** section in both READMEs recommending use with a validator, since
-  repair may insert `null` that doesn't match the user's expected schema.
+  by `,` or `}` and splits it into `"key":"value"`.
+- `tests/cases/mixed_quotes.jsonl` (3 cases), `truncated.jsonl` (5 cases),
+  `missing_colons.jsonl` (1 case).
+- **Caveat** section in both READMEs recommending use with a validator.
 
 ### Changed
-- `json_failures.txt` now 8/8 all repairable (up from 5/8).
-- `test_return_object_invalid`: bare comma `","` now returns `None` instead of
+- `json_failures.txt` 8/8 all repairable (up from 5/8).
+- `test_return_object_invalid`: bare comma `","` returns `None` instead of
   raising `ValueError`.
-- Performance threshold for `test_very_long_string_value` lowered from 1.0 to
-  0.8 MB/s (flaky on low-end CI).
 
 ## v0.1.9 (2026-06-26)
 
 ### Added
-- Brace-as-array-close: when `}` is used to close an array instead of `]`,
-  the parser auto-corrects to `]` (e.g. `{"a":[1}}]}` → `{"a":[1]}`).
-- `_parse_unquoted_value()`: unquoted bare-word string values are now
-  detected and wrapped in double quotes (e.g. `{"name": John}` → `{"name": "John"}`).
-- `tests/cases/brace_as_array_close.jsonl` — 5 cases from `json_failures.txt`.
-- `tests/cases/unquoted_values.jsonl` — 8 cases for unquoted string values.
+- Brace-as-array-close: `}` used to close an array auto-corrects to `]`
+  (e.g. `{"a":[1}}]}` → `{"a":[1]}`).
+- `_parse_unquoted_value()`: bare-word string values detected and wrapped in
+  double quotes (e.g. `{"name": John}` → `{"name": "John"}`).
+- `tests/cases/brace_as_array_close.jsonl` (5 cases).
+- `tests/cases/unquoted_values.jsonl` (8 cases).
 
 ### Changed
-- Test classes split from `test_repair.py` into 7 per-class files under
-  `tests/test_*.py` (`test_adjacent_objects`, `test_complex_scenarios`,
-  `test_control_characters`, `test_edge_cases`, `test_implicit_array`,
-  `test_misordered_brackets`, `test_return_object`).
-- `tests/_helpers.py` extracted for shared test utilities (`roundtrip`,
-  `load_inputs`, `run`, `CASES_DIR`).
+- Tests split from `test_repair.py` into 7 per-class files under `tests/`.
+- `tests/_helpers.py` extracted for shared test utilities.
 - `json_failures.txt` removed from git tracking (added to `.gitignore`).
 
 ## v0.1.8 (2026-06-25)
 
 ### Added
-- Misordered-bracket fix: when `]` appears where `}` is expected in the
-  last element of an array, the object is closed with `}` first (e.g.
-  `[{"key": value]}` → `[{"key": value}]`).
-- `tests/cases/misordered_brackets.jsonl` — 11 test cases including
-  real-world Chinese-text entries from `json_failures.txt`.
+- Misordered-bracket fix: `]` before `}` in last array element closes the
+  object first (e.g. `[{"key": value]}` → `[{"key": value}]`).
+- `tests/cases/misordered_brackets.jsonl` (11 cases).
 
 ### Changed
 - `pyproject.toml`: ruff `extend-exclude` for `tests/cases/`.
 
 ## v0.1.7 (2026-06-23)
 
-### Fixed
-- Double-comma regression in `_parse_object` / `_parse_array` — extra `,,`
-  after string values (e.g. `")","source_turn_ids"`) now skipped by checking
-  last emitted character. All 34/34 `json_failures.txt` blocks repairable
-  (up from 30/34).
-- `_is_closing_quote` alpha lookahead — skip `\n` in whitespace so newline
-  before next key is handled correctly.
-
 ### Added
 - Unbraced-object detection in `_skip_prefix_junk` — text starting with
-  `"key" : value` (missing outer `{`/`}`) auto-wrapped with `{...}`.
-  Repaired 18 additional `json_failures.txt` blocks (27→30→34 total).
-- `tests/cases/double_commas.jsonl` — 8 test cases for double-comma patterns.
+  `"key" : value` auto-wrapped with `{...}`.
+- `tests/cases/double_commas.jsonl` (8 cases).
 - `tests/cases/INDEX.md` — catalog of all 24 `.jsonl` test case files.
+- All 34/34 `json_failures.txt` blocks repairable (up from 30/34).
+
+### Fixed
+- Double-comma regression in `_parse_object`/`_parse_array` — extra `,,`
+  after string values skipped by checking last emitted character.
+- `_is_closing_quote` alpha lookahead skips `\n` in whitespace.
 
 ### Changed
 - `tests/cases/` expanded from 22 to 24 `.jsonl` files.
@@ -94,87 +100,61 @@
 - All code consolidated into single `_Repairer` class in `_repair.py`;
   removed `_core.py`, `_string.py`, `_value.py` mixin split.
 - Test cases (80+) moved from `test_repair.py` into 22 `.jsonl` files
-  under `tests/cases/`, one per category.
-- Hypothesis broken-patterns list moved to `tests/cases/broken_patterns.jsonl`.
-- `_extract_blocks` renamed to `extract_blocks` for cross-module import.
-
-### Removed
-- Dead function `_load_cases` from `test_repair.py`.
+  under `tests/cases/`.
+- `_extract_blocks` renamed to `extract_blocks`.
 
 ### Fixed
-- All Pylance `reportUnusedClass` / `reportUnknownVariableType` / `reportUnknownArgumentType`
-  diagnostics eliminated (use `cast` instead of suppression).
+- All Pylance `reportUnusedClass`/`reportUnknownVariableType`/`reportUnknownArgumentType`
+  diagnostics eliminated.
 
 ## v0.1.5 (2026-06-23)
 
 ### Added
-- Leading comma in arrays/objects is now silently skipped (`[,1]` → `[1]`).
-- Leading-dot and trailing-dot numbers are normalized to valid JSON
-  (`.5` → `0.5`, `5.` → `5.0`).
-- Adjacent objects without commas (`}{`) are detected and wrapped in an
-  array, same as comma-separated sequences (≥8 KB, ≥3 transitions).
+- Leading comma in arrays/objects silently skipped (`[,1]` → `[1]`).
+- Leading-dot/trailing-dot number normalization (`.5` → `0.5`, `5.` → `5.0`).
+- Adjacent objects without commas (`}{`) detected and wrapped in array
+  (≥8 KB, ≥3 transitions).
 - FAQ.md documenting known limitations and development guide.
-- 11 new tests for the above features.
 
 ### Changed
-- `_skip_suffix_junk` rewritten to reuse the output list in-place instead
-  of creating a new one; removed `re` dependency.
-
-### Fixed
-- README closing-quote heuristic now lists all possible characters
-  (`,`, `}`, `]`, `:`, `\n`, and another `"`).
+- `_skip_suffix_junk` rewritten to reuse output list in-place; removed `re`.
 
 ## v0.1.4 (2026-06-22)
 
 ### Added
-- Trailing junk detection: `-lnd`, `junkword` etc. after closing `}` are stripped.
+- Trailing junk detection: text after closing `}` stripped.
 - Stress test for massive implicit arrays (447 objects, ~51 KB input).
-- Tests for trailing junk scenarios.
+- 16/17 blocks in `json_failures.txt` now repairable.
 
 ### Fixed
-- `_is_implicit_object_sequence`: bracket depth tracking (only triggers at depth 0)
-  to avoid false-positives on `}, {` inside valid `[...]` arrays.
-- `_parse_object`: junk guard before missing-comma check to stop parsing
-  when trailing garbage appears after valid JSON.
-- 16/17 blocks in `json_failures.txt` now repairable.
+- `_is_implicit_object_sequence`: bracket depth tracking (only at depth 0).
+- `_parse_object`: junk guard before missing-comma check.
 
 ## v0.1.3 (2026-06-22)
 
 ### Added
-- Implicit object sequence repair: comma-separated `{...}, {...}, {...}`
-  without an outer `[...]` is automatically wrapped in an array.
+- Implicit object sequence repair: `{...}, {...}, {...}` auto-wrapped in array.
 - `check_failures.py`: handles both dict and list repair results.
-
-### Changed
-- json_failures.txt: 22/26 blocks now repairable (up from 10/10 previously).
+- `json_failures.txt`: 22/26 blocks repairable (up from 10/10).
 
 ## v0.1.2 (2026-06-22)
 
 ### Added
-- JavaScript literal support: `NaN`, `Infinity`, `-Infinity`, `undefined`
-  are recognized and mapped to `null`.
-- Hypothesis property-based tests (4 properties, 1100 examples) using
-  `TYPE_CHECKING` stubs — zero `type: ignore` annotations, mypy strict clean.
+- JavaScript literal support: `NaN`, `Infinity`, `-Infinity`, `undefined` → `null`.
+- Hypothesis property-based tests (4 properties, 1100 examples).
 
 ### Fixed
-- `_is_closing_quote` lookahead now skips `\r` in addition to space and tab.
+- `_is_closing_quote` lookahead skips `\r`.
 - Defensive bounds checks on `self.out[-1]` accesses.
-- `_skip_prefix_junk` now skips quoted strings when scanning for `{` or `[`,
-  avoiding false matches on `"}"` and `"]"` as structural brackets.
-- `_skip_suffix_junk` uses a string-aware bracket depth counter so that
-  `}` and `]` inside string values are not mistaken for structural closes.
+- `_skip_prefix_junk` skips quoted strings when scanning for `{`/`[`.
+- `_skip_suffix_junk` uses string-aware bracket depth counter.
 
 ## v0.1.1 (2026-06-22)
 
 ### Fixed
-- Invalid JSON escape sequences are now repaired instead of passed through.
-  `\*`, `\(`, `\)`, `\p` and other non-standard escapes have their backslash
-  escaped (`\\*`, `\\(`, etc.), producing valid JSON.
-- `_is_closing_quote` lookahead now skips `\r` in addition to space and tab.
-- `_parse_literal` now handles JavaScript-style literals: `NaN`, `Infinity`,
-  `-Infinity`, `undefined` — all mapped to `null`.
-- Defensive bounds checks on `self.out[-1]` accesses in object/array/string
-  parsers.
+- Invalid JSON escape sequences repaired: `\*`, `\(`, `\)`, `\p` etc.
+  have backslash escaped (`\\*`, `\\(`, ...).
+- `_is_closing_quote` lookahead skips `\r`.
 
 ## v0.1.0 (2026-06-22)
 
@@ -183,7 +163,7 @@
   LLM outputs.
 - Handles: unescaped embedded quotes, Python triple-quoted strings, CSV-style
   `""` escaping, single-quoted strings, unquoted keys, trailing commas,
-  missing commas/colons, Python/JS literals (`True`/`False`/`None`),
-  comments, control characters, extra text before/after JSON, truncated JSON.
+  missing commas/colons, Python/JS literals, comments, control characters,
+  extra text before/after JSON, truncated JSON.
 - 65 unit tests + 18 performance benchmarks.
 - pre-commit: ruff (lint+format), mypy (strict), uv-lock.

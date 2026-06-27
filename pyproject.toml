@@ -1,6 +1,10 @@
+[build-system]
+requires = ["hatchling", "hatch-cython", "Cython", "setuptools"]
+build-backend = "hatchling.build"
+
 [project]
 name = "json-repair"
-version = "0.1.11"
+version = "0.1.12"
 description = "Repair malformed JSON from LLM outputs - handles unescaped quotes, triple-quoted strings, and more in a single pass"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -10,16 +14,44 @@ dependencies = []
 dev = [
     "pytest>=8.0",
 ]
+cython = [
+    "Cython>=3.0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["json_repair"]
-include = ["json_repair/py.typed"]
+exclude = [
+    "json_repair/_cparse.pyx",
+    "json_repair/_cparse.c",
+]
+
+[tool.hatch.build.targets.wheel.hooks.cython]
+dependencies = ["hatch-cython"]
+
+[tool.hatch.build.targets.wheel.hooks.cython.options]
+src = "json_repair"
+compile_py = false
+directives = { boundscheck = false, wraparound = false, initializedcheck = false, cdivision = true }
+language_level = "3"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/json_repair/*.py",
+    "/json_repair/*.pyx",
+    "/json_repair/*.c",
+    "/json_repair/py.typed",
+    "/tests",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
+    "Cython>=3.0",
     "hypothesis>=6.155.7",
     "mypy>=2.1.0",
     "pre-commit>=4.6.0",
@@ -27,6 +59,11 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.15.18",
+    "setuptools>=75",
+]
+build = [
+    "Cython>=3.0",
+    "setuptools>=75",
 ]
 
 [tool.mypy]
