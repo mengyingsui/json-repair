@@ -11,7 +11,7 @@ import timeit
 
 import pytest
 
-from json_repair import repair_json
+from json_repair import HAS_CYTHON, repair_json
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -292,7 +292,65 @@ class TestTrivial:
         assert t < 0.1, f"Bare string too slow: {t:.3f} ms"
 
 
-# ── 6. Performance report (informational, not a pass/fail test) ────────────────
+# ── 6. Cython vs pure Python benchmark ─────────────────────────────────────
+
+
+def _bench_pure(text: str, iterations: int = 500) -> float:
+    """Benchmark pure Python path by temporarily disabling Cython."""
+    import json_repair._repair as _rp
+
+    saved = _rp.HAS_CYTHON
+    _rp.HAS_CYTHON = False
+    try:
+        timer = timeit.Timer(lambda: repair_json(text))
+        total = timer.timeit(number=iterations)
+        return (total / iterations) * 1000
+    finally:
+        _rp.HAS_CYTHON = saved
+
+
+LONG_EMBEDDED = (
+    '{"text": "'
+    + "".join(f'segment {i} with a "quote" inside. ' for i in range(200))
+    + '"}'
+)
+
+LONG_PLAIN = (
+    '{"data": "'
+    + "Some text content. " * 5000  # ~100 KB
+    + '"}'
+)
+
+
+@pytest.mark.skipif(
+    not HAS_CYTHON, reason="Cython not available — comparison meaningless"
+)
+class TestCythonVsPure:
+    """Compare Cython-accelerated path vs pure Python."""
+
+    def test_short_embedded_string(self) -> None:
+        t_fast = _bench(SMALL_CORRUPT, iterations=2000)
+        t_pure = _bench_pure(SMALL_CORRUPT, iterations=2000)
+        ratio = t_pure / t_fast
+        print(f"\n  short: Cython={t_fast:.3f}ms  Pure={t_pure:.3f}ms  {ratio:.1f}×")
+        assert ratio >= 0.8
+
+    def test_long_embedded_string(self) -> None:
+        t_fast = _bench(LONG_EMBEDDED, iterations=200)
+        t_pure = _bench_pure(LONG_EMBEDDED, iterations=200)
+        ratio = t_pure / t_fast
+        print(f"\n  embedded: Cython={t_fast:.3f}ms  Pure={t_pure:.3f}ms  {ratio:.1f}×")
+        assert ratio >= 0.8
+
+    def test_long_plain_string(self) -> None:
+        t_fast = _bench(LONG_PLAIN, iterations=50)
+        t_pure = _bench_pure(LONG_PLAIN, iterations=50)
+        ratio = t_pure / t_fast
+        print(f"\n  plain:    Cython={t_fast:.3f}ms  Pure={t_pure:.3f}ms  {ratio:.1f}×")
+        assert ratio >= 0.8
+
+
+# ── 7. Performance report (informational, not a pass/fail test) ────────────────
 
 
 @pytest.mark.skip(reason="informational — run manually with -m report")
