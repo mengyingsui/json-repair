@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.1.13 (2026-06-27)
+
+### Added
+- `tests/cases/unterminated_string.jsonl` + `test_unterminated_string.py`.
+
+### Fixed
+- `_parse_string` (pure Python) and `parse_string` (Cython): when a string
+  value is missing its closing `"` before `, », the next key's opening `"`
+  (e.g. `"entity"`) is no longer consumed as the string terminator. The
+  repair emits a closing `"` and resumes key-value parsing correctly.
+- Cython `.pyd` rebuilt from `_cparse.pyx` for the above fix; all 192 tests
+  pass (pure Python + Cython paths).
+
+### Changed
+- `tests/cases/INDEX.md` updated to list 30 `.jsonl` files (was 24 in v0.1.7).
+
 ## v0.1.12 (2026-06-27)
 
 ### Added

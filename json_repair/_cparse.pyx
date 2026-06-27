@@ -94,7 +94,17 @@ def parse_string(text, i, n, out):
                     while k < _n and _text[k] in " \t\r\n":
                         k += 1
                     if k < _n and _text[k] == '"':
-                        return _i + 1, _chars
+                        _out.pop()
+                        _chars -= 1
+                        while _out and _out[-1] in " \t\r\n":
+                            _out.pop()
+                            _chars -= 1
+                        if _out and _out[-1] == ",":
+                            _out.pop()
+                            _chars -= 1
+                        _out.append('"')
+                        _chars += 1
+                        return _i, _chars
                 return _i + 1, _chars
             else:
                 _out.append('\\"')

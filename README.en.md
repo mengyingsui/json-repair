@@ -35,6 +35,7 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 | Mixed-quote boundary fix (v0.1.10) | `"text','key":"val"` → `"text","key":"val"` | Splits `','word":"` inside double-quoted text — prevents single-quoted keys leaking into preceding value |
 | Missing-value-after-colon fill (v0.1.10) | `{"text":` → `{"text": null}` | Fills `null` when value is missing after key in truncated JSON |
 | Colon misplaced in key (v0.1.10) | `"key:value"` → `"key":"value"` | Splits a colon that was written inside the key string into key/value pair |
+| Missing closing quote fix (v0.1.13) | `"text","entity"` → `"text","entity"` | String missing closing `"` no longer consumes the next key's opening `"` |
 
 ## Install
 
@@ -137,6 +138,7 @@ Measured with `pytest-benchmark` — see [Development](#development).
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.1.13 | 2026-06-27 | Missing-closing-quote fix — `_parse_string`/`parse_string` no longer consumes next key's opening `"`; added `unterminated_string.jsonl` |
 | v0.1.12 | 2026-06-27 | Cython-accelerated `_parse_string` (`_cparse.pyx`); build system migrated to `hatchling` + `hatch-cython`; removed `setup.py`; benchmarks ported to `pytest-benchmark` |
 | v0.1.11 | 2026-06-27 | `_skip_suffix_junk` O(1) depth-tracker (eliminates 15–25% of total time); `IMPLICIT_SEQUENCE_MIN_LENGTH` constant; control chars emit `\uXXXX` |
 | v0.1.10 | 2026-06-27 | Mixed-quote boundary fix; missing-value-after-colon fill (`{"text":` → `{"text":null}`); colon-misplaced-in-key split; `mixed_quotes.jsonl`; 8/8 json_failures.txt |

@@ -380,6 +380,15 @@ class _Repairer:
                         while k < self.n and self.text[k] in " \t\r\n":
                             k += 1
                         if k < self.n and self.text[k] == '"':
+                            self.out.pop()
+                            self._out_chars -= 1
+                            while self.out and self.out[-1] in " \t\r\n":
+                                self.out.pop()
+                                self._out_chars -= 1
+                            if self.out and self.out[-1] == ",":
+                                self.out.pop()
+                                self._out_chars -= 1
+                            self._emit('"')
                             return
                     self.i += 1
                     return

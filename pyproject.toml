@@ -4,19 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "json-repair"
-version = "0.1.12"
+version = "0.1.13"
 description = "Repair malformed JSON from LLM outputs - handles unescaped quotes, triple-quoted strings, and more in a single pass"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0",
-]
-cython = [
-    "Cython>=3.0",
-]
 
 [tool.hatch.build.targets.wheel]
 packages = ["json_repair"]
@@ -58,11 +50,8 @@ dev = [
     "pyright>=1.1.410",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-benchmark>=5.2.3",
     "ruff>=0.15.18",
-    "setuptools>=75",
-]
-build = [
-    "Cython>=3.0",
     "setuptools>=75",
 ]
 
