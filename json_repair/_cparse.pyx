@@ -96,10 +96,10 @@ def parse_string(text, i, n, out):
                     if k < _n and _text[k] == '"':
                         _out.pop()
                         _chars -= 1
-                        while _out and _out[-1] in " \t\r\n":
+                        while _out and _out[len(_out) - 1] in " \t\r\n":
                             _out.pop()
                             _chars -= 1
-                        if _out and _out[-1] == ",":
+                        if _out and _out[len(_out) - 1] == ",":
                             _out.pop()
                             _chars -= 1
                         _out.append('"')

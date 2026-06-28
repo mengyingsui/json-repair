@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.1.14 (2026-06-28)
+
+### Added
+- `#` line comment support — `_skip_comment` handles `#…` line-ending comments;
+  `_parse_value`/`_parse_object`/`_parse_array` recognize `#` alongside `//` and `/*`.
+- `tests/cases/comments.jsonl` with 3 entries.
+- Cython `wraparound=False` undefined-behaviour fix (`_out[-1]` → `_out[len(_out)-1]`).
+
+### Changed
+- `tests/cases/INDEX.md` regenerated (30 `.jsonl` files).
+
 ## v0.1.13 (2026-06-27)
 
 ### Added

@@ -36,6 +36,7 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 | Missing-value-after-colon fill (v0.1.10) | `{"text":` → `{"text": null}` | Fills `null` when value is missing after key in truncated JSON |
 | Colon misplaced in key (v0.1.10) | `"key:value"` → `"key":"value"` | Splits a colon that was written inside the key string into key/value pair |
 | Missing closing quote fix (v0.1.13) | `"text","entity"` → `"text","entity"` | String missing closing `"` no longer consumes the next key's opening `"` |
+| `#` line comment support (v0.1.14) | `"a": 1  # comment` | `#` comments are skipped during repair, no effect on output |
 
 ## Install
 
@@ -70,6 +71,8 @@ print(obj)
 
 Repaired JSON is always syntactically valid, but may not be semantically what you need (e.g., missing values become `null`).
 **It is recommended to pair with a validator** — parse the result and check its structure before use.
+
+> **`#` line comments** are silently stripped (treated as if they never existed). If the LLM's output contains items with `#` comments — e.g. the model was uncertain about whether to include a field and marked it with a comment — the repaired result will still keep that item. This is intentional: the repairer should not decide what the model was unsure about, but callers should be aware that comments do **not** act as exclusion markers.
 
 ```python
 from json_repair import repair_json
@@ -138,6 +141,7 @@ Measured with `pytest-benchmark` — see [Development](#development).
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.1.14 | 2026-06-28 | `#` line comment support (`_skip_comment` skips `#…` lines); Cython `wraparound=False` UB fix |
 | v0.1.13 | 2026-06-27 | Missing-closing-quote fix — `_parse_string`/`parse_string` no longer consumes next key's opening `"`; added `unterminated_string.jsonl` |
 | v0.1.12 | 2026-06-27 | Cython-accelerated `_parse_string` (`_cparse.pyx`); build system migrated to `hatchling` + `hatch-cython`; removed `setup.py`; benchmarks ported to `pytest-benchmark` |
 | v0.1.11 | 2026-06-27 | `_skip_suffix_junk` O(1) depth-tracker (eliminates 15–25% of total time); `IMPLICIT_SEQUENCE_MIN_LENGTH` constant; control chars emit `\uXXXX` |

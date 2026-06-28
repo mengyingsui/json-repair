@@ -605,7 +605,7 @@ class _Repairer:
             self._parse_literal()
         elif ch in "-.0123456789":
             self._parse_number()
-        elif ch == "/":
+        elif ch in "/#":
             self._skip_comment()
             self._parse_value()
         elif ch in "}]":
@@ -659,7 +659,7 @@ class _Repairer:
                 self._expect_key = True
                 continue
 
-            if ch == "/":
+            if ch in "/#":
                 self._skip_comment()
                 continue
 
@@ -778,7 +778,7 @@ class _Repairer:
                 self.i += 1
                 continue
 
-            if ch == "/":
+            if ch in "/#":
                 self._skip_comment()
                 continue
 
@@ -902,6 +902,12 @@ class _Repairer:
                 if self.text[self.i] == "*" and self.text[self.i + 1] == "/":
                     self.i += 2
                     return
+                self.i += 1
+        elif self.text[self.i] == "#":
+            # # comments are silently stripped — the item is kept as-is
+            while self.i < self.n and self.text[self.i] != "\n":
+                self.i += 1
+            if self.i < self.n:
                 self.i += 1
         else:
             self.i += 1

@@ -25,4 +25,4 @@ from json_repair._repair import HAS_CYTHON as HAS_CYTHON
 from json_repair._repair import repair_json as repair_json
 
 __all__ = ["repair_json", "HAS_CYTHON"]
-__version__ = "0.1.13"
+__version__ = "0.1.14"
