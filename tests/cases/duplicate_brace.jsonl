@@ -1,0 +1,3 @@
+{"input": "{{\"key\": \"value\"}", "expected": {"key": "value"}}
+{"input": "{\"a\": 1, {{\"b\": 2}}", "expected": {"a": 1, "b": 2}}
+{"input": "{\"events\": [{\"steps\": [{\n  {\n    \"text\": \"hello\"\n  }\n}]}]}", "expected": {"events": [{"steps": [{"text": "hello"}]}]}}

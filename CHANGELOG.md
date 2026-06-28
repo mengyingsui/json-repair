@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.1.15 (2026-06-28)
+
+### Added
+- Duplicate opening brace `{{` → `{` skip in `_parse_object` — fixes
+  `{{"key": "value"}` misparsed as empty-key object.
+- Missing opening quote on key — `key": value` → `"key": value` (alpha-key
+  pre-check accepts `"` after key text; `_parse_unquoted_key` consumes
+  trailing `"`).
+
+### Changed
+- `tests/cases/duplicate_brace.jsonl` (3 cases) and
+  `tests/cases/missing_key_quote.jsonl` (3 cases) added.
+- `tests/cases/INDEX.md` updated (32 `.jsonl` files).
+
 ## v0.1.14 (2026-06-28)
 
 ### Added

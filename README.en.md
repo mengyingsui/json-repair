@@ -37,6 +37,8 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 | Colon misplaced in key (v0.1.10) | `"key:value"` → `"key":"value"` | Splits a colon that was written inside the key string into key/value pair |
 | Missing closing quote fix (v0.1.13) | `"text","entity"` → `"text","entity"` | String missing closing `"` no longer consumes the next key's opening `"` |
 | `#` line comment support (v0.1.14) | `"a": 1  # comment` | `#` comments are skipped during repair, no effect on output |
+| Duplicate brace skip (v0.1.15) | `{{"key": "value"}` → `{"key": "value"}` | Extra `{` after object opening `{` is silently skipped |
+| Missing key opening quote (v0.1.15) | `key": value` → `"key": value` | Missing opening `"` on key is injected; trailing `"` consumed |
 
 ## Install
 
@@ -141,6 +143,7 @@ Measured with `pytest-benchmark` — see [Development](#development).
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.1.15 | 2026-06-28 | Duplicate brace `{{` → `{` skip; Missing key opening quote — `key":` → `"key":` |
 | v0.1.14 | 2026-06-28 | `#` line comment support (`_skip_comment` skips `#…` lines); Cython `wraparound=False` UB fix |
 | v0.1.13 | 2026-06-27 | Missing-closing-quote fix — `_parse_string`/`parse_string` no longer consumes next key's opening `"`; added `unterminated_string.jsonl` |
 | v0.1.12 | 2026-06-27 | Cython-accelerated `_parse_string` (`_cparse.pyx`); build system migrated to `hatchling` + `hatch-cython`; removed `setup.py`; benchmarks ported to `pytest-benchmark` |

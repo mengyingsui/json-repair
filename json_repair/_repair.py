@@ -639,6 +639,10 @@ class _Repairer:
 
             ch = self.text[self.i]
 
+            if ch == "{" and self._expect_key:
+                self.i += 1
+                continue
+
             if ch == "}":
                 if len(self.out) >= 1 and self.out[-1] == ",":
                     self.out.pop()
@@ -695,7 +699,7 @@ class _Repairer:
                         j += 1
                     while j < self.n and self.text[j] in " \t\r":
                         j += 1
-                    if j >= self.n or self.text[j] != ":":
+                    if j >= self.n or self.text[j] not in ':"':
                         break
                 if (
                     not first
@@ -817,6 +821,8 @@ class _Repairer:
             self._emit(self.text[self.i])
             self.i += 1
         self._emit('"')
+        if self.i < self.n and self.text[self.i] == '"':
+            self.i += 1
 
     def _parse_unquoted_value(self) -> None:
         self._emit('"')

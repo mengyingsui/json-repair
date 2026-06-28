@@ -18,6 +18,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `control_characters.jsonl` | 2 | Literal \n and \t preserved as control chars in output. |
 | `csv_escaping.jsonl` | 2 | Doubled quotes "" decoded to single " (CSV convention). |
 | `double_commas.jsonl` | 8 | Extra commas ,, / ,,, in objects and arrays — including after )-ending string values (the block-26 Flutter pattern). |
+| `duplicate_brace.jsonl` | 3 | Extra `{` after object opening `{` — `{{"key": "value"}` → `{"key": "value"}`. |
 | `edge_cases.jsonl` | 8 | Empty objects/arrays, bare strings/numbers/booleans, multi-byte Unicode (Chinese), special symbols, Windows backslash paths. |
 | `embedded_quotes_large.jsonl` | 1 | Large multi-segment JSON with embedded ASCII " in both text values and entity arrays, plus literal \n line breaks. (Input-only.) |
 | `extra_text.jsonl` | 3 | Human-language text before/after JSON ("Here is your JSON: …"). |
@@ -28,6 +29,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `markdown_code_block.jsonl` | 1 | JSON extracted from ```json … ``` fence. |
 | `misordered_brackets.jsonl` | 11 | Array's last object has ] misplaced before/instead of } — simplified + real-world Chinese-text cases from json_failures.txt. |
 | `missing_colons.jsonl` | 2 | Colon inserted between key and value. Also colon misplaced inside key ("key:value" → "key":"value"). |
+| `missing_key_quote.jsonl` | 3 | Missing opening `"` on key — `key": value` → `"key": value`. |
 | `missing_commas.jsonl` | 3 | Commas inserted between elements/key-value pairs. |
 | `mixed_quotes.jsonl` | 3 | Mixed single/double quote boundary: ','word":" inside a double-quoted value — LLM output where a single-quoted key leaks into the preceding text value. |
 | `python_literals.jsonl` | 3 | True/False/None → true/false/null. |
@@ -52,6 +54,8 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | CSVer doubled quotes | `csv_escaping.jsonl` | `'{"a": "say ""hello"""}'` |
 | Dot-number normalize | `leading_dot_numbers.jsonl` | `'{".5": 1}'` |
 | Double-comma skip | `double_commas.jsonl` | `'{"a":1,, "b":2}'` |
+| Duplicate brace skip | `duplicate_brace.jsonl` | `'{{"key": "value"}'` |
+| Duplicate brace skip (nested) | `duplicate_brace.jsonl` | `'{"a": 1, {{"b": 2}}'` |
 | Edge cases | `edge_cases.jsonl` | empty object, bare string, Unicode, … |
 | Extra text before/after | `extra_text.jsonl` | `'Here is JSON: {"a":1}'` |
 | Four-quote | `four_quote.jsonl` | `'{"a": """"hello""""}'` |
@@ -60,6 +64,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | Leading comma skip | `leading_comma.jsonl` | `'[,1,2,3]'` |
 | Markdown code fence | `markdown_code_block.jsonl` | `` '```json\n{"a":1}\n```' `` |
 | Missing colon | `missing_colons.jsonl` | `'{"key" "value"}'` |
+| Missing key quote | `missing_key_quote.jsonl` | `'{"a": 1, key": 2}'` |
 | Missing comma | `missing_commas.jsonl` | `'{"a": 1 "b": 2}'` |
 | Mixed quotes | `mixed_quotes.jsonl` | `','word":"` inside double-quoted string |
 | Python literals | `python_literals.jsonl` | `'{"a": True, "b": None}'` |
