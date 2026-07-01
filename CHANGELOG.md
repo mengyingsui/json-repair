@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.1.16 (2026-06-28)
+
+### Fixed
+- Comma instead of colon after key — `"PROPERTY", "value": "text"` no longer
+  treated as colon (which consumed `"value"` as PROPERTY's value). Instead the
+  comma remains a separator: `"PROPERTY": null, "value": "text"`. Fix:
+  `_parse_value` emits `null` when value position starts with `,`.
+- Stray `:` when expecting key now silently consumed (avoids parser breakage
+  when previous fix leaves an orphaned colon).
+
+### Changed
+- `tests/cases/colon_misplaced_as_comma.jsonl` (2 cases) added.
+- `tests/cases/INDEX.md` updated (33 `.jsonl` files).
+
 ## v0.1.15 (2026-06-28)
 
 ### Added

@@ -1,0 +1,2 @@
+{"input": "{\"key\", \"value\": \"text\"}", "expected": {"key": null, "value": "text"}}
+{"input": "{\"a\": 1, \"key\", \"value\": \"text\"}", "expected": {"a": 1, "key": null, "value": "text"}}

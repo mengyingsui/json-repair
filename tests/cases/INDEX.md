@@ -13,6 +13,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 |---|---|---|
 | `brace_as_array_close.jsonl` | 5 | Real entries from json_failures.txt — array closed with } instead of ] (}}]} → }]}) in single/multi-item arrays, including code-fenced variants. |
 | `broken_patterns.jsonl` | 16 | Mixed defect types — embedded quotes, unquoted keys, trailing commas, missing commas/colons, comments, unescaped newlines, invalid escapes, Python/JS literals, extra text. (Input-only: validity + idempotence.) |
+| `colon_misplaced_as_comma.jsonl` | 2 | Comma used instead of colon after key — `"key", "value": "text"` → `"key":null,"value":"text"` (null for missing value, comma remains as separator). |
 | `comments.jsonl` | 3 | C-style //, /* */, and # comments stripped before parsing. |
 | `complex_scenarios.jsonl` | 5 | Realistic multi-fault inputs — mixed quote styles, comments, trailing commas, unquoted keys, unescaped inner quotes, None. |
 | `control_characters.jsonl` | 2 | Literal \n and \t preserved as control chars in output. |

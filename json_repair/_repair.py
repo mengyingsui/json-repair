@@ -608,7 +608,7 @@ class _Repairer:
         elif ch in "/#":
             self._skip_comment()
             self._parse_value()
-        elif ch in "}]":
+        elif ch in "}]" or ch == ",":
             self._emit("null")
         elif self._expect_key:
             if ch.isalpha() or ch == "_":
@@ -640,6 +640,10 @@ class _Repairer:
             ch = self.text[self.i]
 
             if ch == "{" and self._expect_key:
+                self.i += 1
+                continue
+
+            if ch == ":" and self._expect_key:
                 self.i += 1
                 continue
 
@@ -699,7 +703,7 @@ class _Repairer:
                         j += 1
                     while j < self.n and self.text[j] in " \t\r":
                         j += 1
-                    if j >= self.n or self.text[j] not in ':"':
+                    if j >= self.n or self.text[j] not in ':",':
                         break
                 if (
                     not first
