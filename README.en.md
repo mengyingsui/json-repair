@@ -40,6 +40,7 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 | Duplicate brace skip (v0.1.15) | `{{"key": "value"}` → `{"key": "value"}` | Extra `{` after object opening `{` is silently skipped |
 | Missing key opening quote (v0.1.15) | `key": value` → `"key": value` | Missing opening `"` on key is injected; trailing `"` consumed |
 | Comma instead of colon after key (v0.1.16) | `"key", "value": "text"` → `"key":null,"value":"text"` | Comma is kept as separator; null emitted for missing value |
+| SQL-style `--` comment (v0.1.17) | `"a": 1  -- comment` | `--` comments are skipped during repair, no effect on output |
 
 ## Install
 
@@ -144,6 +145,7 @@ Measured with `pytest-benchmark` — see [Development](#development).
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.1.17 | 2026-06-28 | SQL-style `--` line comment support (`_skip_comment` skips `--…` lines) |
 | v0.1.16 | 2026-06-28 | Comma-after-key fix — `"key", "value":` → `"key":null,"value":` (null for missing value, comma as separator) |
 | v0.1.15 | 2026-06-28 | Duplicate brace `{{` → `{` skip; Missing key opening quote — `key":` → `"key":` |
 | v0.1.14 | 2026-06-28 | `#` line comment support (`_skip_comment` skips `#…` lines); Cython `wraparound=False` UB fix |

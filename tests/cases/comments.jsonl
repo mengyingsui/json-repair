@@ -1,3 +1,5 @@
 {"input": "{\n  // this is a comment\n  \"key\": \"value\"\n}", "expected": {"key": "value"}}
 {"input": "{\"key\": /* inline comment */ \"value\"}", "expected": {"key": "value"}}
 {"input": "{\"a\": 1,  # hash inline\n  \"b\": 2}", "expected": {"a": 1, "b": 2}}
+{"input": "{\"key\": \"value\"} -- SQL line comment", "expected": {"key": "value"}}
+{"input": "{\"entities\": [{\"name\": \"x\"} -- Note: typo\n]}", "expected": {"entities": [{"name": "x"}]}}

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.17 (2026-06-28)
+
+### Added
+- SQL-style `--` line comment support — `_skip_comment` handles `--…` lines;
+  `_parse_value`/`_parse_object`/`_parse_array` detect `--` before number parsing.
+
+### Changed
+- `tests/cases/comments.jsonl` extended from 3 to 5 cases.
+- `tests/cases/INDEX.md` updated (33 `.jsonl` files).
+
 ## v0.1.16 (2026-06-28)
 
 ### Fixed

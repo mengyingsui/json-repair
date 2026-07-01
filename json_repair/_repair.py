@@ -603,6 +603,9 @@ class _Repairer:
             self._parse_single_quoted_string()
         elif ch in "tfnTFNnNiIuU":
             self._parse_literal()
+        elif ch == "-" and self._peek_str(2) == "--":
+            self._skip_comment()
+            self._parse_value()
         elif ch in "-.0123456789":
             self._parse_number()
         elif ch in "/#":
@@ -667,7 +670,7 @@ class _Repairer:
                 self._expect_key = True
                 continue
 
-            if ch in "/#":
+            if ch in "/#" or (ch == "-" and self._peek_str(2) == "--"):
                 self._skip_comment()
                 continue
 
@@ -786,7 +789,7 @@ class _Repairer:
                 self.i += 1
                 continue
 
-            if ch in "/#":
+            if ch in "/#" or (ch == "-" and self._peek_str(2) == "--"):
                 self._skip_comment()
                 continue
 
@@ -915,6 +918,11 @@ class _Repairer:
                 self.i += 1
         elif self.text[self.i] == "#":
             # # comments are silently stripped — the item is kept as-is
+            while self.i < self.n and self.text[self.i] != "\n":
+                self.i += 1
+            if self.i < self.n:
+                self.i += 1
+        elif self._peek_str(2) == "--":
             while self.i < self.n and self.text[self.i] != "\n":
                 self.i += 1
             if self.i < self.n:
