@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.0 (2026-07-03)
+
+### Changed
+- **Rust rewrite** — entire repair state machine ported from Cython to native
+  Rust via PyO3 (`crates/json-repair-core` + `crates/json-repair-python`).
+- Pre-processing (`fix_colon_in_key`, `fix_mixed_quotes`) moved from Python
+  regex to Rust character-level scanners.
+- Valid JSON now passes through unchanged (prevents false positives from
+  pre-processing on valid input).
+
+### Removed
+- Cython source files (`_cparse.pyx`, `_dev.py`) — no longer needed.
+- Pure-Python fallback path — the Rust extension is required.
+
+### Added
+- `crates/json-repair-core/` — reusable Rust crate with full test suite
+  (24 integration tests) and criterion benchmarks.
+- `crates/json-repair-python/` — PyO3 bindings crate.
+- Rust integration tests moved into `crates/json-repair-core/tests/`.
+
 ## v0.2.0 (2026-06-28)
 
 ### Added

@@ -7,17 +7,15 @@ Run with::
 
     pytest tests/test_performance.py -v
     pytest tests/test_performance.py --benchmark-histogram
-    pytest tests/test_performance.py -m cython_vs_pure --benchmark-histogram
 """
 
 from __future__ import annotations
 
 import json
 
-import pytest
 from pytest_benchmark.fixture import BenchmarkFixture
 
-from json_repair import HAS_CYTHON, repair_json
+from json_repair import repair_json
 
 
 def _assert_ok(text: str) -> None:
@@ -257,55 +255,6 @@ class TestTrivial:
     def test_bare_string(self, benchmark: BenchmarkFixture) -> None:
         _assert_ok('"hello world"')
         benchmark(repair_json, '"hello world"')
-
-
-# ── 6. Cython vs pure Python benchmark ─────────────────────────────────────
-
-
-@pytest.mark.skipif(
-    not HAS_CYTHON,
-    reason="Cython not available — comparison meaningless",
-)
-class TestCythonVsPure:
-    """Compare Cython-accelerated path vs pure Python."""
-
-    def _repair_pure(self, text: str) -> object:
-        import json_repair._repair as _rp
-
-        saved = _rp.HAS_CYTHON
-        _rp.HAS_CYTHON = False
-        try:
-            return repair_json(text)
-        finally:
-            _rp.HAS_CYTHON = saved
-
-    # ── Cython (fast) path ──
-
-    def test_cython_short_embedded(self, benchmark: BenchmarkFixture) -> None:
-        _assert_ok(SMALL_CORRUPT)
-        benchmark(repair_json, SMALL_CORRUPT)
-
-    def test_cython_long_embedded(self, benchmark: BenchmarkFixture) -> None:
-        _assert_ok(LONG_EMBEDDED)
-        benchmark(repair_json, LONG_EMBEDDED)
-
-    def test_cython_long_plain(self, benchmark: BenchmarkFixture) -> None:
-        _assert_ok(LONG_PLAIN)
-        benchmark(repair_json, LONG_PLAIN)
-
-    # ── Pure Python path ──
-
-    def test_pure_short_embedded(self, benchmark: BenchmarkFixture) -> None:
-        _assert_ok(SMALL_CORRUPT)
-        benchmark(self._repair_pure, SMALL_CORRUPT)
-
-    def test_pure_long_embedded(self, benchmark: BenchmarkFixture) -> None:
-        _assert_ok(LONG_EMBEDDED)
-        benchmark(self._repair_pure, LONG_EMBEDDED)
-
-    def test_pure_long_plain(self, benchmark: BenchmarkFixture) -> None:
-        _assert_ok(LONG_PLAIN)
-        benchmark(self._repair_pure, LONG_PLAIN)
 
 
 # ── 7. Correctness (no benchmark) ────────────────────────────────────────────

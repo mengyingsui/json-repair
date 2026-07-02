@@ -1,92 +1,118 @@
 # json_repair
 
-修复大语言模型输出中格式异常的 JSON，**单次遍历**即可完成。
+Repair malformed JSON from LLM outputs in a **single pass** — now powered by Rust.
 
-## 解决的问题
+## Problems Solved
 
-LLM 输出的 JSON 常见以下错误，`json_repair` 均可在一次遍历中修复：
+LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 
-| 错误类型 | 输入示例 | 修复结果 |
-|----------|----------|----------|
-| 字符串内未转义引号 | `"He said "hello""` | `"He said \"hello\""` |
-| Python 三引号字符串 | `"""text"""` | `"text"` |
-| CSV 风格 `""` 转义 | `"Col1""Data"` | `"Col1\"Data"` |
-| 单引号字符串 | `{'key': 'val'}` | `{"key": "val"}` |
-| 无引号 key | `{key: "val"}` | `{"key": "val"}` |
-| 尾部逗号 | `{"a": 1,}` | `{"a": 1}` |
-| 缺失逗号/冒号 | `{"a": 1 "b": 2}` | `{"a": 1, "b": 2}` |
-| Python 字面量 | `True / False / None` | `true / false / null` |
-| 注释 | `// comment` | 跳过 |
-| 截断 JSON | `{"a": 1` | `{"a": 1}` |
-| 字符串内控制字符 | 字面换行 / Tab | `\n` / `\t` |
-| 前缀/后缀文本 | `Here is JSON: {...}` | `{...}` |
-| 无效转义序列 (v0.1.1) | `"\*keeper, \(d_i\)"` | `"\\*keeper, \\(d_i\\)"` |
-| JS 字面量 (v0.1.2) | `NaN, Infinity, undefined` | `null` |
-| 隐含对象序列 (v0.1.3, ≥8KB) | `{...}, {...}, {...}` | `[{...}, {...}, {...}]` |
-| 尾部垃圾数据 (v0.1.4) | `{"a":1}-lnd\nuser\n...` | `{"a":1}` |
-| 前导逗号跳过 (v0.1.5) | `[,1]` | `[1]` |
-| 点号数字归一化 (v0.1.5) | `.5` / `5.` | `0.5` / `5.0` |
-| 相邻对象包裹 (v0.1.5) | `}{` (≥8KB, ≥3组) | `[{...},{...}]` |
-| 无大括号对象检测 (v0.1.6) | `"key": value` | `{"key": value}` |
-| 多余逗号跳过 (v0.1.7) | `"x",,` / `[1,,2]` | `"x",` / `[1,2]` |
-| 括号错序修复 (v0.1.8) | `[{"]"}]}` → `[{"..."}]` | 数组末对象 `]` 误放于 `}` 前时自动校正 |
-| 数组 `}` 闭合校正 (v0.1.9) | `{"a":[1}}]}` → `{"a":[1]}` | 数组误用 `}` 关闭时自动替换为 `]` |
-| 无引号值修复 (v0.1.9) | `{"name": John}` → `{"name": "John"}` | 无引号字符串值自动添加引号 |
-| 混合引号边界修复 (v0.1.10) | `"文本','key":"值"` → `"文本","key":"值"` | 双引号内 `','key":"` 模式自动断开，单引号 key 不泄漏到文本值中 |
-| 冒号后缺失值填充 (v0.1.10) | `{"text":` → `{"text": null}` | Key 后缺失的值自动填充 `null` |
-| Key 内冒号拆分 (v0.1.10) | `"key:value"` → `"key":"value"` | 冒号被误写入 key 字符串时，自动拆分为 key/value 对 |
-| 缺失闭合引号修复 (v0.1.13) | `"text","entity"` → `"text","entity"` | 字符串值缺少末尾 `"` 时不再吞掉下一个 key 的开引号 |
-| `#` 行注释支持 (v0.1.14) | `"a": 1  # comment` | `#` 注释自动跳过，不影响 JSON 修复 |
-| 重复花括号跳过 (v0.1.15) | `{{"key": "value"}` → `{"key": "value"}` | 对象开头多余的 `{` 自动跳过 |
-| Key 缺失开引号修复 (v0.1.15) | `key": value` → `"key": value` | Key 缺少开头 `"` 时自动补全并消耗多余的闭引号 |
-| 逗号误用为冒号修复 (v0.1.16) | `"key", "value": "text"` → `"key":null,"value":"text"` | 逗号保留为分隔符，缺失的值填 null |
-| SQL 风格 `--` 注释 (v0.1.17) | `"a": 1  -- comment` | `--` 注释自动跳过，不影响 JSON 修复 |
-| 全量 Cython 加速 (v0.2.0) | 所有热路径解析器（字符串、单引号字符串、三引号字符串、值分发、对象、数组）编译为 C | 字符级循环全部通过 `_cparse.pyx` 编译为 C，包括此前纯 Python 的对象/数组/值分发 |
+| Issue | Input | Repaired |
+|-------|-------|----------|
+| Unescaped quotes in strings | `"He said "hello""` | `"He said \"hello\""` |
+| Python triple-quoted strings | `"""text"""` | `"text"` |
+| CSV-style `""` escaping | `"Col1""Data"` | `"Col1\"Data"` |
+| Single-quoted strings | `{'key': 'val'}` | `{"key": "val"}` |
+| Unquoted keys | `{key: "val"}` | `{"key": "val"}` |
+| Trailing commas | `{"a": 1,}` | `{"a": 1}` |
+| Missing commas/colons | `{"a": 1 "b": 2}` | `{"a": 1, "b": 2}` |
+| Python literals | `True / False / None` | `true / false / null` |
+| Comments | `// comment`, `# comment`, `-- comment` | stripped |
+| Truncated JSON | `{"a": 1` | `{"a": 1}` |
+| Control characters | literal newline / tab | `\n` / `\t` |
+| Extra text before/after | `Here is JSON: {...}` | `{...}` |
+| Invalid escape sequences | `"\*keeper, \(d_i\)"` | `"\\*keeper, \\(d_i\\)"` |
+| JS literals | `NaN, Infinity, undefined` | `null` |
+| Implicit object sequence (≥8KB) | `{...}, {...}, {...}` | `[{...}, {...}, {...}]` |
+| Trailing junk data | `{"a":1}-lnd\nuser...` | `{"a":1}` |
+| Leading comma skip | `[,1]` | `[1]` |
+| Dot-number normalization | `.5` / `5.` | `0.5` / `5.0` |
+| Adjacent-object wrapping | `}{` (≥8KB) | `[{...},{...}]` |
+| Unbraced object detection | `"key": value` | `{"key": value}` |
+| Double-comma skip | `"x",,` / `[1,,2]` | `"x",` / `[1,2]` |
+| Misordered-bracket fix | `[{"key": value]}` | `[{"key": value}]` |
+| Brace-as-array-close | `{"a":[1}}]}` | `{"a":[1]}` |
+| Unquoted string values | `{"name": John}` | `{"name": "John"}` |
+| Mixed-quote boundary fix | `"text','key":"val"` | `"text","key":"val"` |
+| Missing-value-after-colon fill | `{"text":` | `{"text": null}` |
+| Colon misplaced in key | `"key:value"` → `"key":"value"` | auto-split |
+| Missing closing quote fix | `"text","entity"` | `"text","entity"` |
+| Duplicate brace skip | `{{"key": "value"}` | `{"key": "value"}` |
+| Missing key opening quote | `key": value` | `"key": value` |
+| Comma instead of colon after key | `"key", "value":` | `"key":null,"value":` |
 
-## 安装
+## Install
+
+### Python
 
 ```bash
 pip install git+https://gitee.com/mensui/json_repair.git
 ```
 
-或使用 uv：
+Or with uv:
 
 ```bash
 uv add git+https://gitee.com/mensui/json_repair.git
 ```
 
-## 使用
+### Rust
+
+```toml
+[dependencies]
+json-repair-core = { git = "https://gitee.com/mensui/json_repair" }
+```
+
+## Usage
+
+### Python
 
 ```python
 from json_repair import repair_json
 
-# 修复 LLM 输出的异常 JSON
+# Fix broken JSON from LLM output
 broken = '{"response": "He said "hello" to me"}'
 fixed = repair_json(broken)
 print(fixed)
 # '{"response": "He said \"hello\" to me"}'
 
-# 直接获取 Python 对象
+# Get Python object directly
 obj = repair_json(broken, return_object=True)
 print(obj)
 # {'response': 'He said "hello" to me'}
 ```
 
-## 注意
+### Rust
 
-修复后的 JSON 在语法上一定合法，但不保证语义上满足你的需求（例如缺失值被补 `null`）。
-**建议配合验证器使用**，将字符串解析为 `dict` 后检查其结构是否符合预期。
+```toml
+[dependencies]
+json-repair-core = { git = "https://gitee.com/mensui/json_repair" }
+```
 
-> **`#` 行注释**会被静默跳过（视为不存在）。如果 LLM 输出的 JSON 中包含带 `#` 的项（例如模型无法决定是否保留某个字段而用注释标记），修复结果仍会保留该项。这符合预期——修复器不应对模型的不确定性做取舍，但调用方需知晓注释**不会**起到排除作用。
+```rust
+use json_repair_core::repair_json;
+
+fn main() {
+    let broken = r#"{"response": "He said "hello" to me"}"#;
+    let repaired = repair_json(broken).unwrap();
+    println!("{repaired}");
+    // {"response": "He said \"hello\" to me"}
+}
+```
+
+## Caveat
+
+### Python
+
+Repaired JSON is always syntactically valid, but may not be semantically what you need (e.g., missing values become `null`).
+**It is recommended to pair with a validator** — parse the result and check its structure before use.
 
 ```python
 from json_repair import repair_json
 
 raw = '{"name": "Alice", "age":'
 obj = repair_json(raw, return_object=True)
-# obj == {"name": "Alice", "age": null}  ← 可能不是你想要的
+# obj == {"name": "Alice", "age": null}  ← may not be what you want
 
-# 自定义验证
+# Custom validation
 def validate(data):
     return isinstance(data, dict) and "age" in data and data["age"] is not None
 
@@ -96,107 +122,84 @@ else:
     print("unexpected shape, discard or retry")
 ```
 
-## 设计
+### Rust
+
+`repair_json` returns a `Result<String, JsonRepairError>`. The output is always syntactically valid JSON on `Ok`, but may contain `null` for missing values. Validate the parsed output against your expected schema.
+
+## Architecture
 
 ```
-输入文本
+Input text
   │
-  ├─ pre-process (regex)
-  │    _fix_colon_in_key
-  │    _fix_mixed_quotes
+  ├─ Pre-processing (Rust)
+  │    fix_colon_in_key
+  │    fix_mixed_quotes
   │
-  ├─ _Repairer
-  │    1. _skip_prefix_junk
-  │    2. >=8KB {..}{..} → 包为数组
-  │    3. _parse_value
-  │      ├─ _parse_object
-  │      ├─ _parse_array
-  │      ├─ _parse_string
-  │      └─ _parse_literal
-  │    4. _close_brackets
-  │    5. _skip_suffix_junk (O(1) 查表)
+  ├─ Repairer state machine (Rust)
+  │    1. skip_prefix_junk
+  │    2. ≥8KB {..}{..} → wrap as array
+  │    3. parse_value
+  │      ├─ parse_object
+  │      ├─ parse_array
+  │      ├─ parse_string
+  │      └─ parse_literal
+  │    4. close_brackets
+  │    5. skip_suffix_junk (O(1) depth-tracker lookup)
   │
-  └─ 修复后 JSON
+  └─ Repaired JSON
 ```
 
-状态机核心为**单遍字符流**，深度游标在解析过程中记录，后缀清理无二次遍历。关键启发式规则：
+All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
-> 字符串内遇到 `"` 时，仅当紧随其后的非空白字符是 `,` `}` `]` `:` `\n` 或另一个 `"` 才视为闭合引号，其余全部转义。
+## Versions
 
-此规则针对 LLM 自然语言输出中频繁内嵌引号的行为优化。
+| Version | Date | Description |
+|---------|------|-------------|
+| v0.3.0 | 2026-07-03 | Rust rewrite — entire state machine ported from Cython to Rust via PyO3 |
+| v0.2.0 | 2026-06-28 | Full Cython acceleration for all hot-path parsers |
+| v0.1.17 | 2026-06-28 | SQL-style `--` line comment support |
+| v0.1.16 | 2026-06-28 | Comma-after-key fix (null for missing value, comma as separator) |
+| v0.1.15 | 2026-06-28 | Duplicate brace skip; missing key opening quote fix |
+| v0.1.14 | 2026-06-28 | `#` line comment support |
+| v0.1.13 | 2026-06-27 | Unterminated string fix |
+| v0.1.12 | 2026-06-27 | Cython-accelerated `_parse_string` |
+| v0.1.11 | 2026-06-27 | O(1) suffix junk cleanup |
+| v0.1.10 | 2026-06-27 | Mixed-quote boundary fix; colon-in-key split |
+| v0.1.9 | 2026-06-26 | Brace-as-array-close; unquoted value repair |
+| v0.1.8 | 2026-06-25 | Misordered-bracket fix |
+| v0.1.7 | 2026-06-23 | Unbraced-object detection; double-comma skip |
+| v0.1.6 | 2026-06-23 | Single-file `_Repairer` |
+| v0.1.5 | 2026-06-23 | Leading comma skip; dot-number normalization |
+| v0.1.4 | 2026-06-22 | Trailing junk detection |
+| v0.1.3 | 2026-06-22 | Implicit object array wrapping |
+| v0.1.2 | 2026-06-22 | JS literal support; Hypothesis tests |
+| v0.1.1 | 2026-06-22 | Invalid escape sequence fix |
+| v0.1.0 | 2026-06-22 | Initial release |
 
-## 性能
-
-| 场景 | 大小 | 耗时 (Cython) | 耗时 (纯 Python) | 吞吐 |
-|------|------|------|------|------|
-| 空对象 `{}` | 2 B | 2 µs | 2 µs | 1.0 MB/s |
-| 小型 JSON | 48 B | 4 µs | 11 µs | 11.4 MB/s |
-| 中型 JSON | 2.4 KB | 0.09 ms | 0.38 ms | 25.4 MB/s |
-| 大型 JSON | 9.2 KB | 1.5 ms | 4.9 ms | 5.8 MB/s |
-| 真实 LLM 输出 | 0.3 KB | 12 µs | 47 µs | 23.8 MB/s |
-| 深层嵌套 | 0.2 KB | 6 µs | 20 µs | 31.7 MB/s |
-| 多内嵌引号 (短) | 0.2 KB | 4 µs | 13 µs | 47.6 MB/s |
-| 多内嵌引号 (长) | 12 KB | 155 µs | 1.5 ms | 73.8 MB/s |
-
-Cython 加速对字符串密集的场景效果显著（**2–10×**）。自 v0.2.0 起，**所有**热路径解析器均已编译为 C——此前对象/数组/值分发在结构密集型输入上仍为纯 Python 执行。
-测量工具为 `pytest-benchmark`，详见[开发](#开发)一节。
-
-## 版本
-
-| 版本 | 日期 | 说明 |
-|------|------|------|
-| v0.2.0 | 2026-06-28 | 全量 Cython 加速——所有热路径解析器（单引号字符串、三引号字符串、值/对象/数组分发）均编译为 C；此前仅有 `_parse_string` 为 Cython 加速 |
-| v0.1.17 | 2026-06-28 | SQL 风格 `--` 行注释支持（`_skip_comment` 跳过 `--…` 行） |
-| v0.1.16 | 2026-06-28 | 逗号误用为冒号修复 — `"key", "value":` → `"key":null,"value":`（空值填 null，逗号保留为分隔符） |
-| v0.1.15 | 2026-06-28 | 重复花括号 `{{` → `{` 跳过；Key 缺失开引号修复 — `key":` → `"key":` |
-| v0.1.14 | 2026-06-28 | `#` 行注释支持（`_skip_comment` 跳过 `#…` 行）；Cython `wraparound=False` UB 修复 |
-| v0.1.13 | 2026-06-27 | 缺失闭合引号修复（`_parse_string`/`parse_string` 不再吞掉下一个 key 的开引号）；新增 `unterminated_string.jsonl` |
-| v0.1.12 | 2026-06-27 | `_parse_string` Cython 加速 (`_cparse.pyx`)；构建系统迁移至 `hatchling` + `hatch-cython`；`setup.py` 移除；性能测试迁移至 `pytest-benchmark` |
-| v0.1.11 | 2026-06-27 | `_skip_suffix_junk` O(1) 深度查表（消除 15–25% 总耗时）；常量 `IMPLICIT_SEQUENCE_MIN_LENGTH` 提取；控制字符 emit `\uXXXX` |
-| v0.1.10 | 2026-06-27 | 混合引号边界修复；冒号后缺失值填充（`{"text":` → `{"text":null}`）；Key 内冒号拆分；`mixed_quotes.jsonl`；8/8 json_failures.txt 全修复 |
-| v0.1.9 | 2026-06-26 | 数组 `}` 闭合校正；无引号字符串值修复；测试拆分为独立文件 |
-| v0.1.8 | 2026-06-25 | 括号错序修复；`misordered_brackets.jsonl` |
-| v0.1.7 | 2026-06-23 | 无大括号对象检测；多余逗号跳过；24 个 `.jsonl` 文件；34/34 json_failures.txt 全修复 |
-| v0.1.6 | 2026-06-23 | 单 `_Repairer` 类；22 个 `.jsonl` 测试文件；Pylance 严格模式 0 警告 |
-| v0.1.5 | 2026-06-23 | 前导逗号跳过；`.` 数字归一化；相邻对象 `}{` 数组包裹；FAQ.md |
-| v0.1.4 | 2026-06-22 | 尾部垃圾检测；隐式数组深度追踪；16/17 json_failures.txt |
-| v0.1.3 | 2026-06-22 | 隐含对象序列自动包裹为数组 |
-| v0.1.2 | 2026-06-22 | JS 字面量支持；Hypothesis 属性测试；防御性修复 |
-| v0.1.1 | 2026-06-22 | 修复无效 JSON 转义序列 (`\*`, `\(`, `\)` 等) |
-| v0.1.0 | 2026-06-22 | 初始版本，单次遍历状态机修复 LLM JSON |
-
-## 开发
+## Development
 
 ```bash
-# 克隆
+# Clone
 git clone https://gitee.com/mensui/json_repair.git
 cd json_repair
 
-# 安装依赖并编译 Cython
+# Install deps (Rust extension built automatically)
 uv sync
 
-# 运行全部测试
-uv run test
+# Run Python tests
+uv run pytest tests/python/ -v
 
-# 修改 _cparse.pyx 后——重新生成 .pyd
-uv sync
+# Run Rust tests + benches
+cargo test -p json-repair-core
+cargo bench -p json-repair-core
 
-# 性能基准测试
-uv run bench          # 仅基准
-uv run bench-hist     # 直方图
-uv run bench-compare  # 对比
+# Rebuild Rust .pyd (after Rust changes)
+uv run maturin develop --release -m crates/json-repair-python/Cargo.toml
 
-# Lint / 类型检查
-uv run lint
-uv run typecheck
-
-# Pre-commit
-uv run precommit
+# Lint / type check
+uv run ruff check json_repair/ tests/python/
 ```
 
-`uv sync` 自动通过 `hatch-cython` 编译 `.pyx → .c → .pyd`。
-`.c` 为构建产物，已 git-ignored。脚本入口定义在 `pyproject.toml` 的 `[project.scripts]` 中，`json_repair/_dev.py` 实现。
-
-## 许可
+## License
 
 GNU General Public License v2.0

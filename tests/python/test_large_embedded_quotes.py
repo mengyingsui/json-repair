@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tests._helpers import load_inputs, roundtrip
+from _helpers import load_inputs, roundtrip
 
 
 class TestLargeEmbeddedQuotes:

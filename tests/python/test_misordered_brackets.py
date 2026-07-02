@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tests._helpers import run
+from _helpers import run
 
 
 class TestMisorderedBrackets:

@@ -1,0 +1,55 @@
+# json-repair-core
+
+Core Rust library for repairing malformed JSON from LLM outputs. Used by the [`json-repair`](https://gitee.com/mensui/json_repair) Python package (gitee.com).
+
+## Features
+
+- Single-pass state machine — linear time, no backtracking
+- Pre-processing helpers: `fix_colon_in_key`, `fix_mixed_quotes`
+- Heuristic string-closing logic tuned for LLM natural-language embedded quotes
+
+## Usage
+
+```rust
+use json_repair_core::repair_json;
+
+fn main() {
+    let broken = r#"{"response": "He said "hello" to me"}"#;
+    let repaired = repair_json(broken).unwrap();
+    println!("{repaired}");
+    // {"response": "He said \"hello\" to me"}
+}
+```
+
+## API
+
+| Function | Description |
+|----------|-------------|
+| `repair_json(text)` | Repair malformed JSON, returns `Ok(String)` or `Err(JsonRepairError)` |
+| `fix_colon_in_key(text)` | Split `"key:value"` → `"key":"value"` when followed by `,` or `}` |
+| `fix_mixed_quotes(text)` | Fix `','word":"` boundary between double- and single-quoted segments |
+
+## Architecture
+
+```
+Input text
+  │
+  ├─ fix_colon_in_key
+  ├─ fix_mixed_quotes
+  ├─ Repairer state machine
+  │    1. skip_prefix_junk
+  │    2. ≥8KB implicit object sequence → wrap as array
+  │    3. parse_value
+  │      ├─ parse_object
+  │      ├─ parse_array
+  │      ├─ parse_string
+  │      └─ parse_literal
+  │    4. close_brackets
+  │    5. skip_suffix_junk
+  │
+  └─ Repaired JSON
+```
+
+## License
+
+GNU General Public License v2.0

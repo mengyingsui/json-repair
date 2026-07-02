@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tests._helpers import roundtrip
+from _helpers import roundtrip
 
 
 class TestComplexScenarios:

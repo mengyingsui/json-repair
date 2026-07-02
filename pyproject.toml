@@ -1,58 +1,26 @@
 [build-system]
-requires = ["hatchling", "hatch-cython", "Cython", "setuptools"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.14"]
+build-backend = "maturin"
 
 [project]
 name = "json-repair"
-version = "0.2.0"
+version = "0.3.0"
 description = "Repair malformed JSON from LLM outputs - handles unescaped quotes, triple-quoted strings, and more in a single pass"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
 
-[project.scripts]
-test = "json_repair._dev:test"
-bench = "json_repair._dev:bench"
-bench-hist = "json_repair._dev:bench_hist"
-bench-compare = "json_repair._dev:bench_compare"
-lint = "json_repair._dev:lint"
-typecheck = "json_repair._dev:typecheck"
-precommit = "json_repair._dev:precommit"
-
-[tool.hatch.build.targets.wheel]
-packages = ["json_repair"]
-exclude = [
-    "json_repair/_cparse.pyx",
-    "json_repair/_cparse.c",
-]
-
-[tool.hatch.build.targets.wheel.hooks.cython]
-dependencies = ["hatch-cython"]
-
-[tool.hatch.build.targets.wheel.hooks.cython.options]
-src = "json_repair"
-compile_py = false
-directives = { boundscheck = false, wraparound = false, initializedcheck = false, cdivision = true }
-language_level = "3"
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "/json_repair/*.py",
-    "/json_repair/*.pyx",
-    "/json_repair/py.typed",
-    "/tests",
-    "/README.md",
-    "/LICENSE",
-    "/pyproject.toml",
-]
+[tool.maturin]
+manifest-path = "crates/json-repair-python/Cargo.toml"
+module-name = "json_repair._rust_parse"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/python"]
+pythonpath = ["tests/python"]
 
 [dependency-groups]
 dev = [
     "codegraph>=1.2.0",
-    "Cython>=3.0",
     "hypothesis>=6.155.7",
     "mypy>=2.1.0",
     "pre-commit>=4.6.0",
@@ -61,16 +29,11 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "pytest-benchmark>=5.2.3",
     "ruff>=0.15.18",
-    "setuptools>=75",
 ]
 
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "tests.test_repair"
-disable_error_code = ["untyped-decorator"]
 
 [tool.ruff]
 target-version = "py312"
@@ -86,12 +49,9 @@ indent-style = "space"
 # ── Dev workflow ──────────────────────────────────────────────────────────
 #
 # First-time setup:              uv sync
-# Run all tests:                 uv run test
-# After .pyx changes:            uv sync           # rebuilds .pyd
-# Benchmarks:                    uv run bench | bench-hist | bench-compare
-# Lint / typecheck:              uv run lint | typecheck
-# Pre-commit:                    uv run precommit
-#
-# hatch-cython handles .pyx → .c → .pyd during wheel builds.
-# `uv sync` also compiles Cython (via PEP 517 build).
-# Without a .pyd all parsing falls back to pure Python (identical behaviour).
+# Run tests:                     uv run pytest tests/python/ -v
+# Run Rust benches:              cargo bench -p json-repair-core
+# Run Python benches:            uv run pytest tests/python/test_performance.py --benchmark-only
+# Lint:                          uv run ruff check json_repair/ tests/python/
+# Rebuild Rust .pyd:             uv run maturin develop --release -m crates/json-repair-python/Cargo.toml
+#                               then copy .venv/Lib/site-packages/_rust_parse/*.pyd to json_repair/

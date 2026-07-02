@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from _helpers import roundtrip
+
 from json_repair import repair_json
-from tests._helpers import roundtrip
 
 
 class TestEdgeCases:

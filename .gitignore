@@ -5,9 +5,14 @@ __pycache__/
 
 # C extensions
 *.so
+
+# Rust / Cargo
+target/
+Cargo.lock
+
+# PyO3 binary (built by maturin during pip install)
 *.pyd
-# Cython-generated .c (build artifact — PEP 517 always has Cython)
-*.c
+*.pdb
 
 # Distribution / packaging
 .Python

@@ -18,7 +18,7 @@ from hypothesis import strategies as st
 from json_repair import repair_json
 
 # Work around hypothesis stubs requiring Literal for blacklist_categories.
-_CC = cast(Any, ("Cc",))
+_CC = cast(Any, ("Cc", "Cs"))
 
 if TYPE_CHECKING:
     _F = TypeVar("_F", bound=Callable[..., Any])
@@ -61,7 +61,7 @@ _json_value: st.SearchStrategy[Any] = st.recursive(
 )
 
 _BROKEN_RAW: list[str] = []
-_path = Path(__file__).parent / "cases" / "broken_patterns.jsonl"
+_path = Path(__file__).parent.parent / "cases" / "broken_patterns.jsonl"
 for _line in _path.read_text(encoding="utf-8").strip().splitlines():
     if _line.strip():
         _BROKEN_RAW.append(json.loads(_line)["input"])

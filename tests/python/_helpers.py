@@ -8,7 +8,7 @@ from typing import Any
 
 from json_repair import repair_json
 
-CASES_DIR = Path(__file__).parent / "cases"
+CASES_DIR = Path(__file__).parent.parent / "cases"
 
 
 def roundtrip(text: str) -> Any:

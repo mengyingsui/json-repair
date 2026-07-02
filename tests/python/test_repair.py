@@ -9,9 +9,9 @@ import json
 from typing import Any
 
 import pytest
+from _helpers import CASES_DIR, load_inputs, run
 
 from json_repair import repair_json
-from tests._helpers import CASES_DIR, load_inputs, run
 
 
 def _all_cases() -> list[Any]:
@@ -33,7 +33,7 @@ def _all_cases() -> list[Any]:
 # ── Parametrized from .jsonl files ──────────────────────────────────────
 
 
-@pytest.mark.parametrize("input_str,expected", _all_cases())
+@pytest.mark.parametrize("input_str,expected", _all_cases())  # type: ignore[untyped-decorator]
 def test_jsonl_cases(input_str: str, expected: object) -> None:
     run(input_str, expected)
 
@@ -41,7 +41,7 @@ def test_jsonl_cases(input_str: str, expected: object) -> None:
 # ── Broken patterns (validity + idempotence) ────────────────────────────
 
 
-@pytest.mark.parametrize("input_str", load_inputs("broken_patterns"))
+@pytest.mark.parametrize("input_str", load_inputs("broken_patterns"))  # type: ignore[untyped-decorator]
 def test_broken_patterns(input_str: str) -> None:
     """Every known broken pattern should produce valid, idempotent JSON."""
     repaired = repair_json(input_str)

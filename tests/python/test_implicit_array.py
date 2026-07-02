@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 
+from _helpers import run
+
 from json_repair import repair_json
-from tests._helpers import run
 
 
 class TestImplicitArray:

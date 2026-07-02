@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/json-repair-core",
+]
+exclude = [
+    "crates/json-repair-python",
+]
