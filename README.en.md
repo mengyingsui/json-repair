@@ -130,16 +130,16 @@ This is tuned for the natural-language embedded quotes common in LLM output.
 
 | Scenario | Size | Time (Cython) | Time (pure Python) | Throughput |
 |----------|------|------|------|------|
-| Empty `{}` | 2 B | 2 µs | 2 µs | 0.8 MB/s |
-| Small JSON | 48 B | 10 µs | 11 µs | 4.6 MB/s |
-| Medium JSON | 2.4 KB | 0.28 ms | 0.38 ms | 8.5 MB/s |
-| Large JSON | 9.2 KB | 4.5 ms | 4.9 ms | 2.0 MB/s |
-| Realistic LLM output | 0.3 KB | 28 µs | 47 µs | 10.4 MB/s |
-| Deeply nested | 0.2 KB | 19 µs | 20 µs | 12.1 MB/s |
-| Many embedded quotes (short) | 0.2 KB | 8 µs | 47 µs | 23.1 MB/s |
-| Many embedded quotes (long) | 12 KB | 168 µs | 1.5 ms | 71.1 MB/s |
+| Empty `{}` | 2 B | 2 µs | 2 µs | 1.0 MB/s |
+| Small JSON | 48 B | 4 µs | 11 µs | 11.4 MB/s |
+| Medium JSON | 2.4 KB | 0.09 ms | 0.38 ms | 25.4 MB/s |
+| Large JSON | 9.2 KB | 1.5 ms | 4.9 ms | 5.8 MB/s |
+| Realistic LLM output | 0.3 KB | 12 µs | 47 µs | 23.8 MB/s |
+| Deeply nested | 0.2 KB | 6 µs | 20 µs | 31.7 MB/s |
+| Many embedded quotes (short) | 0.2 KB | 4 µs | 13 µs | 47.6 MB/s |
+| Many embedded quotes (long) | 12 KB | 155 µs | 1.5 ms | 73.8 MB/s |
 
-Cython acceleration provides **2–9×** speedup on string-heavy inputs.
+Cython acceleration provides **2–10×** speedup on string-heavy inputs.
 As of v0.2.0, **all** hot-path parsers run in C — including object/array/value
 dispatch (previously pure-Python on structure-heavy inputs).
 Measured with `pytest-benchmark` — see [Development](#development).
@@ -173,33 +173,32 @@ Measured with `pytest-benchmark` — see [Development](#development).
 ```bash
 git clone https://gitee.com/mensui/json_repair.git
 cd json_repair
+
+# Install deps & compile Cython (.pyx → .c → .pyd)
 uv sync
 
-# Run tests (Cython .pyd from wheel, or pure-Python fallback)
-uv run pytest tests/ -v
+# Run all tests
+uv run test
 
-# After modifying _cparse.pyx — rebuild Cython .pyd and re-install
-uv build --wheel
-uv pip install --force-reinstall ".\dist\json_repair-*-cp312-cp312-win_amd64.whl"
+# After modifying _cparse.pyx — rebuild .pyd
+uv sync
 
-# Performance benchmarks (pytest-benchmark)
-uv run pytest tests/test_performance.py --benchmark-only
-uv run pytest tests/test_performance.py --benchmark-histogram
-uv run pytest tests/test_performance.py --benchmark-compare
+# Performance benchmarks
+uv run bench
+uv run bench-hist
+uv run bench-compare
 
-uv run pre-commit run --all-files
+# Lint / type check
+uv run lint
+uv run typecheck
+
+# Pre-commit
+uv run precommit
 ```
 
-### Embedding uv + Cython build into pyproject.toml
-
-Add to `pyproject.toml` to make `uv sync` automatically trigger Cython
-compilation when `.pyx` changes (requires the `.c` to be pre-generated or
-shipped in sdist):
-
-```toml
-# (already configured via hatch-cython — `uv build` compiles .pyx → .c → .pyd)
-# For dev, run: uv build --wheel && uv pip install --force-reinstall .\dist\json_repair-*.whl
-```
+`uv sync` compiles `.pyx → .c → .pyd` via `hatch-cython` automatically.
+`.c` is build-artifact, git-ignored. Commands defined in `[project.scripts]`
+in `pyproject.toml`, implemented by `json_repair/_dev.py`.
 
 ## License
 

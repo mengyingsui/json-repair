@@ -482,6 +482,8 @@ def _cparse_dispatch_value(str _text, Py_ssize_t _i, Py_ssize_t _n,
 
     _skip_ws(_text, &__i, _n)
     if __i >= _n:
+        _emit(_out, "null", &_out_chars)
+        _just_emitted = True
         return __i, _expect_key, _just_emitted, _out_chars, _last_depth0_pos
 
     ch = _text[__i]

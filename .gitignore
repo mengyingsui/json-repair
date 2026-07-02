@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 *.pyd
+# Cython-generated .c (build artifact — PEP 517 always has Cython)
+*.c
 
 # Distribution / packaging
 .Python

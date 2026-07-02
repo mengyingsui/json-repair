@@ -129,16 +129,16 @@ else:
 
 | 场景 | 大小 | 耗时 (Cython) | 耗时 (纯 Python) | 吞吐 |
 |------|------|------|------|------|
-| 空对象 `{}` | 2 B | 2 µs | 2 µs | 0.8 MB/s |
-| 小型 JSON | 48 B | 10 µs | 11 µs | 4.6 MB/s |
-| 中型 JSON | 2.4 KB | 0.28 ms | 0.38 ms | 8.5 MB/s |
-| 大型 JSON | 9.2 KB | 4.5 ms | 4.9 ms | 2.0 MB/s |
-| 真实 LLM 输出 | 0.3 KB | 28 µs | 47 µs | 10.4 MB/s |
-| 深层嵌套 | 0.2 KB | 19 µs | 20 µs | 12.1 MB/s |
-| 多内嵌引号 (短) | 0.2 KB | 8 µs | 47 µs | 23.1 MB/s |
-| 多内嵌引号 (长) | 12 KB | 168 µs | 1.5 ms | 71.1 MB/s |
+| 空对象 `{}` | 2 B | 2 µs | 2 µs | 1.0 MB/s |
+| 小型 JSON | 48 B | 4 µs | 11 µs | 11.4 MB/s |
+| 中型 JSON | 2.4 KB | 0.09 ms | 0.38 ms | 25.4 MB/s |
+| 大型 JSON | 9.2 KB | 1.5 ms | 4.9 ms | 5.8 MB/s |
+| 真实 LLM 输出 | 0.3 KB | 12 µs | 47 µs | 23.8 MB/s |
+| 深层嵌套 | 0.2 KB | 6 µs | 20 µs | 31.7 MB/s |
+| 多内嵌引号 (短) | 0.2 KB | 4 µs | 13 µs | 47.6 MB/s |
+| 多内嵌引号 (长) | 12 KB | 155 µs | 1.5 ms | 73.8 MB/s |
 
-Cython 加速对字符串密集的场景效果显著（**2–9×**）。自 v0.2.0 起，**所有**热路径解析器均已编译为 C——此前对象/数组/值分发在结构密集型输入上仍为纯 Python 执行。
+Cython 加速对字符串密集的场景效果显著（**2–10×**）。自 v0.2.0 起，**所有**热路径解析器均已编译为 C——此前对象/数组/值分发在结构密集型输入上仍为纯 Python 执行。
 测量工具为 `pytest-benchmark`，详见[开发](#开发)一节。
 
 ## 版本
@@ -172,30 +172,30 @@ Cython 加速对字符串密集的场景效果显著（**2–9×**）。自 v0.2
 git clone https://gitee.com/mensui/json_repair.git
 cd json_repair
 
-# 安装依赖
+# 安装依赖并编译 Cython
 uv sync
 
-# 运行测试（使用已安装的 Cython .pyd，或纯 Python 回退）
-uv run pytest tests/ -v
+# 运行全部测试
+uv run test
 
-# 修改 _cparse.pyx 后——重新编译 Cython .pyd 并重装
-uv build --wheel
-uv pip install --force-reinstall ".\dist\json_repair-*-cp312-cp312-win_amd64.whl"
+# 修改 _cparse.pyx 后——重新生成 .pyd
+uv sync
 
-# 性能基准测试（pytest-benchmark）
-uv run pytest tests/test_performance.py --benchmark-only
-uv run pytest tests/test_performance.py --benchmark-histogram
-uv run pytest tests/test_performance.py --benchmark-compare
+# 性能基准测试
+uv run bench          # 仅基准
+uv run bench-hist     # 直方图
+uv run bench-compare  # 对比
 
-# 运行 pre-commit
-uv run pre-commit run --all-files
+# Lint / 类型检查
+uv run lint
+uv run typecheck
+
+# Pre-commit
+uv run precommit
 ```
 
-### 将 uv + Cython 构建流程嵌入 pyproject.toml
-
-当前 `pyproject.toml` 已通过 `hatch-cython` 配置 Cython 编译：
-`uv build` 会自动执行 `.pyx → .c → .pyd`。
-开发时可使用 `uv build --wheel` 跳过 sdist 构建以节省时间。
+`uv sync` 自动通过 `hatch-cython` 编译 `.pyx → .c → .pyd`。
+`.c` 为构建产物，已 git-ignored。脚本入口定义在 `pyproject.toml` 的 `[project.scripts]` 中，`json_repair/_dev.py` 实现。
 
 ## 许可
 

@@ -10,6 +10,15 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
 
+[project.scripts]
+test = "json_repair._dev:test"
+bench = "json_repair._dev:bench"
+bench-hist = "json_repair._dev:bench_hist"
+bench-compare = "json_repair._dev:bench_compare"
+lint = "json_repair._dev:lint"
+typecheck = "json_repair._dev:typecheck"
+precommit = "json_repair._dev:precommit"
+
 [tool.hatch.build.targets.wheel]
 packages = ["json_repair"]
 exclude = [
@@ -30,7 +39,6 @@ language_level = "3"
 include = [
     "/json_repair/*.py",
     "/json_repair/*.pyx",
-    "/json_repair/*.c",
     "/json_repair/py.typed",
     "/tests",
     "/README.md",
@@ -77,14 +85,13 @@ indent-style = "space"
 
 # ── Dev workflow ──────────────────────────────────────────────────────────
 #
-# After modifying json_repair/_cparse.pyx:
-#   uv build --wheel          # compiles .pyx → .c → .pyd, builds wheel only
-#   uv pip install --force-reinstall ".\dist\json_repair-*-cp312-cp312-win_amd64.whl"
-#   uv run pytest tests/ -v
+# First-time setup:              uv sync
+# Run all tests:                 uv run test
+# After .pyx changes:            uv sync           # rebuilds .pyd
+# Benchmarks:                    uv run bench | bench-hist | bench-compare
+# Lint / typecheck:              uv run lint | typecheck
+# Pre-commit:                    uv run precommit
 #
-# The first `uv sync` installs from the pre-built wheel in dist/ (if any).
-# Without a .pyd, all parsing falls back to pure Python (identical behaviour).
-#
-# hatch-cython handles the .pyx → .c → .pyd chain automatically during build.
-# Use `uv build --wheel` instead of `uv build` to skip sdist generation for
-# faster iteration.
+# hatch-cython handles .pyx → .c → .pyd during wheel builds.
+# `uv sync` also compiles Cython (via PEP 517 build).
+# Without a .pyd all parsing falls back to pure Python (identical behaviour).
