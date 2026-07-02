@@ -25,11 +25,33 @@ import re
 
 
 try:
-    from json_repair._cparse import parse_string as _parse_string_fast
+    from json_repair._cparse import (
+        fast_parse_array as _fast_parse_array,
+    )
+    from json_repair._cparse import (
+        fast_parse_object as _fast_parse_object,
+    )
+    from json_repair._cparse import (
+        fast_parse_value as _fast_parse_value,
+    )
+    from json_repair._cparse import (
+        parse_single_quoted_string as _parse_single_quoted_string_fast,
+    )
+    from json_repair._cparse import (
+        parse_string as _parse_string_fast,
+    )
+    from json_repair._cparse import (
+        parse_triple_string as _parse_triple_string_fast,
+    )
 
     HAS_CYTHON = True
 except ImportError:
     _parse_string_fast = None
+    _parse_single_quoted_string_fast = None
+    _parse_triple_string_fast = None
+    _fast_parse_value = None
+    _fast_parse_object = None
+    _fast_parse_array = None
     HAS_CYTHON = False
 
 
@@ -457,6 +479,15 @@ class _Repairer:
     # ── triple-quoted string ──────────────────────────────────────────────
 
     def _parse_triple_string(self) -> None:
+        if HAS_CYTHON:
+            new_i, added = _parse_triple_string_fast(
+                self.text, self.i, self.n, self.out
+            )
+            self.i = new_i
+            self._out_chars += added
+            self._just_emitted_value = True
+            return
+
         self.i += 3
         self._emit('"')
 
@@ -515,6 +546,15 @@ class _Repairer:
     # ── single-quoted string ──────────────────────────────────────────────
 
     def _parse_single_quoted_string(self) -> None:
+        if HAS_CYTHON:
+            new_i, added = _parse_single_quoted_string_fast(
+                self.text, self.i, self.n, self.out
+            )
+            self.i = new_i
+            self._out_chars += added
+            self._just_emitted_value = True
+            return
+
         self._emit('"')
         self.i += 1
 
@@ -581,6 +621,26 @@ class _Repairer:
     # ── value dispatch ────────────────────────────────────────────────────
 
     def _parse_value(self) -> None:
+        if HAS_CYTHON:
+            (
+                self.i,
+                self._expect_key,
+                self._just_emitted_value,
+                self._out_chars,
+                self._last_depth0_pos,
+            ) = _fast_parse_value(
+                self.text,
+                self.i,
+                self.n,
+                self.out,
+                self.brackets,
+                self._expect_key,
+                self._just_emitted_value,
+                self._out_chars,
+                self._last_depth0_pos,
+            )
+            return
+
         self._skip_ws()
         if self.i >= self.n:
             self._emit("null")
@@ -627,6 +687,26 @@ class _Repairer:
     # ── object ────────────────────────────────────────────────────────────
 
     def _parse_object(self) -> None:
+        if HAS_CYTHON:
+            (
+                self.i,
+                self._expect_key,
+                self._just_emitted_value,
+                self._out_chars,
+                self._last_depth0_pos,
+            ) = _fast_parse_object(
+                self.text,
+                self.i,
+                self.n,
+                self.out,
+                self.brackets,
+                self._expect_key,
+                self._just_emitted_value,
+                self._out_chars,
+                self._last_depth0_pos,
+            )
+            return
+
         self._emit("{")
         self.brackets.append("}")
         self.i += 1
@@ -747,6 +827,26 @@ class _Repairer:
     # ── array ─────────────────────────────────────────────────────────────
 
     def _parse_array(self) -> None:
+        if HAS_CYTHON:
+            (
+                self.i,
+                _,
+                self._just_emitted_value,
+                self._out_chars,
+                self._last_depth0_pos,
+            ) = _fast_parse_array(
+                self.text,
+                self.i,
+                self.n,
+                self.out,
+                self.brackets,
+                self._expect_key,
+                self._just_emitted_value,
+                self._out_chars,
+                self._last_depth0_pos,
+            )
+            return
+
         self._emit("[")
         self.brackets.append("]")
         self.i += 1

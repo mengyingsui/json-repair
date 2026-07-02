@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "json-repair"
-version = "0.1.17"
+version = "0.2.0"
 description = "Repair malformed JSON from LLM outputs - handles unescaped quotes, triple-quoted strings, and more in a single pass"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -43,6 +43,7 @@ testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
+    "codegraph>=1.2.0",
     "Cython>=3.0",
     "hypothesis>=6.155.7",
     "mypy>=2.1.0",
@@ -73,3 +74,17 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+# ── Dev workflow ──────────────────────────────────────────────────────────
+#
+# After modifying json_repair/_cparse.pyx:
+#   uv build --wheel          # compiles .pyx → .c → .pyd, builds wheel only
+#   uv pip install --force-reinstall ".\dist\json_repair-*-cp312-cp312-win_amd64.whl"
+#   uv run pytest tests/ -v
+#
+# The first `uv sync` installs from the pre-built wheel in dist/ (if any).
+# Without a .pyd, all parsing falls back to pure Python (identical behaviour).
+#
+# hatch-cython handles the .pyx → .c → .pyd chain automatically during build.
+# Use `uv build --wheel` instead of `uv build` to skip sdist generation for
+# faster iteration.

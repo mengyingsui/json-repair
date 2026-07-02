@@ -56,6 +56,30 @@ wheels = [
 ]
 
 [[package]]
+name = "click"
+version = "8.4.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/76/d4/81420972a676e8ffea40450d8c8c92943e7218a78fe9b64359836cc9876b/click-8.4.2.tar.gz", hash = "sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6", size = 338000, upload-time = "2026-06-24T17:45:15.148Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/e2/79c688af8b210d232694e31e59da9f6ec747bae31c3f5946e4e9b98860d5/click-8.4.2-py3-none-any.whl", hash = "sha256:e6f9f66136c816745b9d65817da91d61d957fb16e02e4dcd0552553c5a197b76", size = 119243, upload-time = "2026-06-24T17:45:13.73Z" },
+]
+
+[[package]]
+name = "codegraph"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/19/42/c371fab60ca37d717624dcbc90cac28e60630086ca43f06d8feed5e2f87a/codegraph-1.2.0.tar.gz", hash = "sha256:3bc33d23c87a6068b26f87862743d3785ac287420d451b592556a5e569c213c0", size = 25236, upload-time = "2026-01-18T14:24:54.778Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/de/06/61e649a79d4860cc0635186d2146ab9bb48a6e971c5d8c1aa2de2ed52124/codegraph-1.2.0-py3-none-any.whl", hash = "sha256:d8918b0211f00b40ab9dcc427ddd423928eb5cb8bde774fc9adf9196e5dedce1", size = 28196, upload-time = "2026-01-18T14:24:52.318Z" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -144,11 +168,12 @@ wheels = [
 
 [[package]]
 name = "json-repair"
-version = "0.1.17"
+version = "0.2.0"
 source = { editable = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "codegraph" },
     { name = "cython" },
     { name = "hypothesis" },
     { name = "mypy" },
@@ -165,6 +190,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "codegraph", specifier = ">=1.2.0" },
     { name = "cython", specifier = ">=3.0" },
     { name = "hypothesis", specifier = ">=6.155.7" },
     { name = "mypy", specifier = ">=2.1.0" },

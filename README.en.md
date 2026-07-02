@@ -41,6 +41,7 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 | Missing key opening quote (v0.1.15) | `key": value` → `"key": value` | Missing opening `"` on key is injected; trailing `"` consumed |
 | Comma instead of colon after key (v0.1.16) | `"key", "value": "text"` → `"key":null,"value":"text"` | Comma is kept as separator; null emitted for missing value |
 | SQL-style `--` comment (v0.1.17) | `"a": 1  -- comment` | `--` comments are skipped during repair, no effect on output |
+| Full Cython acceleration (v0.2.0) | All hot-path parsers (string, single-quoted, triple-quoted, value, object, array) run in C | Per-character loops for string, object, array, and value dispatch are **all** compiled to C via `_cparse.pyx` |
 
 ## Install
 
@@ -139,12 +140,15 @@ This is tuned for the natural-language embedded quotes common in LLM output.
 | Many embedded quotes (long) | 12 KB | 168 µs | 1.5 ms | 71.1 MB/s |
 
 Cython acceleration provides **2–9×** speedup on string-heavy inputs.
+As of v0.2.0, **all** hot-path parsers run in C — including object/array/value
+dispatch (previously pure-Python on structure-heavy inputs).
 Measured with `pytest-benchmark` — see [Development](#development).
 
 ## Versions
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.2.0 | 2026-06-28 | Full Cython acceleration — all hot-path parsers (single-quoted, triple-quoted, value/object/array dispatch) now run in C; only `_parse_string` was Cythonized before |
 | v0.1.17 | 2026-06-28 | SQL-style `--` line comment support (`_skip_comment` skips `--…` lines) |
 | v0.1.16 | 2026-06-28 | Comma-after-key fix — `"key", "value":` → `"key":null,"value":` (null for missing value, comma as separator) |
 | v0.1.15 | 2026-06-28 | Duplicate brace `{{` → `{` skip; Missing key opening quote — `key":` → `"key":` |
@@ -170,7 +174,13 @@ Measured with `pytest-benchmark` — see [Development](#development).
 git clone https://gitee.com/mensui/json_repair.git
 cd json_repair
 uv sync
+
+# Run tests (Cython .pyd from wheel, or pure-Python fallback)
 uv run pytest tests/ -v
+
+# After modifying _cparse.pyx — rebuild Cython .pyd and re-install
+uv build --wheel
+uv pip install --force-reinstall ".\dist\json_repair-*-cp312-cp312-win_amd64.whl"
 
 # Performance benchmarks (pytest-benchmark)
 uv run pytest tests/test_performance.py --benchmark-only
@@ -178,6 +188,17 @@ uv run pytest tests/test_performance.py --benchmark-histogram
 uv run pytest tests/test_performance.py --benchmark-compare
 
 uv run pre-commit run --all-files
+```
+
+### Embedding uv + Cython build into pyproject.toml
+
+Add to `pyproject.toml` to make `uv sync` automatically trigger Cython
+compilation when `.pyx` changes (requires the `.c` to be pre-generated or
+shipped in sdist):
+
+```toml
+# (already configured via hatch-cython — `uv build` compiles .pyx → .c → .pyd)
+# For dev, run: uv build --wheel && uv pip install --force-reinstall .\dist\json_repair-*.whl
 ```
 
 ## License
