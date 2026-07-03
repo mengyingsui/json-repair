@@ -4,4 +4,4 @@
 msrv = "1.85"
 
 # Allow certain lints that are too noisy for this codebase
-allow-attributes-without-reason = true
+# allow-attributes-without-reason = true  # removed - not supported in clippy 0.1.96

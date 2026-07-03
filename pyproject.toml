@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "json-repair"
-version = "0.3.1"
+version = "0.3.2"
 description = "Repair malformed JSON from LLM outputs - handles unescaped quotes, triple-quoted strings, and more in a single pass"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -42,11 +42,13 @@ dev = [
     "codegraph>=1.2.0",
     "hypothesis>=6.155.7",
     "mypy>=2.1.0",
+    "pip-audit>=2.8.0",
     "pre-commit>=4.6.0",
     "pyright>=1.1.410",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-benchmark>=5.2.3",
+    "pytest-cov>=6.1.0",
     "ruff>=0.15.18",
 ]
 
@@ -64,6 +66,18 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.coverage.run]
+source = ["json_repair"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if __name__ == .__main__.:",
+    "pragma: no cover",
+]
+
+[tool.pip-audit]
+strict = true
 
 # ── Dev workflow ──────────────────────────────────────────────────────────
 #

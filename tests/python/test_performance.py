@@ -11,6 +11,7 @@ Run with::
 
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 
@@ -25,7 +26,7 @@ BENCH_DATA_PATH = CASES_DIR / "bench_data.jsonl"
 
 def _load_entries() -> list[dict]:
     lines = BENCH_DATA_PATH.read_text(encoding="utf-8").strip().splitlines()
-    return [json.loads(l) for l in lines if l.strip()]
+    return [json.loads(line) for line in lines if line.strip()]
 
 
 def _repair_and_validate(text: str) -> None:
@@ -37,10 +38,8 @@ def _repair_and_validate(text: str) -> None:
 def _repair_and_validate_unfixable(text: str) -> None:
     """Repair and attempt to validate; expect parse failure."""
     repaired = repair_json(text)
-    try:
+    with contextlib.suppress(json.JSONDecodeError):
         json.loads(repaired)
-    except json.JSONDecodeError:
-        pass
 
 
 ENTRIES = _load_entries()
@@ -52,10 +51,9 @@ ALL_ENTRIES = FIXABLE + UNFIXABLE
 class TestAllCases:
     @pytest.mark.parametrize(
         "entry",
-        [pytest.param(e, id=f'{e["label"]}') for e in ALL_ENTRIES],
+        [pytest.param(e, id=f"{e['label']}") for e in ALL_ENTRIES],
     )
     def test_repair_speed(self, entry: dict, benchmark: BenchmarkFixture) -> None:
-        label = entry["label"]
         inp = entry["input"]
         expected_valid = entry["expected_valid"]
 

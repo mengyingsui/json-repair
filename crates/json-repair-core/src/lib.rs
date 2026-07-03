@@ -140,5 +140,5 @@ pub fn repair_json(text: &str) -> Result<String, JsonRepairError> {
     let text = fix_colon_in_key(text);
     let text = fix_mixed_quotes(&text);
     let mut repairer = Repairer::new(&text);
-    Ok(repairer.repair())
+    repairer.repair()
 }

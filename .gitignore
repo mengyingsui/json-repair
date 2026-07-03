@@ -150,3 +150,8 @@ json_failures.txt
 
 # Temp test scripts
 _test_*.py
+
+# Fuzz artifacts / corpora
+crates/json-repair-core/fuzz/artifacts/
+crates/json-repair-core/fuzz/corpus/
+crates/json-repair-core/fuzz/coverage/

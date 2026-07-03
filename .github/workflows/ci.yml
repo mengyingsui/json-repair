@@ -9,7 +9,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  PYTHON_VERSION: "3.12"
 
 jobs:
   # ── Rust checks ──────────────────────────────────────────────────────────
@@ -23,20 +22,87 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install Rust toolchain (stable)
         run: rustup toolchain install stable --profile minimal
 
       - name: cargo test
         run: cargo test -p json-repair-core
 
       - name: cargo clippy
-        run: cargo clippy -p json-repair-core -- -D warnings
+        run: cargo clippy -p json-repair-core --all-targets -- -D warnings
 
       - name: cargo bench
         run: cargo bench -p json-repair-core
 
+  # ── Rust dependency audits ───────────────────────────────────────────────
+  rust-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cargo deny check
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories licenses bans
+
+  # ── Rust fuzzing (nightly, quick smoke test) ────────────────────────────
+  rust-fuzz:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (nightly)
+        run: rustup toolchain install nightly --profile minimal
+
+      - name: Install cargo-fuzz
+        run: cargo +nightly install cargo-fuzz
+
+      - name: Fuzz repair_json for 30 seconds
+        run: cargo +nightly fuzz run repair --fuzz-dir crates/json-repair-core/fuzz -- -max_total_time=30
+
   # ── Python checks ────────────────────────────────────────────────────────
   python:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        py: ["3.12", "3.13"]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (Python ${{ matrix.py }})
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.py }}
+
+      - name: uv sync
+        run: uv sync
+
+      - name: pytest (with coverage)
+        run: uv run pytest --cov=json_repair --cov-report=xml tests/python/ -v
+
+      - uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+
+      - name: ruff check
+        run: uv run ruff check json_repair/ tests/python/
+
+      - name: mypy check
+        run: uv run mypy json_repair/
+
+      - name: pyright check
+        run: uv run pyright json_repair/
+
+      - name: pip-audit (dependency vulnerabilities)
+        run: uv run pip-audit
+
+  # ── Build wheels (tagged releases only) ──────────────────────────────────
+  wheels:
+    if: startsWith(github.ref, 'refs/tags/v')
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -49,36 +115,14 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: "3.12"
 
-      - name: uv sync
-        run: uv sync
-
-      - name: pytest
-        run: uv run pytest tests/python/ -v
-
-      - name: ruff check
-        run: uv run ruff check json_repair/ tests/python/
-
-      - name: mypy check
-        run: uv run mypy json_repair/
-
-  # ── Build wheels (Linux x86_64) ──────────────────────────────────────────
-  wheels:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - uses: PyO3/maturin-action@v1
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Build wheel with maturin
-        run: uv run maturin build --release -m crates/json-repair-python/Cargo.toml
+          command: build
+          args: --release -m crates/json-repair-python/Cargo.toml
 
       - uses: actions/upload-artifact@v4
         with:
-          name: wheel
+          name: wheel-${{ matrix.os }}
           path: target/wheels/*.whl

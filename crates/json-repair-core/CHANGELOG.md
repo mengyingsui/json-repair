@@ -1,5 +1,29 @@
 # Changelog — json-repair-core
 
+## v0.1.2 (2026-07-03)
+
+### Security
+- **Depth violation → `Err`** — exceeding `MAX_PARSE_DEPTH=512` now returns
+  `Err(JsonRepairError)` instead of silently emitting `null`.
+- **Numeric corruption detection** — non-numeric characters immediately
+  following a number token now trigger `Err` instead of silent split.
+- **Explicit `ParserState` enum** — escape handling in `parse_string`,
+  `parse_single_quoted_string`, and `parse_triple_string` now uses a formal
+  state machine (`Normal` / `InString` / `InStringEscaped`).
+- **Fuzz testing** — `cargo-fuzz` target for random-input robustness.
+
+### Added
+- `ParserState` enum with three variants.
+- `error: Option<JsonRepairError>` field on `Repairer`, enabling error
+  propagation from sub-methods without cascading signature changes.
+- Fuzz target at `fuzz/fuzz_targets/repair.rs`.
+
+### Changed
+- `Repairer::repair()` return type: `String` → `Result<String, JsonRepairError>`.
+- Main loop now checks `self.error` before each frame pop — errors from
+  sub-methods abort the parse immediately.
+- All three string-parsers use `match self.state` with explicit transitions.
+
 ## v0.1.1 (2026-07-03)
 
 ### Security

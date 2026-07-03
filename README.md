@@ -1,5 +1,7 @@
 # json_repair
 
+[![Security: v0.3.2+](https://img.shields.io/badge/Security-v0.3.2%2B-2ea44f?labelColor=333)](SECURITY.md)
+
 Repair malformed JSON from LLM outputs in a **single pass** — now powered by Rust.
 
 ## Problems Solved
@@ -155,16 +157,14 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Scenario | Python (via PyO3) | Rust (native) |
 |----------|-------------------|---------------|
-| Valid JSON passthrough | ~2.8 µs | ~3.1 µs |
-| Small corrupted | ~8.6 µs | ~7.8 µs |
-| Triple-quoted | ~15 µs | ~5.5 µs |
-| Embedded quotes | ~23 µs | ~10 µs |
-| Deep nested (6 levels) | ~25 µs | ~3.0 µs |
-| Deeply nested array (50) | ~22 µs | ~14 µs |
-| Realistic LLM output | ~50 µs | ~24 µs |
-| Medium corrupted (~5 KB) | ~340 µs | ~122 µs |
-| Large corrupted (~50 KB) | ~1.25 ms | ~430 µs |
-| Very long string (~2 MB) | ~8.5 ms | ~3.0 ms |
+| Valid JSON passthrough | ~13 µs | ~0.66 µs |
+| Small corrupted | ~20 µs | ~3.3 µs |
+| Triple-quoted | ~17 µs | ~2.3 µs |
+| Embedded quotes | ~37 µs | ~3.8 µs |
+| Deep nested (6 levels) | ~35 µs | ~1.4 µs |
+| Realistic LLM output | ~50 µs | ~5.2 µs |
+| Medium corrupted (~5 KB) | ~0.40 ms | ~0.10 ms |
+| Large corrupted (~50 KB) | ~1.6 ms | ~0.18 ms |
 
 All measurements on modern hardware (single-pass, O(n)). Run locally:
 
@@ -180,6 +180,7 @@ cargo bench -p json-repair-core
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.3.2 🔒 | 2026-07-03 | **Security-hardened release** — depth/numeric Err, ParserState enum, GIL release, fuzz, proptest, pip-audit, coverage. See [`SECURITY.md`](SECURITY.md) |
 | v0.3.1 | 2026-07-03 | Security hardening — recursion depth limit, allocation fixes, CI, docs |
 | v0.3.0 | 2026-07-03 | Rust rewrite — entire state machine ported from Cython to Rust via PyO3 |
 | v0.2.0 | 2026-06-28 | Full Cython acceleration for all hot-path parsers |

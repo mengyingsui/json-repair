@@ -1,8 +1,24 @@
 use std::fmt::Write;
 
+use crate::error::JsonRepairError;
+
 const IMPLICIT_SEQUENCE_MIN_LENGTH: usize = 8192;
-const MAX_PARSE_DEPTH: usize = 500;
+const MAX_PARSE_DEPTH: usize = 512;
 const VALID_ESCAPES: &str = r#""\/bfnrt"#;
+
+#[derive(Clone, Copy, PartialEq)]
+enum ParserState {
+    Normal,
+    InString,
+    InStringEscaped,
+}
+
+enum ParseFrame {
+    Value,
+    ResumeObject { prev_expect: bool },
+    ResumeArray,
+    ResumeImplicitArray { first: bool },
+}
 
 pub(crate) struct Repairer {
     chars: Vec<char>,
@@ -14,7 +30,8 @@ pub(crate) struct Repairer {
     just_emitted_value: bool,
     out_chars: usize,
     last_depth0_pos: usize,
-    depth: usize,
+    error: Option<JsonRepairError>,
+    state: ParserState,
 }
 
 impl Repairer {
@@ -31,7 +48,8 @@ impl Repairer {
             just_emitted_value: false,
             out_chars: 0,
             last_depth0_pos: 0,
-            depth: 0,
+            error: None,
+            state: ParserState::Normal,
         }
     }
 
@@ -209,18 +227,23 @@ impl Repairer {
 
     fn parse_string(&mut self) {
         self.emit_char('"');
+        self.state = ParserState::InString;
         self.i += 1;
         while self.i < self.n {
             let ch = self.chars[self.i];
-            if ch == '\\' {
-                self.i += 1;
-                if self.i < self.n {
-                    self.emit_escape(self.chars[self.i]);
+            match self.state {
+                ParserState::InStringEscaped => {
+                    self.emit_escape(ch);
+                    self.state = ParserState::InString;
                     self.i += 1;
-                } else {
-                    self.emit_str("\\\\");
+                    continue;
                 }
-                continue;
+                ParserState::InString if ch == '\\' => {
+                    self.state = ParserState::InStringEscaped;
+                    self.i += 1;
+                    continue;
+                }
+                _ => {}
             }
             if ch == '"' {
                 if self.peek(1) == '"' {
@@ -245,6 +268,7 @@ impl Repairer {
                 }
                 if self.is_closing_quote() {
                     self.emit_char('"');
+                    self.state = ParserState::Normal;
                     let nc = self.peek(1);
                     if nc.is_ascii_alphabetic() || nc == '_' {
                         let mut k = self.i + 1;
@@ -307,6 +331,7 @@ impl Repairer {
             self.emit_char(ch);
             self.i += 1;
         }
+        self.state = ParserState::Normal;
         if !self.out.ends_with('"') {
             self.emit_char('"');
         }
@@ -315,6 +340,7 @@ impl Repairer {
     fn parse_triple_string(&mut self) {
         self.i += 3;
         self.emit_char('"');
+        self.state = ParserState::InString;
         while self.i < self.n {
             if self.peek_is("\"\"\"") {
                 let after = self.i + 3;
@@ -323,20 +349,25 @@ impl Repairer {
                 } else {
                     self.i += 3;
                     self.emit_char('"');
+                    self.state = ParserState::Normal;
                     self.just_emitted_value = true;
                     return;
                 }
             }
             let ch = self.chars[self.i];
-            if ch == '\\' {
-                self.i += 1;
-                if self.i < self.n {
-                    self.emit_escape(self.chars[self.i]);
+            match self.state {
+                ParserState::InStringEscaped => {
+                    self.emit_escape(ch);
+                    self.state = ParserState::InString;
                     self.i += 1;
-                } else {
-                    self.emit_str("\\\\");
+                    continue;
                 }
-                continue;
+                ParserState::InString if ch == '\\' => {
+                    self.state = ParserState::InStringEscaped;
+                    self.i += 1;
+                    continue;
+                }
+                _ => {}
             }
             if ch == '"' {
                 self.emit_str("\\\"");
@@ -367,28 +398,35 @@ impl Repairer {
             self.emit_char(ch);
             self.i += 1;
         }
+        self.state = ParserState::Normal;
         self.emit_char('"');
     }
 
     fn parse_single_quoted_string(&mut self) {
         self.emit_char('"');
+        self.state = ParserState::InString;
         self.i += 1;
         while self.i < self.n {
             let ch = self.chars[self.i];
-            if ch == '\\' {
-                if self.peek(1) == '\'' {
-                    self.emit_char('\'');
-                    self.i += 2;
+            match self.state {
+                ParserState::InStringEscaped => {
+                    if ch == '\'' {
+                        self.emit_char('\'');
+                        self.state = ParserState::InString;
+                        self.i += 1;
+                        continue;
+                    }
+                    self.emit_escape(ch);
+                    self.state = ParserState::InString;
+                    self.i += 1;
                     continue;
                 }
-                self.i += 1;
-                if self.i < self.n {
-                    self.emit_escape(self.chars[self.i]);
+                ParserState::InString if ch == '\\' => {
+                    self.state = ParserState::InStringEscaped;
                     self.i += 1;
-                } else {
-                    self.emit_str("\\\\");
+                    continue;
                 }
-                continue;
+                _ => {}
             }
             if ch == '\'' {
                 let mut j = self.i + 1;
@@ -399,6 +437,7 @@ impl Repairer {
                 }
                 if j >= self.n || ",\u{7d}\u{5d}:\n".contains(self.chars[j]) {
                     self.emit_char('"');
+                    self.state = ParserState::Normal;
                     self.i += 1;
                     self.just_emitted_value = true;
                     return;
@@ -437,290 +476,8 @@ impl Repairer {
             self.emit_char(ch);
             self.i += 1;
         }
+        self.state = ParserState::Normal;
         self.emit_char('"');
-    }
-
-    fn parse_value(&mut self) {
-        self.depth += 1;
-        if self.depth > MAX_PARSE_DEPTH {
-            self.emit_str("null");
-            self.depth -= 1;
-            return;
-        }
-        self.parse_value_inner();
-        self.depth -= 1;
-    }
-
-    fn parse_value_inner(&mut self) {
-        self.skip_ws();
-        if self.i >= self.n {
-            self.emit_str("null");
-            return;
-        }
-        let ch = self.chars[self.i];
-        match ch {
-            '{' => self.parse_object(),
-            '[' => self.parse_array(),
-            '"' => {
-                if self.peek_is("\"\"\"") {
-                    let rest: String = self.chars[self.i + 3..].iter().collect();
-                    if rest.contains("\"\"\"") {
-                        self.parse_triple_string();
-                        return;
-                    }
-                }
-                self.parse_string();
-            }
-            '\'' => self.parse_single_quoted_string(),
-            't' | 'f' | 'n' | 'T' | 'F' | 'N' | 'i' | 'I' | 'u' | 'U' => self.parse_literal(),
-            '-' => {
-                if self.peek_is("--") {
-                    self.skip_comment();
-                    self.parse_value();
-                } else {
-                    self.parse_number();
-                }
-            }
-            '.' | '0'..='9' => self.parse_number(),
-            '/' | '#' => {
-                self.skip_comment();
-                self.parse_value();
-            }
-            '}' | ']' | ',' => {
-                self.emit_str("null");
-            }
-            _ => {
-                if self.expect_key && (ch.is_ascii_alphabetic() || ch == '_') {
-                    self.parse_unquoted_key();
-                } else if ch.is_ascii_alphabetic() || ch == '_' {
-                    self.parse_unquoted_value();
-                } else {
-                    self.i += 1;
-                    self.parse_value();
-                }
-            }
-        }
-    }
-
-    fn parse_object(&mut self) {
-        self.emit_char('{');
-        self.brackets.push('}');
-        self.i += 1;
-        let prev_expect = self.expect_key;
-        self.expect_key = true;
-        let mut first = true;
-        loop {
-            self.skip_ws();
-            if self.i >= self.n {
-                break;
-            }
-            let ch = self.chars[self.i];
-            if ch == '{' && self.expect_key {
-                self.i += 1;
-                continue;
-            }
-            if ch == ':' && self.expect_key {
-                self.i += 1;
-                continue;
-            }
-            if ch == '}' {
-                if self.out.ends_with(',') {
-                    self.out.pop();
-                    self.out_chars -= 1;
-                }
-                self.emit_char('}');
-                self.brackets.pop();
-                if self.brackets.is_empty() {
-                    self.last_depth0_pos = self.out_chars;
-                }
-                self.i += 1;
-                self.expect_key = prev_expect;
-                self.just_emitted_value = true;
-                return;
-            }
-            if ch == ',' {
-                if !first && !self.out.ends_with(',') {
-                    self.emit_char(',');
-                }
-                self.i += 1;
-                self.expect_key = true;
-                continue;
-            }
-            if ch == '/' || ch == '#' || (ch == '-' && self.peek_is("--")) {
-                self.skip_comment();
-                continue;
-            }
-            if ch == '"' && self.just_emitted_value {
-                let mut j = self.i + 1;
-                while j < self.n && self.chars[j].is_ascii_whitespace() {
-                    j += 1;
-                }
-                if j >= self.n || "},\u{5d}:".contains(self.chars[j]) {
-                    self.i += 1;
-                    continue;
-                }
-            }
-            if ch == ']' {
-                if self.out.ends_with(',') {
-                    self.out.pop();
-                    self.out_chars -= 1;
-                }
-                self.emit_char('}');
-                self.brackets.pop();
-                if self.brackets.is_empty() {
-                    self.last_depth0_pos = self.out_chars;
-                }
-                self.expect_key = prev_expect;
-                return;
-            }
-            if self.expect_key {
-                if !first
-                    && ch != '"'
-                    && ch != '_'
-                    && ch != '/'
-                    && ch != '\''
-                    && !ch.is_ascii_alphabetic()
-                {
-                    break;
-                }
-                if ch.is_ascii_alphabetic() {
-                    let mut j = self.i + 1;
-                    while j < self.n && (self.chars[j].is_alphanumeric() || self.chars[j] == '_') {
-                        j += 1;
-                    }
-                    while j < self.n
-                        && (self.chars[j] == ' ' || self.chars[j] == '\t' || self.chars[j] == '\r')
-                    {
-                        j += 1;
-                    }
-                    if j >= self.n || !",\":".contains(self.chars[j]) {
-                        break;
-                    }
-                }
-                if !first
-                    && self.just_emitted_value
-                    && !self.out.ends_with(',')
-                    && !self.out.ends_with('{')
-                    && !self.out.ends_with('[')
-                {
-                    self.emit_char(',');
-                }
-                self.parse_key();
-                self.skip_ws();
-                if self.i < self.n && self.chars[self.i] == ':' {
-                    self.emit_char(':');
-                    self.i += 1;
-                } else if self.i < self.n && self.chars[self.i] != ':' {
-                    self.emit_char(':');
-                }
-                self.expect_key = false;
-                self.parse_value();
-                self.expect_key = true;
-                self.just_emitted_value = true;
-            } else {
-                if !first
-                    && ch != '"'
-                    && ch != '{'
-                    && ch != '['
-                    && ch != '\''
-                    && ch != 't'
-                    && ch != 'f'
-                    && ch != 'n'
-                    && ch != 'T'
-                    && ch != 'F'
-                    && ch != 'N'
-                    && ch != 'i'
-                    && ch != 'I'
-                    && ch != 'u'
-                    && ch != 'U'
-                    && ch != '-'
-                    && ch != '.'
-                    && !ch.is_ascii_digit()
-                {
-                    break;
-                }
-                if !first
-                    && self.just_emitted_value
-                    && !self.out.ends_with(',')
-                    && !self.out.ends_with('{')
-                    && !self.out.ends_with('[')
-                    && ch != '}'
-                    && ch != ']'
-                    && ch != ','
-                {
-                    self.emit_char(',');
-                }
-                self.parse_value();
-                self.just_emitted_value = true;
-            }
-            first = false;
-        }
-        self.expect_key = prev_expect;
-    }
-
-    fn parse_array(&mut self) {
-        self.emit_char('[');
-        self.brackets.push(']');
-        self.i += 1;
-        let mut first = true;
-        loop {
-            self.skip_ws();
-            if self.i >= self.n {
-                break;
-            }
-            let ch = self.chars[self.i];
-            if ch == ']' {
-                if self.out.ends_with(',') {
-                    self.out.pop();
-                    self.out_chars -= 1;
-                }
-                self.emit_char(']');
-                self.brackets.pop();
-                if self.brackets.is_empty() {
-                    self.last_depth0_pos = self.out_chars;
-                }
-                self.i += 1;
-                self.just_emitted_value = true;
-                return;
-            }
-            if ch == '}' {
-                if self.out.ends_with(',') {
-                    self.out.pop();
-                    self.out_chars -= 1;
-                }
-                self.emit_char(']');
-                self.brackets.pop();
-                if self.brackets.is_empty() {
-                    self.last_depth0_pos = self.out_chars;
-                }
-                self.i += 1;
-                self.just_emitted_value = true;
-                return;
-            }
-            if ch == ',' {
-                if !first && !self.out.ends_with(',') {
-                    self.emit_char(',');
-                }
-                self.i += 1;
-                continue;
-            }
-            if ch == '/' || ch == '#' || (ch == '-' && self.peek_is("--")) {
-                self.skip_comment();
-                continue;
-            }
-            if !first
-                && self.just_emitted_value
-                && !self.out.ends_with(',')
-                && !self.out.ends_with('[')
-                && !self.out.ends_with(':')
-                && ch != ']'
-            {
-                self.emit_char(',');
-            }
-            self.parse_value();
-            self.just_emitted_value = true;
-            first = false;
-        }
     }
 
     fn parse_key(&mut self) {
@@ -815,6 +572,13 @@ impl Repairer {
         let start = self.i;
         while self.i < self.n && "-0123456789.eE+".contains(self.chars[self.i]) {
             self.i += 1;
+        }
+        if self.i < self.n && self.chars[self.i].is_ascii_alphabetic() {
+            self.error = Some(JsonRepairError {
+                message: "number contains non-numeric characters".into(),
+                position: Some(start),
+            });
+            return;
         }
         let num_str: String = self.chars[start..self.i].iter().collect();
         let num_str = if num_str.starts_with("+.") {
@@ -934,46 +698,392 @@ impl Repairer {
         false
     }
 
-    fn parse_implicit_array(&mut self) {
-        self.emit_char('[');
-        let mut first = true;
+
+
+    pub(crate) fn repair(&mut self) -> Result<String, JsonRepairError> {
+        self.skip_prefix_junk();
+        if self.i >= self.n {
+            return Ok(String::new());
+        }
+
+        let mut stack: Vec<ParseFrame> = Vec::new();
+
+        if self.is_implicit_object_sequence() {
+            self.emit_char('[');
+            stack.push(ParseFrame::ResumeImplicitArray { first: true });
+        } else {
+            stack.push(ParseFrame::Value);
+        }
+
+        while let Some(frame) = stack.pop() {
+            if let Some(err) = self.error.take() {
+                return Err(err);
+            }
+
+            let current_depth = stack.len() + 1;
+            if current_depth > MAX_PARSE_DEPTH {
+                return Err(JsonRepairError {
+                    message: format!(
+                        "max parse depth of {MAX_PARSE_DEPTH} exceeded at position {}",
+                        self.i
+                    ),
+                    position: Some(self.i),
+                });
+            }
+
+            match frame {
+                ParseFrame::Value => self.run_value(&mut stack),
+                ParseFrame::ResumeObject { prev_expect } => {
+                    self.resume_object(&mut stack, prev_expect);
+                }
+                ParseFrame::ResumeArray => {
+                    self.resume_array(&mut stack);
+                }
+                ParseFrame::ResumeImplicitArray { first } => {
+                    self.resume_implicit_array(&mut stack, first);
+                }
+            }
+        }
+
+        if let Some(err) = self.error.take() {
+            return Err(err);
+        }
+
+        self.close_brackets();
+        self.skip_suffix_junk();
+        Ok(std::mem::take(&mut self.out))
+    }
+
+    /// Parse one value (primitive, string, number, object, array).
+    /// For objects/arrays, pushes the iteration frames onto the stack.
+    fn run_value(&mut self, stack: &mut Vec<ParseFrame>) {
+        self.skip_ws();
+        if self.i >= self.n {
+            self.emit_str("null");
+            return;
+        }
+
+        let ch = self.chars[self.i];
+        match ch {
+            '{' => {
+                self.emit_char('{');
+                self.brackets.push('}');
+                self.i += 1;
+                let prev_expect = self.expect_key;
+                self.expect_key = true;
+                self.object_loop(stack, prev_expect, true);
+            }
+            '[' => {
+                self.emit_char('[');
+                self.brackets.push(']');
+                self.i += 1;
+                self.array_loop(stack, true);
+            }
+            '"' => {
+                if self.peek_is("\"\"\"") {
+                    let rest: String = self.chars[self.i + 3..].iter().collect();
+                    if rest.contains("\"\"\"") {
+                        self.parse_triple_string();
+                        return;
+                    }
+                }
+                self.parse_string();
+            }
+            '\'' => self.parse_single_quoted_string(),
+            't' | 'f' | 'n' | 'T' | 'F' | 'N' | 'i' | 'I' | 'u' | 'U' => self.parse_literal(),
+            '-' => {
+                if self.peek_is("--") {
+                    self.skip_comment();
+                    // tail-recurse by pushing back to the stack
+                    stack.push(ParseFrame::Value);
+                } else {
+                    self.parse_number();
+                }
+            }
+            '.' | '0'..='9' => self.parse_number(),
+            '/' | '#' => {
+                self.skip_comment();
+                stack.push(ParseFrame::Value);
+            }
+            '}' | ']' | ',' => {
+                self.emit_str("null");
+            }
+            _ => {
+                if self.expect_key && (ch.is_ascii_alphabetic() || ch == '_') {
+                    self.parse_unquoted_key();
+                    self.skip_ws();
+                    if self.i < self.n && self.chars[self.i] == ':' {
+                        self.emit_char(':');
+                        self.i += 1;
+                    } else if self.i < self.n && self.chars[self.i] != ':' {
+                        self.emit_char(':');
+                    }
+                    self.expect_key = false;
+                    // After parsing a key, immediately parse the value
+                    stack.push(ParseFrame::Value);
+                } else if ch.is_ascii_alphabetic() || ch == '_' {
+                    self.parse_unquoted_value();
+                } else {
+                    self.i += 1;
+                    stack.push(ParseFrame::Value);
+                }
+            }
+        }
+    }
+
+    /// Continue an object loop after a nested value has been completed.
+    fn resume_object(&mut self, stack: &mut Vec<ParseFrame>, prev_expect: bool) {
+        self.expect_key = true;
+        self.just_emitted_value = true;
+
+        self.object_loop(stack, prev_expect, false);
+    }
+
+    /// Object loop: processes one element at a time.
+    /// Returns when the object is complete or a nested-value parse is needed.
+    fn object_loop(&mut self, stack: &mut Vec<ParseFrame>, prev_expect: bool, first: bool) {
         loop {
             self.skip_ws();
             if self.i >= self.n {
                 break;
             }
-            if self.chars[self.i] != '{' {
+            let ch = self.chars[self.i];
+            if ch == '{' && self.expect_key {
+                self.i += 1;
+                continue;
+            }
+            if ch == ':' && self.expect_key {
+                self.i += 1;
+                continue;
+            }
+            if ch == '}' {
+                if self.out.ends_with(',') {
+                    self.out.pop();
+                    self.out_chars -= 1;
+                }
+                self.emit_char('}');
+                self.brackets.pop();
+                if self.brackets.is_empty() {
+                    self.last_depth0_pos = self.out_chars;
+                }
+                self.i += 1;
+                self.expect_key = prev_expect;
+                self.just_emitted_value = true;
+                return;
+            }
+            if ch == ',' {
+                if !first && !self.out.ends_with(',') {
+                    self.emit_char(',');
+                }
+                self.i += 1;
+                self.expect_key = true;
+                continue;
+            }
+            if ch == '/' || ch == '#' || (ch == '-' && self.peek_is("--")) {
+                self.skip_comment();
+                continue;
+            }
+            if ch == '"' && self.just_emitted_value {
+                let mut j = self.i + 1;
+                while j < self.n && self.chars[j].is_ascii_whitespace() {
+                    j += 1;
+                }
+                if j >= self.n || "},\u{5d}:".contains(self.chars[j]) {
+                    self.i += 1;
+                    continue;
+                }
+            }
+            if ch == ']' {
+                if self.out.ends_with(',') {
+                    self.out.pop();
+                    self.out_chars -= 1;
+                }
+                self.emit_char('}');
+                self.brackets.pop();
+                if self.brackets.is_empty() {
+                    self.last_depth0_pos = self.out_chars;
+                }
+                self.expect_key = prev_expect;
+                return;
+            }
+            if self.expect_key {
+                if !first
+                    && ch != '"'
+                    && ch != '_'
+                    && ch != '/'
+                    && ch != '\''
+                    && !ch.is_ascii_alphabetic()
+                {
+                    break;
+                }
+                if ch.is_ascii_alphabetic() {
+                    let mut j = self.i + 1;
+                    while j < self.n && (self.chars[j].is_alphanumeric() || self.chars[j] == '_') {
+                        j += 1;
+                    }
+                    while j < self.n
+                        && (self.chars[j] == ' ' || self.chars[j] == '\t' || self.chars[j] == '\r')
+                    {
+                        j += 1;
+                    }
+                    if j >= self.n || !",\":".contains(self.chars[j]) {
+                        break;
+                    }
+                }
+                if !first
+                    && self.just_emitted_value
+                    && !self.out.ends_with(',')
+                    && !self.out.ends_with('{')
+                    && !self.out.ends_with('[')
+                {
+                    self.emit_char(',');
+                }
+                self.parse_key();
+                self.skip_ws();
+                if self.i < self.n && self.chars[self.i] == ':' {
+                    self.emit_char(':');
+                    self.i += 1;
+                } else if self.i < self.n && self.chars[self.i] != ':' {
+                    self.emit_char(':');
+                }
+                self.expect_key = false;
+                // Parse value and come back
+                stack.push(ParseFrame::ResumeObject { prev_expect });
+                stack.push(ParseFrame::Value);
+                return;
+            } else {
+                if !first
+                    && ch != '"'
+                    && ch != '{'
+                    && ch != '['
+                    && ch != '\''
+                    && ch != 't'
+                    && ch != 'f'
+                    && ch != 'n'
+                    && ch != 'T'
+                    && ch != 'F'
+                    && ch != 'N'
+                    && ch != 'i'
+                    && ch != 'I'
+                    && ch != 'u'
+                    && ch != 'U'
+                    && ch != '-'
+                    && ch != '.'
+                    && !ch.is_ascii_digit()
+                {
+                    break;
+                }
+                if !first
+                    && self.just_emitted_value
+                    && !self.out.ends_with(',')
+                    && !self.out.ends_with('{')
+                    && !self.out.ends_with('[')
+                    && ch != '}'
+                    && ch != ']'
+                    && ch != ','
+                {
+                    self.emit_char(',');
+                }
+                // Parse value and come back
+                stack.push(ParseFrame::ResumeObject { prev_expect });
+                stack.push(ParseFrame::Value);
+                return;
+            }
+        }
+        self.expect_key = prev_expect;
+    }
+
+    /// Continue an array loop after a nested value has been completed.
+    fn resume_array(&mut self, stack: &mut Vec<ParseFrame>) {
+        self.just_emitted_value = true;
+        self.array_loop(stack, false);
+    }
+
+    fn array_loop(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
+        loop {
+            self.skip_ws();
+            if self.i >= self.n {
                 break;
             }
+            let ch = self.chars[self.i];
+            if ch == ']' {
+                if self.out.ends_with(',') {
+                    self.out.pop();
+                    self.out_chars -= 1;
+                }
+                self.emit_char(']');
+                self.brackets.pop();
+                if self.brackets.is_empty() {
+                    self.last_depth0_pos = self.out_chars;
+                }
+                self.i += 1;
+                self.just_emitted_value = true;
+                return;
+            }
+            if ch == '}' {
+                if self.out.ends_with(',') {
+                    self.out.pop();
+                    self.out_chars -= 1;
+                }
+                self.emit_char(']');
+                self.brackets.pop();
+                if self.brackets.is_empty() {
+                    self.last_depth0_pos = self.out_chars;
+                }
+                self.i += 1;
+                self.just_emitted_value = true;
+                return;
+            }
+            if ch == ',' {
+                if !first && !self.out.ends_with(',') {
+                    self.emit_char(',');
+                }
+                self.i += 1;
+                continue;
+            }
+            if ch == '/' || ch == '#' || (ch == '-' && self.peek_is("--")) {
+                self.skip_comment();
+                continue;
+            }
+            if !first
+                && self.just_emitted_value
+                && !self.out.ends_with(',')
+                && !self.out.ends_with('[')
+                && !self.out.ends_with(':')
+                && ch != ']'
+            {
+                self.emit_char(',');
+            }
+            // Parse value and come back
+            stack.push(ParseFrame::ResumeArray);
+            stack.push(ParseFrame::Value);
+            return;
+        }
+    }
+
+    fn resume_implicit_array(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
+        self.just_emitted_value = true;
+        self.skip_ws();
+        if self.i < self.n && self.chars[self.i] == ',' {
+            self.i += 1;
+        }
+        self.implicit_array_loop(stack, first);
+    }
+
+    fn implicit_array_loop(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
+        self.skip_ws();
+        if self.i < self.n && self.chars[self.i] == '{' {
             if !first {
                 self.emit_char(',');
             }
-            self.parse_value();
-            first = false;
-            self.skip_ws();
-            if self.i < self.n && self.chars[self.i] == ',' {
-                self.i += 1;
-            }
+            stack.push(ParseFrame::ResumeImplicitArray { first: false });
+            stack.push(ParseFrame::Value);
+            return;
         }
         if !first && self.out.ends_with(',') {
             self.out.pop();
             self.out_chars -= 1;
         }
         self.emit_char(']');
-    }
-
-    pub(crate) fn repair(&mut self) -> String {
-        self.skip_prefix_junk();
-        if self.i >= self.n {
-            return String::new();
-        }
-        if self.is_implicit_object_sequence() {
-            self.parse_implicit_array();
-        } else {
-            self.parse_value();
-        }
-        self.close_brackets();
-        self.skip_suffix_junk();
-        std::mem::take(&mut self.out)
     }
 }

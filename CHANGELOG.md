@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.3.2 (2026-07-03)
+
+### Security
+- **Depth violation → `Err`** — exceeding `MAX_PARSE_DEPTH=512` now returns
+  `Err(JsonRepairError)` instead of silently emitting `null`.
+- **Numeric corruption detection** — `{"key": 123abc}` now returns `Err`
+  instead of silently splitting into `"123"` + `"abc"`.
+- **Explicit `ParserState` enum** — escape handling in string parsing now uses
+  a formal state machine (`Normal` / `InString` / `InStringEscaped`), replacing
+  implicit `if ch == '\\'` control flow.
+- **GIL release** — PyO3 binding now calls `py.allow_threads()` so other Python
+  threads can run during Rust computation.
+
+### Added
+- Fuzz testing (`cargo-fuzz`) — random UTF-8 inputs fed to `repair_json`.
+- Python dependency auditing (`pip-audit`) in CI.
+- Python test coverage (`pytest-cov`) with Codecov upload.
+- Type stub (`_rust_parse.pyi`) for the compiled PyO3 extension.
+
+### Fixed
+- `clippy.toml` — removed invalid config field that broke `cargo clippy`.
+- 3 pre-existing `ruff` warnings in `test_performance.py`.
+
+### Changed
+- Rust crate `json-repair-core` bumped to **v0.1.2**.
+
 ## v0.3.1 (2026-07-03)
 
 ### Security
