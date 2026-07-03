@@ -151,6 +151,30 @@ Input text
 
 All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
+## Performance
+
+| Scenario | Python (via PyO3) | Rust (native) |
+|----------|-------------------|---------------|
+| Trivial (number) | ~1.2 µs | — |
+| Empty object/array | ~1.5 µs | — |
+| Small corrupted | ~5.8 µs | ~1.4 µs |
+| Triple-quoted | ~17 µs | — |
+| Deep nested (≤500) | ~20 µs | — |
+| Realistic LLM output | ~40 µs | — |
+| Medium input (~10 KB) | ~290 µs | — |
+| Long input (~50 KB) | ~1.1 ms | ~4.6 µs |
+| Very long string (~2 MB) | ~7.7 ms | — |
+
+All measurements on modern hardware (single-pass, O(n)). Run locally:
+
+```bash
+# Python benchmarks
+uv run pytest tests/python/test_performance.py --benchmark-only
+
+# Rust benchmarks
+cargo bench -p json-repair-core
+```
+
 ## Versions
 
 | Version | Date | Description |

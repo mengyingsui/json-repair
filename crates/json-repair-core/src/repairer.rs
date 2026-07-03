@@ -1,6 +1,7 @@
 use std::fmt::Write;
 
 const IMPLICIT_SEQUENCE_MIN_LENGTH: usize = 8192;
+const MAX_PARSE_DEPTH: usize = 500;
 const VALID_ESCAPES: &str = r#""\/bfnrt"#;
 
 pub(crate) struct Repairer {
@@ -13,6 +14,7 @@ pub(crate) struct Repairer {
     just_emitted_value: bool,
     out_chars: usize,
     last_depth0_pos: usize,
+    depth: usize,
 }
 
 impl Repairer {
@@ -29,6 +31,7 @@ impl Repairer {
             just_emitted_value: false,
             out_chars: 0,
             last_depth0_pos: 0,
+            depth: 0,
         }
     }
 
@@ -116,21 +119,24 @@ impl Repairer {
     }
 
     fn skip_prefix_junk(&mut self) {
-        let s: String = self.chars.iter().collect();
-        let trimmed = s.trim_start();
-        let prefix_len = s.len() - trimmed.len();
-        let text = if let Some(after_fence) = trimmed.strip_prefix("```") {
-            if let Some(newline_pos) = after_fence.find('\n') {
-                after_fence[newline_pos + 1..].to_string()
-            } else {
-                after_fence.to_string()
+        let mut start = 0;
+        while start < self.n && self.chars[start].is_ascii_whitespace() {
+            start += 1;
+        }
+        if start + 2 < self.n
+            && self.chars[start] == '`'
+            && self.chars[start + 1] == '`'
+            && self.chars[start + 2] == '`'
+        {
+            start += 3;
+            while start < self.n && self.chars[start] != '\n' {
+                start += 1;
             }
-        } else if prefix_len > 0 {
-            trimmed.to_string()
-        } else {
-            s
-        };
-        let mut text_chars: Vec<char> = text.chars().collect();
+            if start < self.n {
+                start += 1;
+            }
+        }
+        let mut text_chars: Vec<char> = self.chars[start..].to_vec();
         let text_n = text_chars.len();
         let saved = self.i;
         let mut unbraced_start: isize = -1;
@@ -166,16 +172,10 @@ impl Repairer {
                     }
                 }
                 let mut j = self.i;
-                while j < text_n {
-                    let c = text_chars[j];
-                    if c.is_ascii_whitespace() {
-                        j += 1;
-                    } else {
-                        break;
-                    }
+                while j < text_n && text_chars[j].is_ascii_whitespace() {
+                    j += 1;
                 }
-                let after: String = text_chars[j..].iter().collect();
-                if after.starts_with(':') && unbraced_start == -1 {
+                if j < text_n && text_chars[j] == ':' && unbraced_start == -1 {
                     unbraced_start = str_start as isize;
                 }
             } else {
@@ -249,13 +249,13 @@ impl Repairer {
                             k += 1;
                         }
                         if k < self.n && self.chars[k] == '"' {
-                            self.out.pop();
-                            self.out_chars -= 1;
-                            while let Some(c) = self.out.pop() {
-                                self.out_chars -= 1;
-                                if !c.is_ascii_whitespace() {
-                                    self.out.push(c);
-                                    self.out_chars += 1;
+                    let _ = self.out.pop();
+                    self.out_chars -= 1;
+                    while let Some(c) = self.out.pop() {
+                        self.out_chars -= c.len_utf8();
+                        if !c.is_ascii_whitespace() {
+                            self.out.push(c);
+                            self.out_chars += c.len_utf8();
                                     break;
                                 }
                             }
@@ -433,6 +433,17 @@ impl Repairer {
     }
 
     fn parse_value(&mut self) {
+        self.depth += 1;
+        if self.depth > MAX_PARSE_DEPTH {
+            self.emit_str("null");
+            self.depth -= 1;
+            return;
+        }
+        self.parse_value_inner();
+        self.depth -= 1;
+    }
+
+    fn parse_value_inner(&mut self) {
         self.skip_ws();
         if self.i >= self.n {
             self.emit_str("null");
