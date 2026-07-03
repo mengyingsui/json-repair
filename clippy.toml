@@ -1,0 +1,7 @@
+# ── clippy configuration ────────────────────────────────────────────────────
+# See https://doc.rust-lang.org/clippy/ for all available lints.
+
+msrv = "1.85"
+
+# Allow certain lints that are too noisy for this codebase
+allow-attributes-without-reason = true

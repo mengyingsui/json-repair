@@ -2,10 +2,10 @@
 name = "json-repair-python"
 version = "0.1.0"
 edition = "2024"
-description = "Python bindings for json-repair-core via PyO3"
 license = "GPL-2.0-only"
 repository = "https://gitee.com/mensui/json_repair"
 homepage = "https://gitee.com/mensui/json_repair"
+description = "Python bindings for json-repair-core via PyO3"
 
 [lib]
 name = "_rust_parse"

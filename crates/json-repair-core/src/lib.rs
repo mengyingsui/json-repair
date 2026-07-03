@@ -1,9 +1,16 @@
 pub mod error;
+
 mod repairer;
 
 use error::JsonRepairError;
 use repairer::Repairer;
 
+/// Fix the `','word":"` mixed-quote boundary pattern in `text`.
+///
+/// When LLM output uses both `'` and `"` quote styles, a double-quoted string
+/// value may contain `','word":"` where `'word'` was originally a single-quoted
+/// key.  This pre-processing step splits it into `","word":"` so the parser
+/// correctly treats `word` as the next key.
 pub fn fix_mixed_quotes(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
     let n = chars.len();
@@ -40,6 +47,11 @@ pub fn fix_mixed_quotes(text: &str) -> String {
     out
 }
 
+/// Split `"key:value"` into `"key":"value"` when followed by `,` or `}`.
+///
+/// Detects quoted strings that contain a colon where the content before the
+/// colon is a valid bare key and the content after is a valid bare value,
+/// and the string is followed by structural punctuation.
 pub fn fix_colon_in_key(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
     let n = chars.len();
@@ -99,6 +111,25 @@ pub fn fix_colon_in_key(text: &str) -> String {
     out
 }
 
+/// Repair a malformed JSON string and return valid JSON.
+///
+/// This is the main entry point.  It returns `Ok(valid_json)` on success, or
+/// `Err(JsonRepairError)` if repair produced text that is still invalid JSON.
+///
+/// # Example
+///
+/// ```
+/// use json_repair_core::repair_json;
+///
+/// let broken = r#"{"key": "value with "embedded" quotes"}"#;
+/// let repaired = repair_json(broken).unwrap();
+/// assert_eq!(repaired, r#"{"key":"value with \"embedded\" quotes"}"#);
+/// ```
+///
+/// # Errors
+///
+/// Returns `JsonRepairError` if input is catastrophically malformed or the
+/// repair algorithm cannot produce valid JSON.
 pub fn repair_json(text: &str) -> Result<String, JsonRepairError> {
     if text.trim().is_empty() {
         return Ok(String::new());

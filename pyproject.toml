@@ -8,7 +8,26 @@ version = "0.3.0"
 description = "Repair malformed JSON from LLM outputs - handles unescaped quotes, triple-quoted strings, and more in a single pass"
 readme = "README.md"
 requires-python = ">=3.12"
+authors = [
+    { name = "mensui" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Linguistic",
+]
+keywords = ["json", "repair", "llm", "malformed", "fix"]
 dependencies = []
+
+[project.urls]
+Homepage = "https://gitee.com/mensui/json_repair"
+Repository = "https://gitee.com/mensui/json_repair"
+Changelog = "https://gitee.com/mensui/json_repair/blob/master/CHANGELOG.md"
 
 [tool.maturin]
 manifest-path = "crates/json-repair-python/Cargo.toml"
