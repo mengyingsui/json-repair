@@ -155,15 +155,15 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Scenario | Python (via PyO3) | Rust (native) |
 |----------|-------------------|---------------|
-| Trivial (number) | ~1.2 µs | — |
-| Empty object/array | ~1.5 µs | — |
-| Small corrupted | ~5.8 µs | ~1.4 µs |
-| Triple-quoted | ~17 µs | — |
-| Deep nested (≤500) | ~20 µs | — |
-| Realistic LLM output | ~40 µs | — |
-| Medium input (~10 KB) | ~290 µs | — |
-| Long input (~50 KB) | ~1.1 ms | ~4.6 µs |
-| Very long string (~2 MB) | ~7.7 ms | — |
+| Trivial (number) | ~1.4 µs | — |
+| Empty object/array | ~1.7 µs | — |
+| Small corrupted | ~8.6 µs | ~1.5 µs |
+| Triple-quoted | ~15 µs | — |
+| Deep nested (≤500) | ~25 µs | — |
+| Realistic LLM output | ~50 µs | — |
+| Medium input (~10 KB) | ~340 µs | — |
+| Long input (~50 KB) | ~1.1 ms | ~4.1 µs |
+| Very long string (~2 MB) | ~8.5 ms | — |
 
 All measurements on modern hardware (single-pass, O(n)). Run locally:
 
@@ -179,6 +179,7 @@ cargo bench -p json-repair-core
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.3.1 | 2026-07-03 | Security hardening — recursion depth limit, allocation fixes, CI, docs |
 | v0.3.0 | 2026-07-03 | Rust rewrite — entire state machine ported from Cython to Rust via PyO3 |
 | v0.2.0 | 2026-06-28 | Full Cython acceleration for all hot-path parsers |
 | v0.1.17 | 2026-06-28 | SQL-style `--` line comment support |

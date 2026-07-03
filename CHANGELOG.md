@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.3.1 (2026-07-03)
+
+### Security
+- **Recursion depth limit** (`MAX_PARSE_DEPTH=500`) — prevents stack overflow on
+  deeply nested input (`[[[...]]]`). `parse_value` now wraps itself with a depth
+  counter; exceeding the limit emits `null` and returns.
+
+### Fixed
+- `out_chars` byte tracking in `parse_string` — `-= 1` → `-= c.len_utf8()` for
+  correct non-ASCII suffix-junk cleanup.
+- `skip_prefix_junk` redundant String allocations — rewritten to use index-based
+  operations on `Vec<char>`, eliminating intermediate `String` copies.
+- `peek_str` per-call allocation — replaced with `peek_is(&str)`, zero-allocation
+  pattern matching.
+- `parse_number` slow `f64::parse` on very long digit sequences (>100 chars now
+  skips the parse and emits the number directly).
+
+### Added
+- CI pipeline (GitHub Actions): Rust test+clippy+bench, Python pytest+ruff+mypy,
+  wheel build on tag.
+- `.editorconfig`, `.pre-commit-config.yaml`, `clippy.toml`, `deny.toml`.
+- `SECURITY.md` with vulnerability reporting policy.
+- Rustdoc documentation for all public API items in `json-repair-core`.
+- `.pyi` type stub for the PyO3 extension module.
+- PyPI metadata (`authors`, `classifiers`, `keywords`, `project.urls`).
+
+### Changed
+- Workspace `Cargo.toml` now uses `workspace.package` shared metadata;
+  `json-repair-core` inherits `version`, `edition`, `license`, `rust-version`.
+- Rust crate `json-repair-core` bumped to **v0.1.1**.
+
 ## v0.3.0 (2026-07-03)
 
 ### Changed

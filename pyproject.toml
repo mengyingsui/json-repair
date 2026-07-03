@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "json-repair"
-version = "0.3.0"
+version = "0.3.1"
 description = "Repair malformed JSON from LLM outputs - handles unescaped quotes, triple-quoted strings, and more in a single pass"
 readme = "README.md"
 requires-python = ">=3.12"
