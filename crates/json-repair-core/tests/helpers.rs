@@ -12,7 +12,12 @@ pub fn collect_cases(dir: &Path) -> Vec<(String, String, usize, Option<serde_jso
     let mut cases = Vec::new();
     let mut entries: Vec<_> = fs::read_dir(dir).unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
+        .filter(|e| {
+            let p = e.path();
+            let ext = p.extension().is_some_and(|ext| ext == "jsonl");
+            let is_bench = p.file_stem().and_then(|s| s.to_str()) == Some("bench_data");
+            ext && !is_bench
+        })
         .collect();
     entries.sort_by_key(|e| e.file_name());
     for entry in entries {

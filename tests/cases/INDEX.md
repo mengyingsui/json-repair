@@ -6,6 +6,7 @@ All `.jsonl` files under `tests/cases/` are auto-discovered by
 Lines use the format: `{"input": "...", "expected": ...}`.
 
 > ⚠️ **When adding a new `.jsonl` file, update this INDEX.md.**
+> **`bench_data.jsonl`** — benchmark input data, included here for reference. Not a test case file (no `"expected"` field).
 
 ---
 
@@ -44,6 +45,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `unquoted_values.jsonl` | 8 | Unquoted string values like {"name": John} — also multi-word values with spaces, values containing escaped quotes. |
 | `unterminated_string.jsonl` | 1 | String value missing closing " before , — next key's opening " is otherwise consumed as the string terminator. |
 | `valid_pass_through.jsonl` | 9 | Already-valid JSON — must pass through unchanged (regression guard). |
+| `bench_data.jsonl` | 19 | ⚡ Benchmark input data (no `expected` field). Used by both Rust (`crates/json-repair-core/benches/`) and Python (`tests/python/test_performance.py`) benchmarks. |
 
 ## Quick Reference by Feature
 

@@ -4,6 +4,11 @@
 
 ### What does json_repair *not* handle?
 
+- **Non-standard key-value separators** — when a character other than `:`
+  separates a key from a non-string value (e.g. `{"key"; 1}`, `{"key"| 2}`,
+  `{"key"& 3}`, or `{"key" 4}`), the string parser treats the `"` before
+  the separator as embedded content and escapes it, producing garbled output
+  that is still not valid JSON after repair.
 - **Nested unescaped quotes in deeply ambiguous contexts** — the heuristic
   uses a short lookahead to decide whether `"` closes the string or is
   embedded content. When natural-language text contains multiple adjacent
@@ -23,12 +28,26 @@
 
 ### Is the output guaranteed to be valid JSON?
 
-In Python, `repair_json` with `return_object=True` raises `ValueError` if the
-repaired text is still not valid JSON. Without `return_object`, the string
-returned is always syntactically valid JSON for all known broken patterns.
+For most malformed inputs encountered in practice (embedded quotes, missing
+brackets, trailing commas, etc.) the repaired output is valid JSON.
 
-In Rust, `repair_json` returns `Result<String, JsonRepairError>` — the caller
-should handle the error case for catastrophically malformed input.
+However, some patterns are **currently unfixable** — the repairer produces
+output that is still syntactically invalid. These include:
+- Non-standard key-value separators (e.g. `";"`, `"|"`, `"&"` with
+  non-string values like `{"key"; 1}`)
+- Backslash before closing quote (`"\`)
+- Isolated stray double-quote characters
+- Input that is too short to trigger the state machine's close-bracket logic
+
+In Python, `repair_json` with `return_object=True` raises `ValueError` for
+these cases. Without `return_object`, the string is returned as-is and may
+or may not be valid JSON — the caller should validate with `json.loads()`
+if they need guarantees.
+
+In Rust, `repair_json` always returns `Ok(String)` (the repairer always
+produces *some* output), but the output may not pass
+`serde_json::from_str::<serde_json::Value>()`. The caller should validate
+the result if required.
 
 ### Does it handle streaming / partial output?
 
@@ -62,10 +81,10 @@ starts with `{` or `[` (though that case is rare in LLM output).
 
 Two symmetric fixes handle swapped closing brackets:
 
-| Fix (version) | Pattern | Behavior |
-|---------------|---------|----------|
-| **Object `]` close** (v0.1.8) | `[{"key": value]}` → `[{"key": value}]` | When `]` appears where `}` is expected in an object, the object is closed with `}` first. |
-| **Array `}` close** (v0.1.9) | `{"a":[1}}]}` → `{"a":[1]}` | When `}` appears where `]` is expected in an array, the array is closed with `]` first. |
+| Fix | Pattern | Behavior |
+|-----|---------|----------|
+| **Object `]` close** | `[{"key": value]}` → `[{"key": value}]` | When `]` appears where `}` is expected in an object, the object is closed with `}` first. |
+| **Array `}` close** | `{"a":[1}}]}` → `{"a":[1]}` | When `}` appears where `]` is expected in an array, the array is closed with `]` first. |
 
 Both only trigger when the wrong bracket is found at the *expected* closing
 position of a nested construct — they do not rearrange arbitrary bracket
@@ -84,7 +103,7 @@ Limitations:
 - The heuristic does not attempt to distinguish intended unquoted strings from
   intended JSON literals — everything is wrapped in quotes.
 
-### Mixed single/double quote boundary (v0.1.10)
+### Mixed single/double quote boundary
 
 When LLM output uses both `'` and `"` quote styles, a double-quoted string
 value may contain `','word":"` where `'word'` was originally a single-quoted
@@ -124,11 +143,14 @@ are common, but unusual formatting can still produce false positives.
 ### How fast is it?
 
 Single-pass, O(n) character-by-character in Rust. A 100 KB input
-typically completes in under 1 ms on modern hardware. See
-`crates/json-repair-core/benches/bench_repair.rs` for micro-benchmarks
-(powered by criterion). Run:
+typically completes in under 1 ms on modern hardware.
 
-    cargo bench -p json-repair-core
+Both Python and Rust benchmarks now read from the same shared data file
+`tests/cases/bench_data.jsonl` (19 cases covering fixable and unfixable
+inputs of varying sizes). Run:
+
+    cargo bench -p json-repair-core              # Rust (criterion)
+    pytest tests/python/test_performance.py --benchmark-only   # Python (pytest-benchmark)
 
 ### Why not use a parser-based approach (e.g. serde_json fallback)?
 

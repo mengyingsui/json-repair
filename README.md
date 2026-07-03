@@ -155,15 +155,16 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Scenario | Python (via PyO3) | Rust (native) |
 |----------|-------------------|---------------|
-| Trivial (number) | ~1.4 µs | — |
-| Empty object/array | ~1.7 µs | — |
-| Small corrupted | ~8.6 µs | ~1.5 µs |
-| Triple-quoted | ~15 µs | — |
-| Deep nested (≤500) | ~25 µs | — |
-| Realistic LLM output | ~50 µs | — |
-| Medium input (~10 KB) | ~340 µs | — |
-| Long input (~50 KB) | ~1.1 ms | ~4.1 µs |
-| Very long string (~2 MB) | ~8.5 ms | — |
+| Valid JSON passthrough | ~2.8 µs | ~3.1 µs |
+| Small corrupted | ~8.6 µs | ~7.8 µs |
+| Triple-quoted | ~15 µs | ~5.5 µs |
+| Embedded quotes | ~23 µs | ~10 µs |
+| Deep nested (6 levels) | ~25 µs | ~3.0 µs |
+| Deeply nested array (50) | ~22 µs | ~14 µs |
+| Realistic LLM output | ~50 µs | ~24 µs |
+| Medium corrupted (~5 KB) | ~340 µs | ~122 µs |
+| Large corrupted (~50 KB) | ~1.25 ms | ~430 µs |
+| Very long string (~2 MB) | ~8.5 ms | ~3.0 ms |
 
 All measurements on modern hardware (single-pass, O(n)). Run locally:
 
