@@ -40,9 +40,17 @@ impl Repairer {
         if pos < self.n { self.chars[pos] } else { '\0' }
     }
 
-    fn peek_str(&self, len: usize) -> String {
-        let end = (self.i + len).min(self.n);
-        self.chars[self.i..end].iter().collect()
+    fn peek_is(&self, s: &str) -> bool {
+        let end = self.i + s.len();
+        if end > self.n {
+            return false;
+        }
+        for (j, c) in s.chars().enumerate() {
+            if self.chars[self.i + j] != c {
+                return false;
+            }
+        }
+        true
     }
 
     fn emit_char(&mut self, c: char) {
@@ -308,7 +316,7 @@ impl Repairer {
         self.i += 3;
         self.emit_char('"');
         while self.i < self.n {
-            if self.peek_str(3) == "\"\"\"" {
+            if self.peek_is("\"\"\"") {
                 let after = self.i + 3;
                 if after < self.n && self.chars[after] == '"' {
                     // pass
@@ -454,7 +462,7 @@ impl Repairer {
             '{' => self.parse_object(),
             '[' => self.parse_array(),
             '"' => {
-                if self.peek_str(3) == "\"\"\"" {
+                if self.peek_is("\"\"\"") {
                     let rest: String = self.chars[self.i + 3..].iter().collect();
                     if rest.contains("\"\"\"") {
                         self.parse_triple_string();
@@ -466,7 +474,7 @@ impl Repairer {
             '\'' => self.parse_single_quoted_string(),
             't' | 'f' | 'n' | 'T' | 'F' | 'N' | 'i' | 'I' | 'u' | 'U' => self.parse_literal(),
             '-' => {
-                if self.peek_str(2) == "--" {
+                if self.peek_is("--") {
                     self.skip_comment();
                     self.parse_value();
                 } else {
@@ -538,7 +546,7 @@ impl Repairer {
                 self.expect_key = true;
                 continue;
             }
-            if ch == '/' || ch == '#' || (ch == '-' && self.peek_str(2) == "--") {
+            if ch == '/' || ch == '#' || (ch == '-' && self.peek_is("--")) {
                 self.skip_comment();
                 continue;
             }
@@ -696,7 +704,7 @@ impl Repairer {
                 self.i += 1;
                 continue;
             }
-            if ch == '/' || ch == '#' || (ch == '-' && self.peek_str(2) == "--") {
+            if ch == '/' || ch == '#' || (ch == '-' && self.peek_is("--")) {
                 self.skip_comment();
                 continue;
             }
@@ -825,7 +833,7 @@ impl Repairer {
         } else {
             num_str
         };
-        if num_str.parse::<f64>().is_ok() {
+        if num_str.len() > 100 || num_str.parse::<f64>().is_ok() {
             self.emit_str(&num_str);
         } else {
             self.emit_char('0');
@@ -834,14 +842,14 @@ impl Repairer {
     }
 
     fn skip_comment(&mut self) {
-        if self.peek_str(2) == "//" {
+        if self.peek_is("//") {
             while self.i < self.n && self.chars[self.i] != '\n' {
                 self.i += 1;
             }
             if self.i < self.n {
                 self.i += 1;
             }
-        } else if self.peek_str(2) == "/*" {
+        } else if self.peek_is("/*") {
             self.i += 2;
             while self.i + 1 < self.n {
                 if self.chars[self.i] == '*' && self.chars[self.i + 1] == '/' {
@@ -850,7 +858,7 @@ impl Repairer {
                 }
                 self.i += 1;
             }
-        } else if self.chars[self.i] == '#' || self.peek_str(2) == "--" {
+        } else if self.chars[self.i] == '#' || self.peek_is("--") {
             while self.i < self.n && self.chars[self.i] != '\n' {
                 self.i += 1;
             }
