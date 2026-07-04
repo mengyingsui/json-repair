@@ -1,5 +1,18 @@
 # Changelog — json-repair-core
 
+## v0.1.6 (2026-07-04)
+
+### Changed
+- Cargo.lock tracked for reproducible CI builds.
+
+### Fixed
+- **Trailing-comma at EOF** — fuzzer-discovered: `array_loop` and
+  `object_loop` now strip trailing commas before breaking at end-of-input
+  (e.g. `[12,\n` → `[12]`, not `[12,]`).
+
+### Security
+- No new security features; all guarantees from v0.1.4+ preserved.
+
 ## v0.1.5 (2026-07-04)
 
 ### Changed

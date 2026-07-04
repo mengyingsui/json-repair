@@ -117,7 +117,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: PyO3/maturin-action@v2
+      - uses: PyO3/maturin-action@v1
         with:
           command: build
           args: --release -m crates/json-repair-python/Cargo.toml
