@@ -13,4 +13,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 json-repair-core = { path = "../json-repair-core" }
-pyo3 = { version = "0.23", features = ["extension-module"] }
+pyo3 = { version = "0.29", features = ["extension-module"] }
