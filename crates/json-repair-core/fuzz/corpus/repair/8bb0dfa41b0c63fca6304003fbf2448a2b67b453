@@ -1,0 +1,14 @@
+Here is the JSON you requested:
+
+```json
+{
+    "analysis": {
+        "summary": "The user said "I need help"  assist?"",
+        "sentiment": "positive",
+        "entities": ["user", "system"],
+      none}de_snippet": """def foo():
+    return "bar"
+"""
+    }
+}
+```

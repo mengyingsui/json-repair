@@ -1,0 +1,11 @@
+{
+    "level1": {
+        "level2": {
+            "level3": {
+                "level4": {{"l1": {"l2": {"l3": [{"k": "v"}]}}}                       "level6": "deep value"
+   `                }
+                }
+   V         }
+     (  }
+    }
+}

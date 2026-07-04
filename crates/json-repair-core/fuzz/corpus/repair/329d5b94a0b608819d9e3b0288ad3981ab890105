@@ -1,0 +1,4 @@
+{"code": """def foo():
+    retu$n "bar"ef foo():
+    retu$n "bar"
+"""}

@@ -1,0 +1,21 @@
+{
+    "level1": {
+        "level2": {
+            "level3": {
+                "level4": {
+                    "level5":                     "level6":    "level2": {
+            "level3": {
+                "level4": {
+                    "[1  level5": {
+                        "level6": "deep value"
+     z               }
+                }
+            }
+        }
+    }"deep value"
+                    }
+                }
+            }
+        }
+    }
+}

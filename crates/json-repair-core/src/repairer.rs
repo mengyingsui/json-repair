@@ -117,11 +117,42 @@ impl Repairer {
             return true;
         }
         let nc = self.chars[j];
-        const CLOSING_CHARS: &str = ",}]:\n";
+        const CLOSING_CHARS: &str = ",}]\n";
         if CLOSING_CHARS.contains(nc) {
+            if nc == ',' && !self.expect_key {
+                let mut k = j + 1;
+                while k < self.n
+                    && (self.chars[k] == ' '
+                        || self.chars[k] == '\t'
+                        || self.chars[k] == '\r'
+                        || self.chars[k] == '\n')
+                {
+                    k += 1;
+                }
+                if k < self.n {
+                    let after = self.chars[k];
+                    if after != '"'
+                        && after != '{'
+                        && after != '['
+                        && after != 't'
+                        && after != 'f'
+                        && after != 'n'
+                        && after != '-'
+                        && after != '}'
+                        && after != ']'
+                        && after != ','
+                        && !after.is_ascii_digit()
+                    {
+                        return false;
+                    }
+                }
+            }
             return true;
         }
         if nc == '"' {
+            return true;
+        }
+        if self.expect_key && nc == ':' {
             return true;
         }
         if nc.is_ascii_alphabetic() || nc == '_' {
@@ -134,12 +165,12 @@ impl Repairer {
             }
             if k < self.n && self.chars[k] == '"' {
                 k += 1;
-            }
-            while k < self.n && self.chars[k].is_ascii_whitespace() {
-                k += 1;
-            }
-            if k < self.n && self.chars[k] == ':' {
-                return true;
+                while k < self.n && self.chars[k].is_ascii_whitespace() {
+                    k += 1;
+                }
+                if k < self.n && self.chars[k] == ':' {
+                    return true;
+                }
             }
         }
         false
@@ -649,7 +680,10 @@ impl Repairer {
         } else {
             num_str
         };
-        if num_str.len() > 100 || num_str.parse::<f64>().is_ok() {
+        let num_str = normalize_number_leading_zeros(&num_str);
+        if num_str.len() > 100
+            || serde_json::from_str::<serde_json::Value>(&num_str).is_ok()
+        {
             self.emit_str(&num_str);
         } else {
             self.emit_char('0');
@@ -1137,5 +1171,46 @@ impl Repairer {
             self.out_chars -= 1;
         }
         self.emit_char(']');
+    }
+}
+
+/// Strip leading zeros from the integer part of a number string.
+///
+/// JSON (RFC 8259) forbids leading zeros in numbers.  `f64::parse()` accepts
+/// them, so the repairer's `parse_number` would emit e.g. `"000"` which is
+/// invalid JSON.  This helper normalises those away while preserving the
+/// numeric value.
+///
+/// ```ignore
+/// assert_eq!(normalize_number_leading_zeros("000"),   "0");
+/// assert_eq!(normalize_number_leading_zeros("-001"),  "-1");
+/// assert_eq!(normalize_number_leading_zeros("00.5"),  "0.5");
+/// assert_eq!(normalize_number_leading_zeros("0"),     "0");    // unchanged
+/// assert_eq!(normalize_number_leading_zeros("0.5"),   "0.5");  // unchanged
+/// assert_eq!(normalize_number_leading_zeros("123"),   "123");  // unchanged
+/// ```
+fn normalize_number_leading_zeros(s: &str) -> String {
+    if s.is_empty() {
+        return s.to_string();
+    }
+    let start = if s.starts_with('-') || s.starts_with('+') {
+        1
+    } else {
+        0
+    };
+    let int_end = s[start..]
+        .find(['.', 'e', 'E'])
+        .map(|pos| start + pos)
+        .unwrap_or(s.len());
+
+    let int_part = &s[start..int_end];
+    if int_part.len() > 1 && int_part.starts_with('0') {
+        let stripped = int_part.trim_start_matches('0');
+        let normalized = if stripped.is_empty() { "0" } else { stripped };
+        let sign_prefix = if start > 0 { &s[..start] } else { "" };
+        let rest = &s[int_end..];
+        format!("{}{}{}", sign_prefix, normalized, rest)
+    } else {
+        s.to_string()
     }
 }

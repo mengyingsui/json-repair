@@ -94,3 +94,81 @@ proptest! {
         }
     }
 }
+
+/// ── Number-corruption edge cases ──────────────────────────────────────────
+
+fn numeric_corruption_input() -> impl Strategy<Value = String> {
+    prop_oneof![
+        // "number + junk" patterns — the core "123abc" class of bug
+        (any::<u64>(), "[a-z_]{1,10}").prop_map(|(n, suffix)| format!("{n}{suffix}")),
+        (any::<i64>(), "[a-z]{1,5}").prop_map(|(n, suffix)| format!("{n}{suffix}")),
+        (r"[0-9]{1,3}\.[0-9]{1,3}", "[a-zA-Z]{1,5}")
+            .prop_map(|(n, suffix)| format!("{n}{suffix}")),
+        // multiple decimal points
+        r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}",
+        // trailing dot
+        r"[0-9]{1,5}\.",
+        r"\.[0-9]{1,5}",
+        // leading zeros
+        r"0[0-9]{2,6}",
+        r"-0[0-9]{1,5}",
+        // hex-like (0x...)
+        r"0[xX][0-9a-fA-F]{1,8}",
+        // multiple signs
+        r"[+-]{2,3}[0-9]{1,5}",
+        r"--[0-9]{1,5}",
+        // malformed scientific
+        r"[0-9]{1,3}e[+-]?[0-9]{0,3}[a-z]{0,3}",
+        r"[0-9]{1,3}e[0-9]{1,2}\.[0-9]{1,2}",
+        r"[0-9]{1,2}e[0-9]{1,2}e[0-9]{1,2}",
+        // sign in wrong position
+        r"[0-9]{2,4}-[0-9]{2,4}",
+        // embedded spaces
+        r"[0-9]{2} [0-9]{2}",
+        r"[0-9]{1,3}\. [0-9]{1,3}",
+        r"[0-9]{1,3}\s+\.[0-9]{1,3}",
+        // lone operators
+        Just("+".to_string()),
+        Just("-".to_string()),
+        Just(".".to_string()),
+        Just("e".to_string()),
+    ]
+}
+
+proptest! {
+    #[test]
+    fn numeric_corruption_rejected_or_fixed(input in numeric_corruption_input()) {
+        // Some number-corrupted inputs may be repairable, others must error.
+        // Neither path should panic or produce invalid JSON.
+        match json_repair_core::repair_json(&input) {
+            Ok(repaired) => {
+                if !repaired.is_empty() {
+                    let _: serde_json::Value = serde_json::from_str(&repaired)
+                        .expect("repaired number-corrupted input must be valid JSON");
+                }
+            }
+            Err(_) => {} // rejection is acceptable
+        }
+    }
+
+    #[test]
+    fn numeric_corruption_no_panic(input in numeric_corruption_input()) {
+        // The absolute minimum guarantee: no panic.
+        let _ = json_repair_core::repair_json(&input);
+    }
+
+    #[test]
+    fn corrupt_number_in_json_value(
+        raw_key in "[a-z]{1,6}",
+        corrupt_num in numeric_corruption_input(),
+    ) {
+        let input = format!(r#"{{"{raw_key}": {corrupt_num}}}"#);
+        let _ = json_repair_core::repair_json(&input);
+    }
+
+    #[test]
+    fn corrupt_number_in_array(corrupt_num in numeric_corruption_input()) {
+        let input = format!("[{corrupt_num}]");
+        let _ = json_repair_core::repair_json(&input);
+    }
+}

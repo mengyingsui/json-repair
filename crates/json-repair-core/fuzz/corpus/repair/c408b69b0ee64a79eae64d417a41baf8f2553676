@@ -1,0 +1,7 @@
+{"items":[
+{"text":"枪是从哪里来的？","entity":"枪","type":9,"stable":false,"topic":"origin of the gun"},
+{"text":"自杀，还是伪装成自杀？","entity":"自杀","type":5,"stable":false,"topic":"suicide or fake suicide"},
+{"text":"这种自杀方式怎么才留下这点血痕？","entity":"自杀","type":8,"s":"枪","type":9,"stable":false,"topic":"origin of the gun"},
+{"text":"自杀，还是伪装成自杀？","entity":"自杀","type":5,"stable":false,"topic":"suicide or fake suicide"},
+{"text":"这种自杀方式怎么才留下这点血痕？","entity":"自杀","type":8,"stable":false,"topic":"blood tratable":false,"topic":"b"time travel and healing ability"}
+]}

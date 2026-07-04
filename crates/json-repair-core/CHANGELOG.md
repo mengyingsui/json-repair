@@ -1,5 +1,30 @@
 # Changelog — json-repair-core
 
+## v0.1.4 (2026-07-04)
+
+### Security
+- **Number normalisation** — leading zeros in numbers are stripped
+  (`"000"` → `"0"`, `"-001"` → `"-1"`) so emitted JSON conforms to RFC 8259
+  (which forbids leading zeros). Previously `f64::parse()` accepted
+  non-conformant numbers which were emitted verbatim.
+
+### Changed
+- `parse_number` now validates via `serde_json::from_str` instead of
+  `f64::parse()` — correctly rejects non-JSON-conformant numbers that
+  `f64` would silently accept.
+- `is_closing_quote` — `:` after an unquoted key is now treated as part of
+  the key-value pair when the parser expects a key. Comma-before-value
+  detection tightened to check more reserved characters (`true`, `false`,
+  `null`, `-`, digits) before declaring the quote as closing.
+
+### Fixed
+- Leading-zero numbers (`000`, `-001`, `00.5`) now emit valid JSON.
+
+### Added
+- Numeric-corruption property tests (4 new proptest functions) covering
+  number+junk suffix, multiple decimal points, hex-like, multiple signs,
+  malformed scientific notation, embedded spaces, and lone operators.
+
 ## v0.1.3 (2026-07-04)
 
 ### Added

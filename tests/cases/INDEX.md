@@ -41,7 +41,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `trailing_junk.jsonl` | 3 | Extraneous text after valid JSON discarded (-lnd, junk, log lines). |
 | `triple_quoted.jsonl` | 5 | """…""" multiline strings — inner quotes, embedded newlines, empty. |
 | `truncated.jsonl` | 8 | Missing closing braces/brackets/quotes — parser infers and closes. Also handles missing value after colon (emits null). |
-| `unescaped_quotes.jsonl` | 5 | Unescaped " inside strings — parser deduces delimiter vs content. |
+| `unescaped_quotes.jsonl` | 3 | Unescaped " inside strings — parser deduces delimiter vs content. Handles `"Stop Doing"`, `"Pomodoro Timer"`, `"Done"` in long text values; also `"The Climb"` followed by `,` and `"buddy movie"` in prose. |
 | `unquoted_keys.jsonl` | 3 | {key: "value"} style unquoted object keys. |
 | `unquoted_values.jsonl` | 8 | Unquoted string values like {"name": John} — also multi-word values with spaces, values containing escaped quotes. |
 | `unterminated_string.jsonl` | 1 | String value missing closing " before , — next key's opening " is otherwise consumed as the string terminator. |

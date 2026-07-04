@@ -1,0 +1,1 @@
+{"what": "the link offset \(d_i\) refers to"}

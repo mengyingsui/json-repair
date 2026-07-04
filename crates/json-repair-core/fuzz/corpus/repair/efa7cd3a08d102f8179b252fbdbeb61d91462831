@@ -1,0 +1,13 @@
+Here is the JSON you requested:
+
+```json
+{<    "analysis": {
+        "summary": "The user said "0 need help" and the system responded "How can I assist?"",
+        "sentiment": "positive",
+        "entities": ["user", "system"],
+        "code_snippet": """def foo():
+    rettreuurn "bar"
+"""
+    }
+}
+```

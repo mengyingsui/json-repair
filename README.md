@@ -1,6 +1,6 @@
 # json_repair
 
-[![Security: v0.3.3+](https://img.shields.io/badge/Security-v0.3.3%2B-2ea44f?labelColor=333)](SECURITY.md)
+[![Security: v0.3.4+](https://img.shields.io/badge/Security-v0.3.4%2B-2ea44f?labelColor=333)](SECURITY.md)
 
 Repair malformed JSON from LLM outputs in a **single pass** — now powered by Rust.
 
@@ -180,6 +180,7 @@ cargo bench -p json-repair-core
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.3.4 🔒 | 2026-07-04 | **Leading-zero normalisation** — numbers with leading zeros stripped to RFC 8259; `is_closing_quote` comma/key hardening; numeric-corruption proptests. |
 | v0.3.3 🔒 | 2026-07-04 | **Prefix junk hardening** — metadata tags `[TEXT_*]`, code fences, link parens; Cow<str> preprocessor; peek_is correctness fix; fuzz-verified. |
 | v0.3.2 🔒 | 2026-07-03 | **Security-hardened release** — depth/numeric Err, ParserState enum, GIL release, fuzz, proptest, pip-audit, coverage. See [`SECURITY.md`](SECURITY.md) |
 | v0.3.1 | 2026-07-03 | Security hardening — recursion depth limit, allocation fixes, CI, docs |

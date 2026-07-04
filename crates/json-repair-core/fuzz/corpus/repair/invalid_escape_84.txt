@@ -1,0 +1,1 @@
+{"text": "newline\nhere and star\*there"}

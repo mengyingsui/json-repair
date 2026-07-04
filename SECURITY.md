@@ -2,7 +2,7 @@
 
 ## Security Declaration
 
-Starting with **v0.3.3** (Python) / **v0.1.3** (Rust),
+Starting with **v0.3.4** (Python) / **v0.1.4** (Rust),
 `json_repair` makes the following security guarantees:
 
 - **No stack overflow** — iterative parser with explicit `Vec` stack;
@@ -27,7 +27,7 @@ Starting with **v0.3.3** (Python) / **v0.1.3** (Rust),
 | **json-repair-core** (Rust) | 0.1.x | :white_check_mark: |
 | | < 0.1 | :x: |
 
-Security guarantees in the declaration above apply to **Python v0.3.3+** / **Rust v0.1.3+**.
+Security guarantees in the declaration above apply to **Python v0.3.4+** / **Rust v0.1.4+**.
 
 ## Reporting a Vulnerability
 

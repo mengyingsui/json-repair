@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.3.4 (2026-07-04)
+
+### Security
+- **Leading-zero number normalisation** — numbers with leading zeros
+  (`"000"`, `"-001"`, `"00.5"`) are now stripped to RFC 8259-conformant
+  forms before emission (`"0"`, `"-1"`, `"0.5"`).
+
+### Changed
+- Rust crate `json-repair-core` bumped to **v0.1.4**.
+- `parse_number` validates via `serde_json::from_str` instead of
+  `f64::parse()` for stricter JSON conformance.
+- `is_closing_quote` — `:` after unquoted key recognised in `expect_key`
+  context; comma-before-value detection checks more reserved characters
+  (`true`, `false`, `null`, `-`, digits, `{`, `[`, `}`, `]`, `,`).
+
+### Fixed
+- Leading-zero numbers now emit valid JSON (previously `f64::parse()`
+  accepted them and they were emitted verbatim, violating RFC 8259).
+
+### Added
+- Numeric-corruption property tests (4 proptest functions) covering
+  number+junk, multiple decimal points, hex-like, multiple signs, and
+  malformed scientific notation.
+- New realistic-LLM-output test cases in `unescaped_quotes.jsonl`.
+
 ## v0.3.3 (2026-07-04)
 
 ### Added
