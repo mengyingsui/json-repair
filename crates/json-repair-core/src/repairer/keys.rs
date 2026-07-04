@@ -23,7 +23,17 @@ impl Repairer {
             if " \t\r\n:{}[],\"'/\u{200b}".contains(ch) {
                 break;
             }
-            self.emit_char(ch);
+            if ch == '\\' {
+                self.emit_str("\\\\");
+            } else if ch == '"' {
+                self.emit_str("\\\"");
+            } else if (ch as u32) < 0x20 {
+                use std::fmt::Write;
+                let _ = write!(self.out, "\\u{:04x}", ch as u32);
+                self.out_chars += 6;
+            } else {
+                self.emit_char(ch);
+            }
             self.i += 1;
         }
         self.emit_char('"');
