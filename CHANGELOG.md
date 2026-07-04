@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.3.5 🔒 (2026-07-04)
+
+### Changed
+- **Module system** — `repairer.rs` split into 7 submodules under `repairer/`;
+  pre-processors moved to `preprocess.rs`.
+- Rust crate `json-repair-core` bumped to **v0.1.5**.
+- Performance table refreshed with all 19 benchmark scenarios (verified across
+  repeated runs; module refactoring has no measurable performance impact).
+
+### Added
+- `serde-validate` Cargo feature — makes `serde_json` optional
+  (`--no-default-features` to build without it).
+- Debug-only assertions throughout the repairer — bracket balance, byte sync,
+  output valid-JSON, string closure invariants.
+- `repair_json_debug` public API — extra validation in dev, zero-cost in release.
+
 ## v0.3.4 (2026-07-04)
 
 ### Security

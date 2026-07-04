@@ -29,6 +29,10 @@ Starting with **v0.3.4** (Python) / **v0.1.4** (Rust),
 
 Security guarantees in the declaration above apply to **Python v0.3.4+** / **Rust v0.1.4+**.
 
+The module refactoring in v0.3.5 / v0.1.5 adds no new security features but
+preserves all existing guarantees — the same safe‑Rust state machine with
+additional `debug_assert!` guards (active in debug builds only).
+
 ## Reporting a Vulnerability
 
 Report vulnerabilities privately to the maintainer via Gitee issues

@@ -1,6 +1,6 @@
 # json_repair
 
-[![Security: v0.3.4+](https://img.shields.io/badge/Security-v0.3.4%2B-2ea44f?labelColor=333)](SECURITY.md)
+[![Security: v0.3.5+](https://img.shields.io/badge/Security-v0.3.5%2B-2ea44f?labelColor=333)](SECURITY.md)
 
 Repair malformed JSON from LLM outputs in a **single pass** — now powered by Rust.
 
@@ -155,26 +155,26 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 ## Performance
 
-| Scenario | Python (via PyO3) | Rust (native) |
-|----------|-------------------|---------------|
-| Valid JSON passthrough | ~11 µs | ~1.3 µs |
-| Small corrupted | ~16 µs | ~6.1 µs |
-| Triple-quoted | ~11 µs | ~5.7 µs |
-| Embedded quotes | ~19 µs | ~8.6 µs |
-| Deep nested (6 levels) | ~15 µs | ~3.1 µs |
-| Realistic LLM output | ~27 µs | ~6.5 µs |
-| Medium corrupted (~5 KB) | ~0.21 ms | ~59 µs |
-| Large corrupted (~50 KB) | ~0.68 ms | ~0.38 ms |
-| Medium valid (~2.5 KB) | ~0.16 ms | ~51 µs |
-| Large valid (~9 KB) | ~0.76 ms | ~0.36 ms |
-| Unfixable semicolons (small) | ~11 µs | ~4.5 µs |
-| Unfixable semicolons (medium) | ~87 µs | ~12 µs |
-| Unfixable semicolons (large) | ~0.39 ms | ~97 µs |
-| Unfixable pipes | ~0.11 ms | ~25 µs |
-| Unfixable amps | ~0.10 ms | ~15 µs |
-| Unfixable missing colons | ~0.10 ms | ~12 µs |
-| Unfixable semicolons (bool) | ~44 µs | ~7.0 µs |
-| Unfixable LLM-like semicolons | ~0.48 ms | ~0.11 ms |
+| Scenario | Python (via PyO3) | Rust (native) | Ratio |
+|----------|-------------------|---------------|-------|
+| Valid JSON passthrough | ~4 µs | ~0.65 µs | 6× |
+| Small corrupted | ~8 µs | ~4.0 µs | 2× |
+| Triple-quoted | ~7 µs | ~3.1 µs | 2× |
+| Embedded quotes | ~12 µs | ~3.6 µs | 3× |
+| Deep nested (6 levels) | ~13 µs | ~1.5 µs | 9× |
+| Realistic LLM output | ~20 µs | ~5.2 µs | 4× |
+| Medium corrupted (~5 KB) | ~0.26 ms | ~60 µs | 4× |
+| Large corrupted (~50 KB) | ~1.5 ms | ~0.20 ms | 8× |
+| Medium valid (~2.5 KB) | ~0.28 ms | ~24 µs | 12× |
+| Large valid (~9 KB) | ~1.4 ms | ~0.18 ms | 8× |
+| Unfixable semicolons (small) | ~17 µs | ~2.0 µs | 9× |
+| Unfixable semicolons (medium) | ~0.10 ms | ~11 µs | 9× |
+| Unfixable semicolons (large) | ~0.52 ms | ~44 µs | 12× |
+| Unfixable pipes | ~0.10 ms | ~12 µs | 8× |
+| Unfixable amps | ~0.10 ms | ~12 µs | 8× |
+| Unfixable missing colons | ~0.10 ms | ~11 µs | 9× |
+| Unfixable semicolons (bool) | ~34 µs | ~4.1 µs | 8× |
+| Unfixable LLM-like semicolons | ~0.42 ms | ~46 µs | 9× |
 
 All measurements on modern hardware (single-pass, O(n)). Run locally:
 
@@ -190,6 +190,7 @@ cargo bench -p json-repair-core
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.3.5 🔒 | 2026-07-04 | **Module refactoring** — repairer split into 7 submodules; Cargo feature `serde-validate`; debug assertions; refreshed benchmarks. |
 | v0.3.4 🔒 | 2026-07-04 | **Leading-zero normalisation** — numbers with leading zeros stripped to RFC 8259; `is_closing_quote` comma/key hardening; numeric-corruption proptests. |
 | v0.3.3 🔒 | 2026-07-04 | **Prefix junk hardening** — metadata tags `[TEXT_*]`, code fences, link parens; Cow<str> preprocessor; peek_is correctness fix; fuzz-verified. |
 | v0.3.2 🔒 | 2026-07-03 | **Security-hardened release** — depth/numeric Err, ParserState enum, GIL release, fuzz, proptest, pip-audit, coverage. See [`SECURITY.md`](SECURITY.md) |

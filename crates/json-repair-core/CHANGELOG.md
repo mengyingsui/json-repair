@@ -1,5 +1,20 @@
 # Changelog — json-repair-core
 
+## v0.1.5 (2026-07-04)
+
+### Changed
+- **Module system** — single `repairer.rs` (1216 lines) split into 7 submodules:
+  `string`, `number`, `literal`, `keys`, `structure`, `comment`, `junk`.
+- Pre-processing (`fix_colon_in_key`, `fix_mixed_quotes`) moved to `preprocess.rs`.
+
+### Added
+- `serde-validate` Cargo feature (enabled by default) — makes `serde_json`
+  optional.  Disable with `--no-default-features` to remove the dependency.
+- Debug-only assertions (`debug_assert!`) throughout the codebase — byte counter
+  sync, bracket balance, output valid-JSON checks, string closure invariants.
+- `repair_json_debug` public function — wraps `repair_json` with extra
+  idempotence and output validation checks (compiles away in release builds).
+
 ## v0.1.4 (2026-07-04)
 
 ### Security
