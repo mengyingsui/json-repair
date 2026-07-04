@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.3.3 (2026-07-04)
+
+### Added
+- Rust integration tests (`prefix_junk.rs`) and JSONL cases (`prefix_tags.jsonl`) for
+  metadata tags, code fences, and link patterns.
+- 10 new Rust integration tests covering `[TEXT_START]`/`[TEXT_END]` tag skipping,
+  non-JSON code fence skipping, JSON code fence parsing, and multi-tag sequences.
+
+### Changed
+- Rust crate `json-repair-core` bumped to **v0.1.3**.
+- `fix_colon_in_key` and `fix_mixed_quotes` now return `Cow<'_, str>` — zero allocation
+  when input has no matching patterns.
+- `peek_is` now uses `s.chars().count()` instead of `s.len()` for correct character index
+  calculation (all current callers are ASCII, so behavioral no-op).
+
+### Fixed
+- `skip_prefix_junk` now detects `[TEXT_*]`-style metadata tags and skips them before
+  scanning for real JSON; correctly handles `` ```json `` fences (preserves JSON inside)
+  vs `` ```text `` fences (skips entire block).
+- `is_closing_quote` magic string `",}]:\n"` extracted to `CLOSING_CHARS` const.
+- `link_depth` variable mutability and index calculation in bracket link skipping.
+- Pylance `reportUnknownArgumentType` diagnostics in `test_performance.py`,
+  `test_adjacent_objects.py`, `test_implicit_array.py` — explicit type annotations
+  and `str()` casts.
+- `_helpers.py::run` parameter type `object` → `Any` to suppress false positive warnings.
+
 ## v0.3.2 (2026-07-03)
 
 ### Security

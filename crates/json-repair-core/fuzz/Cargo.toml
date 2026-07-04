@@ -1,3 +1,5 @@
+[workspace]
+
 [package]
 name = "json-repair-core-fuzz"
 version = "0.0.1"
@@ -6,6 +8,10 @@ publish = false
 
 [package.metadata]
 cargo-fuzz = true
+
+[[bin]]
+name = "repair"
+path = "fuzz_targets/repair.rs"
 
 [dependencies]
 libfuzzer-sys = "0.4"

@@ -39,7 +39,7 @@ def load_inputs(name: str) -> list[str]:
     return inputs
 
 
-def run(input_str: str, expected: object) -> None:
+def run(input_str: str, expected: Any) -> None:
     """Assert that repair_json(input) parses to expected."""
     result = roundtrip(input_str)
     assert result == expected, f"Expected {expected!r}, got {result!r}"

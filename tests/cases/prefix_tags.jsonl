@@ -1,0 +1,8 @@
+{"input": "[TEXT_START]\n```text\nsome text\n```\n[TEXT_END]\n{\"hello\": \"world\"}", "expected": {"hello": "world"}}
+{"input": "[TEXT_START] some metadata [{\"a\": 1, \"b\": 2}]", "expected": [{"a": 1, "b": 2}]}
+{"input": "[TEXT_START]\n```text\nstuff\n```\n[TEXT_END]\n```json\n{\"a\": 1}\n```", "expected": {"a": 1}}
+{"input": "[X]{\"a\": 1}", "expected": {"a": 1}}
+{"input": "[TAG_A][TAG_B][TAG_C]{\"result\": true}", "expected": {"result": true}}
+{"input": "[1, 2, 3]", "expected": [1, 2, 3]}
+{"input": "[\"hello\", \"world\"]", "expected": ["hello", "world"]}
+{"input": "prefix text then [TEXT_START] tags [TEXT_END] before {\"key\": \"value\"}", "expected": {"key": "value"}}

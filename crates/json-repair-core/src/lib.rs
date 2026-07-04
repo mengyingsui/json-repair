@@ -2,6 +2,8 @@ pub mod error;
 
 mod repairer;
 
+use std::borrow::Cow;
+
 use error::JsonRepairError;
 use repairer::Repairer;
 
@@ -11,7 +13,7 @@ use repairer::Repairer;
 /// value may contain `','word":"` where `'word'` was originally a single-quoted
 /// key.  This pre-processing step splits it into `","word":"` so the parser
 /// correctly treats `word` as the next key.
-pub fn fix_mixed_quotes(text: &str) -> String {
+pub fn fix_mixed_quotes(text: &str) -> Cow<'_, str> {
     let chars: Vec<char> = text.chars().collect();
     let n = chars.len();
     let mut out = String::with_capacity(n);
@@ -44,7 +46,7 @@ pub fn fix_mixed_quotes(text: &str) -> String {
         out.push(chars[i]);
         i += 1;
     }
-    out
+    if out == text { Cow::Borrowed(text) } else { Cow::Owned(out) }
 }
 
 /// Split `"key:value"` into `"key":"value"` when followed by `,` or `}`.
@@ -52,7 +54,7 @@ pub fn fix_mixed_quotes(text: &str) -> String {
 /// Detects quoted strings that contain a colon where the content before the
 /// colon is a valid bare key and the content after is a valid bare value,
 /// and the string is followed by structural punctuation.
-pub fn fix_colon_in_key(text: &str) -> String {
+pub fn fix_colon_in_key(text: &str) -> Cow<'_, str> {
     let chars: Vec<char> = text.chars().collect();
     let n = chars.len();
     let mut out = String::with_capacity(n);
@@ -97,7 +99,7 @@ pub fn fix_colon_in_key(text: &str) -> String {
                             out.push(chars[j]);
                             let rest: String = chars[j + 1..].iter().collect();
                             out.push_str(&rest);
-                            return out;
+                            return Cow::Owned(out);
                         }
                     }
                 }
@@ -108,7 +110,7 @@ pub fn fix_colon_in_key(text: &str) -> String {
             i += 1;
         }
     }
-    out
+    if out == text { Cow::Borrowed(text) } else { Cow::Owned(out) }
 }
 
 /// Repair a malformed JSON string and return valid JSON.
@@ -138,7 +140,7 @@ pub fn repair_json(text: &str) -> Result<String, JsonRepairError> {
         return Ok(text.to_string());
     }
     let text = fix_colon_in_key(text);
-    let text = fix_mixed_quotes(&text);
-    let mut repairer = Repairer::new(&text);
+    let text = fix_mixed_quotes(text.as_ref());
+    let mut repairer = Repairer::new(text.as_ref());
     repairer.repair()
 }

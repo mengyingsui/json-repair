@@ -59,7 +59,7 @@ impl Repairer {
     }
 
     fn peek_is(&self, s: &str) -> bool {
-        let end = self.i + s.len();
+        let end = self.i + s.chars().count();
         if end > self.n {
             return false;
         }
@@ -117,7 +117,8 @@ impl Repairer {
             return true;
         }
         let nc = self.chars[j];
-        if ",\u{7d}\u{5d}:\n".contains(nc) {
+        const CLOSING_CHARS: &str = ",}]:\n";
+        if CLOSING_CHARS.contains(nc) {
             return true;
         }
         if nc == '"' {
@@ -149,19 +150,6 @@ impl Repairer {
         while start < self.n && self.chars[start].is_ascii_whitespace() {
             start += 1;
         }
-        if start + 2 < self.n
-            && self.chars[start] == '`'
-            && self.chars[start + 1] == '`'
-            && self.chars[start + 2] == '`'
-        {
-            start += 3;
-            while start < self.n && self.chars[start] != '\n' {
-                start += 1;
-            }
-            if start < self.n {
-                start += 1;
-            }
-        }
         let mut text_chars: Vec<char> = self.chars[start..].to_vec();
         let text_n = text_chars.len();
         let saved = self.i;
@@ -172,7 +160,71 @@ impl Repairer {
                 break;
             }
             let ch = text_chars[self.i];
+            if ch == '`' && self.i + 2 < text_n
+                && text_chars[self.i + 1] == '`'
+                && text_chars[self.i + 2] == '`'
+            {
+                self.i += 3;
+                let lang_start = self.i;
+                while self.i < text_n && text_chars[self.i] != '\n' {
+                    self.i += 1;
+                }
+                let lang: String = text_chars[lang_start..self.i].iter().collect();
+                let lang_trimmed = lang.trim();
+                let is_json_fence = lang_trimmed.is_empty() || lang_trimmed == "json";
+                if self.i < text_n {
+                    self.i += 1;
+                }
+                if !is_json_fence {
+                    let mut code_depth = 1u32;
+                    while self.i < text_n && code_depth > 0 {
+                        if self.i + 2 < text_n
+                            && text_chars[self.i] == '`'
+                            && text_chars[self.i + 1] == '`'
+                            && text_chars[self.i + 2] == '`'
+                        {
+                            self.i += 3;
+                            code_depth -= 1;
+                        } else {
+                            self.i += 1;
+                        }
+                    }
+                }
+                continue;
+            }
             if ch == '{' || ch == '[' {
+                if ch == '[' {
+                    let mut depth = 1i32;
+                    let mut j = self.i + 1;
+                    let mut is_metatag = j < text_n;
+                    while j < text_n && depth > 0 {
+                        match text_chars[j] {
+                            '[' => depth += 1,
+                            ']' => depth -= 1,
+                            '{' | '"' => { is_metatag = false; }
+                            _ => {}
+                        }
+                        j += 1;
+                    }
+                    if depth == 0 && is_metatag && j - self.i <= 64 {
+                        let inner: String = text_chars[self.i + 1..j - 1].iter().collect();
+                        if inner.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+                            self.i = j;
+                            continue;
+                        }
+                    }
+                    if j < text_n && text_chars[j] == '(' {
+                        let mut link_depth = 1i32;
+                        let mut k = j + 1;
+                        while k < text_n && link_depth > 0 {
+                            if text_chars[k] == '(' { link_depth += 1; }
+                            if text_chars[k] == ')' { link_depth -= 1; }
+                            k += 1;
+                        }
+                        self.i = k;
+                        continue;
+                    }
+                }
                 if unbraced_start != -1 {
                     let wrapped: String = text_chars[unbraced_start as usize..].iter().collect();
                     text_chars = format!("{{{wrapped}").chars().collect();

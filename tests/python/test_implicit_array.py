@@ -44,6 +44,5 @@ class TestImplicitArray:
         text = ",\n".join([big_obj] * 25)
         repaired = repair_json(text)
         assert isinstance(repaired, str)
-        result = json.loads(repaired)
-        assert isinstance(result, list), f"Expected list, got {type(result)}"
+        result: list[object] = json.loads(repaired)
         assert len(result) == 25

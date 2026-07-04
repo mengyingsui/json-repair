@@ -24,7 +24,7 @@ CASES_DIR = Path(__file__).parent.parent / "cases"
 BENCH_DATA_PATH = CASES_DIR / "bench_data.jsonl"
 
 
-def _load_entries() -> list[dict]:
+def _load_entries() -> list[dict[str, str]]:
     lines = BENCH_DATA_PATH.read_text(encoding="utf-8").strip().splitlines()
     return [json.loads(line) for line in lines if line.strip()]
 
@@ -32,14 +32,14 @@ def _load_entries() -> list[dict]:
 def _repair_and_validate(text: str) -> None:
     """Repair and validate; raises on invalid output."""
     repaired = repair_json(text)
-    json.loads(repaired)
+    json.loads(str(repaired))
 
 
 def _repair_and_validate_unfixable(text: str) -> None:
     """Repair and attempt to validate; expect parse failure."""
     repaired = repair_json(text)
     with contextlib.suppress(json.JSONDecodeError):
-        json.loads(repaired)
+        json.loads(str(repaired))
 
 
 ENTRIES = _load_entries()
@@ -53,7 +53,9 @@ class TestAllCases:
         "entry",
         [pytest.param(e, id=f"{e['label']}") for e in ALL_ENTRIES],
     )
-    def test_repair_speed(self, entry: dict, benchmark: BenchmarkFixture) -> None:
+    def test_repair_speed(
+        self, entry: dict[str, str], benchmark: BenchmarkFixture
+    ) -> None:
         inp = entry["input"]
         expected_valid = entry["expected_valid"]
 

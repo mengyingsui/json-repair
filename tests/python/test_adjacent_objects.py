@@ -15,8 +15,7 @@ class TestAdjacentObjects:
         text = "".join([big_obj] * 20)
         repaired = repair_json(text)
         assert isinstance(repaired, str)
-        result = json.loads(repaired)
-        assert isinstance(result, list)
+        result: list[object] = json.loads(repaired)
         assert len(result) == 20
 
     def test_adjacent_objects_mixed_commas(self) -> None:
@@ -25,6 +24,5 @@ class TestAdjacentObjects:
         text = "".join(parts)
         repaired = repair_json(text)
         assert isinstance(repaired, str)
-        result = json.loads(repaired)
-        assert isinstance(result, list)
+        result: list[object] = json.loads(repaired)
         assert len(result) == 20

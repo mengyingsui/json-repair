@@ -1,5 +1,23 @@
 # Changelog — json-repair-core
 
+## v0.1.3 (2026-07-04)
+
+### Added
+- 10 new Rust integration tests in `tests/prefix_junk.rs` for metadata tag
+  skipping, code fence handling, and link-pattern skipping.
+- `CLOSING_CHARS` const in `is_closing_quote` for readability.
+
+### Changed
+- `fix_colon_in_key` and `fix_mixed_quotes` return `Cow<'_, str>` — zero
+  allocation when input has no matching patterns.
+
+### Fixed
+- `skip_prefix_junk` now detects `[TEXT_*]` metadata tags, skips non-JSON
+  code fences, preserves JSON inside ` ```json ``` ` fences.
+- `peek_is` uses `s.chars().count()` instead of `s.len()` for correct
+  non-ASCII character offset calculation.
+- `skip_prefix_junk` link-depth loop variable mutability.
+
 ## v0.1.2 (2026-07-03)
 
 ### Security

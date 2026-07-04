@@ -35,6 +35,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `missing_commas.jsonl` | 3 | Commas inserted between elements/key-value pairs. |
 | `mixed_quotes.jsonl` | 3 | Mixed single/double quote boundary: ','word":" inside a double-quoted value — LLM output where a single-quoted key leaks into the preceding text value. |
 | `python_literals.jsonl` | 3 | True/False/None → true/false/null. |
+| `prefix_tags.jsonl` | 8 | Metadata tags `[TEXT_START]`/`[TEXT_END]`/`[X]` and code fences before JSON — `[TAG_A][TAG_B]{"a":1}`; real `[1,2,3]` arrays preserved. |
 | `single_quoted.jsonl` | 3 | Single-quoted keys/values converted to double quotes. |
 | `trailing_commas.jsonl` | 3 | Trailing comma after last element removed, including nested. |
 | `trailing_junk.jsonl` | 3 | Extraneous text after valid JSON discarded (-lnd, junk, log lines). |
@@ -70,6 +71,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | Missing key quote | `missing_key_quote.jsonl` | `'{"a": 1, key": 2}'` |
 | Missing comma | `missing_commas.jsonl` | `'{"a": 1 "b": 2}'` |
 | Mixed quotes | `mixed_quotes.jsonl` | `','word":"` inside double-quoted string |
+| Prefix tags / code fences | `prefix_tags.jsonl` | `'[TEXT_START]```text↵...```[TEXT_END]↵{"a":1}'` |
 | Python literals | `python_literals.jsonl` | `'{"a": True, "b": None}'` |
 | Single-quoted keys/values | `single_quoted.jsonl` | `"{'a': 'value'}"` |
 | Trailing comma | `trailing_commas.jsonl` | `'{"a": 1,}'` |
