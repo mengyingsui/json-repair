@@ -6,7 +6,7 @@
 |------|-------------|
 | `test_repair.py` | Parametrized JSONL tests — reads `tests/cases/*.jsonl` and verifies every repair case. |
 | `test_hypothesis.py` | Property-based fuzzing — valid JSON passthrough, broken→valid idempotence. |
-| `test_performance.py` | Micro-benchmarks via `pytest-benchmark` (18 scenarios across 5 classes). |
+| `test_performance.py` | Micro-benchmarks via `pytest-benchmark` (19 scenarios across 5 classes). |
 | `test_adjacent_objects.py` | Adjacent-object wrapping (`{...},{...}` → `[{...},{...}]`). |
 | `test_complex_scenarios.py` | Realistic LLM JSON with embedded quotes, code blocks. |
 | `test_control_characters.py` | Literal `\r` in string values. |

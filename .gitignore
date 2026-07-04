@@ -8,7 +8,6 @@ __pycache__/
 
 # Rust / Cargo
 target/
-Cargo.lock
 
 # PyO3 binary (built by maturin during pip install)
 *.pyd

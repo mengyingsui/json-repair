@@ -1,6 +1,6 @@
 # json_repair
 
-[![Security: v0.3.5+](https://img.shields.io/badge/Security-v0.3.5%2B-2ea44f?labelColor=333)](SECURITY.md)
+[![Security: v0.3.6+](https://img.shields.io/badge/Security-v0.3.6%2B-2ea44f?labelColor=333)](SECURITY.md)
 
 Repair malformed JSON from LLM outputs in a **single pass** — now powered by Rust.
 
@@ -190,6 +190,7 @@ cargo bench -p json-repair-core
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.3.6 🔒 | 2026-07-04 | **PyO3 0.29, CI hardening** — Cargo.lock tracked; Actions bumped to checkout@v5, upload-artifact@v5; `allow_threads` → `detach` for pyo3 0.29 compat; wheel build via `uv build --wheel`; trailing-comma EOF fix from fuzzer. |
 | v0.3.5 🔒 | 2026-07-04 | **Module refactoring** — repairer split into 7 submodules; Cargo feature `serde-validate`; debug assertions; refreshed benchmarks. |
 | v0.3.4 🔒 | 2026-07-04 | **Leading-zero normalisation** — numbers with leading zeros stripped to RFC 8259; `is_closing_quote` comma/key hardening; numeric-corruption proptests. |
 | v0.3.3 🔒 | 2026-07-04 | **Prefix junk hardening** — metadata tags `[TEXT_*]`, code fences, link parens; Cow<str> preprocessor; peek_is correctness fix; fuzz-verified. |
@@ -234,6 +235,8 @@ cargo test -p json-repair-core
 cargo bench -p json-repair-core
 
 # Rebuild Rust .pyd (after Rust changes)
+uv build --wheel  # outputs to dist/
+# or for editable installs:
 uv run maturin develop --release -m crates/json-repair-python/Cargo.toml
 
 # Lint / type check

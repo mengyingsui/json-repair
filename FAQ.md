@@ -162,8 +162,10 @@ that the state machine fixes in one pass.
 
 ### How do I add a new repair rule?
 
-1. Add logic to the `Repairer` in `crates/json-repair-core/src/repairer.rs`.
-2. Wire it into `parse_value()` or `parse_string()` at the right priority.
+1. Add logic to the appropriate submodule in `crates/json-repair-core/src/repairer/`
+   (`string.rs`, `number.rs`, `literal.rs`, `keys.rs`, `structure.rs`, `comment.rs`,
+   `junk.rs`) or the module entry at `repairer/mod.rs`.
+2. Wire it into `parse_value()` or `parse_string()` in the relevant submodule at the right priority.
 3. Add a `.jsonl` test data file under `tests/cases/` (one JSON object per line
    with `input` and optionally `expected` keys).
 4. If `expected` is provided, add a parametrized Rust integration test in

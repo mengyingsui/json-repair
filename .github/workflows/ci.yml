@@ -20,7 +20,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust toolchain (stable)
         run: rustup toolchain install stable --profile minimal
@@ -38,7 +38,7 @@ jobs:
   rust-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: cargo deny check
         uses: EmbarkStudios/cargo-deny-action@v2
@@ -50,13 +50,13 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust toolchain (nightly)
         run: rustup toolchain install nightly --profile minimal
 
       - name: Install cargo-fuzz
-        run: cargo +nightly install cargo-fuzz
+        run: cargo +nightly install cargo-fuzz --locked
 
       - name: Fuzz repair_json for 30 seconds
         run: cargo +nightly fuzz run repair --fuzz-dir crates/json-repair-core/fuzz -- -max_total_time=30
@@ -71,7 +71,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install uv (Python ${{ matrix.py }})
         uses: astral-sh/setup-uv@v5
@@ -110,19 +110,16 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
 
-      - uses: PyO3/maturin-action@v1
-        with:
-          command: build
-          args: --release -m crates/json-repair-python/Cargo.toml
+      - name: Build wheels
+        run: uv build --wheel
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: wheel-${{ matrix.os }}
-          path: target/wheels/*.whl
+          path: dist/*.whl

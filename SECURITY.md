@@ -33,6 +33,9 @@ The module refactoring in v0.3.5 / v0.1.5 adds no new security features but
 preserves all existing guarantees — the same safe‑Rust state machine with
 additional `debug_assert!` guards (active in debug builds only).
 
+The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
+changes only; security posture is unchanged.
+
 ## Reporting a Vulnerability
 
 Report vulnerabilities privately to the maintainer via Gitee issues

@@ -23,6 +23,10 @@ impl Repairer {
         loop {
             self.skip_ws();
             if self.i >= self.n {
+                if self.out.ends_with(',') {
+                    self.out.pop();
+                    self.out_chars -= 1;
+                }
                 break;
             }
             let ch = self.chars[self.i];
@@ -193,6 +197,10 @@ impl Repairer {
         loop {
             self.skip_ws();
             if self.i >= self.n {
+                if self.out.ends_with(',') {
+                    self.out.pop();
+                    self.out_chars -= 1;
+                }
                 break;
             }
             let ch = self.chars[self.i];

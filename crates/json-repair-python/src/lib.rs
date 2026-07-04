@@ -14,6 +14,6 @@ fn _rust_parse(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// threads can run concurrently.
 #[pyfunction]
 fn py_repair_json(py: Python<'_>, text: &str) -> PyResult<String> {
-    py.allow_threads(|| json_repair_core::repair_json(text))
+    py.detach(move || json_repair_core::repair_json(text))
         .map_err(|e| PyValueError::new_err(format!("{e}")))
 }

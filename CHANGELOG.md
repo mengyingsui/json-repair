@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.6 🔒 (2026-07-04)
+
+### Changed
+- **PyO3 bumped 0.23 → 0.29** — `py.allow_threads()` replaced by `py.detach()`
+  (the method was removed in pyo3 0.29; `detach` is the replacement API).
+- **`uv build --wheel`** replaces `uvx maturin build` for wheels job — uses
+  native uv build backend, outputs to `dist/*.whl`.
+- **Cargo.lock now tracked** in version control for reproducible CI builds.
+- **GitHub Actions** bumped to Node.js 24 compatible versions —
+  `checkout@v5`, `upload-artifact@v5`.
+- Rust crate `json-repair-core` bumped to **v0.1.6**.
+
+### Fixed
+- **Trailing-comma at EOF** — fuzzer-discovered crash: input `[12,\n`
+  produced `[12,]` (invalid JSON).  `array_loop` and `object_loop` now
+  strip trailing commas before breaking on end-of-input.
+
+### Security
+- No new security features; all guarantees from v0.3.4+ / v0.1.4+ preserved.
+
 ## v0.3.5 🔒 (2026-07-04)
 
 ### Changed

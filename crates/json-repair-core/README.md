@@ -7,6 +7,9 @@ Core Rust library for repairing malformed JSON from LLM outputs. Used by the [`j
 - Single-pass state machine — linear time, no backtracking
 - Pre-processing helpers: `fix_colon_in_key`, `fix_mixed_quotes`
 - Heuristic string-closing logic tuned for LLM natural-language embedded quotes
+- Modular architecture: `repairer/` submodules (`string`, `number`, `literal`, `keys`, `structure`, `comment`, `junk`)
+- Cargo feature `serde-validate` (`--no-default-features` to make `serde_json` optional)
+- Debug-only assertions and `repair_json_debug` API (zero-cost in release)
 
 ## Usage
 
@@ -26,6 +29,7 @@ fn main() {
 | Function | Description |
 |----------|-------------|
 | `repair_json(text)` | Repair malformed JSON, returns `Ok(String)` or `Err(JsonRepairError)` |
+| `repair_json_debug(text)` | Like `repair_json` with extra assertions (zero-cost in release) |
 | `fix_colon_in_key(text)` | Split `"key:value"` → `"key":"value"` when followed by `,` or `}` |
 | `fix_mixed_quotes(text)` | Fix `','word":"` boundary between double- and single-quoted segments |
 
