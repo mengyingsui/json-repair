@@ -96,7 +96,6 @@ proptest! {
 }
 
 /// ── Number-corruption edge cases ──────────────────────────────────────────
-
 fn numeric_corruption_input() -> impl Strategy<Value = String> {
     prop_oneof![
         // "number + junk" patterns — the core "123abc" class of bug
@@ -140,14 +139,11 @@ proptest! {
     fn numeric_corruption_rejected_or_fixed(input in numeric_corruption_input()) {
         // Some number-corrupted inputs may be repairable, others must error.
         // Neither path should panic or produce invalid JSON.
-        match json_repair_core::repair_json(&input) {
-            Ok(repaired) => {
-                if !repaired.is_empty() {
-                    let _: serde_json::Value = serde_json::from_str(&repaired)
-                        .expect("repaired number-corrupted input must be valid JSON");
-                }
+        if let Ok(repaired) = json_repair_core::repair_json(&input) {
+            if !repaired.is_empty() {
+                let _: serde_json::Value = serde_json::from_str(&repaired)
+                    .expect("repaired number-corrupted input must be valid JSON");
             }
-            Err(_) => {} // rejection is acceptable
         }
     }
 

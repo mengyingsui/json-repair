@@ -157,14 +157,24 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Scenario | Python (via PyO3) | Rust (native) |
 |----------|-------------------|---------------|
-| Valid JSON passthrough | ~13 µs | ~0.66 µs |
-| Small corrupted | ~20 µs | ~3.3 µs |
-| Triple-quoted | ~17 µs | ~2.3 µs |
-| Embedded quotes | ~37 µs | ~3.8 µs |
-| Deep nested (6 levels) | ~35 µs | ~1.4 µs |
-| Realistic LLM output | ~50 µs | ~5.2 µs |
-| Medium corrupted (~5 KB) | ~0.40 ms | ~0.10 ms |
-| Large corrupted (~50 KB) | ~1.6 ms | ~0.18 ms |
+| Valid JSON passthrough | ~11 µs | ~1.3 µs |
+| Small corrupted | ~16 µs | ~6.1 µs |
+| Triple-quoted | ~11 µs | ~5.7 µs |
+| Embedded quotes | ~19 µs | ~8.6 µs |
+| Deep nested (6 levels) | ~15 µs | ~3.1 µs |
+| Realistic LLM output | ~27 µs | ~6.5 µs |
+| Medium corrupted (~5 KB) | ~0.21 ms | ~59 µs |
+| Large corrupted (~50 KB) | ~0.68 ms | ~0.38 ms |
+| Medium valid (~2.5 KB) | ~0.16 ms | ~51 µs |
+| Large valid (~9 KB) | ~0.76 ms | ~0.36 ms |
+| Unfixable semicolons (small) | ~11 µs | ~4.5 µs |
+| Unfixable semicolons (medium) | ~87 µs | ~12 µs |
+| Unfixable semicolons (large) | ~0.39 ms | ~97 µs |
+| Unfixable pipes | ~0.11 ms | ~25 µs |
+| Unfixable amps | ~0.10 ms | ~15 µs |
+| Unfixable missing colons | ~0.10 ms | ~12 µs |
+| Unfixable semicolons (bool) | ~44 µs | ~7.0 µs |
+| Unfixable LLM-like semicolons | ~0.48 ms | ~0.11 ms |
 
 All measurements on modern hardware (single-pass, O(n)). Run locally:
 

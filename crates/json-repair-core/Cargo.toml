@@ -10,11 +10,16 @@ description = "Core Rust library for repairing malformed JSON from LLM outputs"
 keywords = ["json", "repair", "llm", "fix", "malformed"]
 categories = ["parser-implementations", "text-processing"]
 
+[features]
+default = ["serde-validate"]
+serde-validate = ["dep:serde_json"]
+
 [dependencies]
-serde_json.workspace = true
+serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
+serde_json.workspace = true
 criterion = { version = "0.5", features = ["html_reports"] }
 proptest = "1"
 
