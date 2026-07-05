@@ -6,3 +6,4 @@
 {"input": "[1, 2, 3]", "expected": [1, 2, 3]}
 {"input": "[\"hello\", \"world\"]", "expected": ["hello", "world"]}
 {"input": "prefix text then [TEXT_START] tags [TEXT_END] before {\"key\": \"value\"}", "expected": {"key": "value"}}
+{"input": "[TEXT_START]\n{\"a\": 1}", "expected": {"a": 1}}

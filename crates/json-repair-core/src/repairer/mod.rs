@@ -97,6 +97,10 @@ impl Repairer {
 
     fn close_brackets(&mut self) {
         while let Some(b) = self.brackets.pop() {
+            if self.out.ends_with(',') {
+                self.out.pop();
+                self.out_chars -= 1;
+            }
             self.emit_char(b);
         }
         debug_assert!(self.brackets.is_empty(), "close_brackets: unclosed brackets remain");
@@ -248,26 +252,30 @@ impl Repairer {
         self.close_brackets();
         self.skip_suffix_junk();
         let out = std::mem::take(&mut self.out);
-        debug_assert!(
-            Repairer::is_output_balanced(&out),
-            "repaired output has unbalanced brackets"
-        );
+        if !Repairer::is_output_balanced(&out) {
+            return Err(JsonRepairError {
+                message: "repaired output has unbalanced brackets".to_string(),
+                position: None,
+            });
+        }
         #[cfg(debug_assertions)]
         {
-            debug_assert!(
-                serde_json::from_str::<serde_json::Value>(&out).is_ok(),
-                "repair result is not valid JSON:\n---\n{}\n---",
-                &out
-            );
+            let bracket_depth = out.chars().filter(|&c| c == '{' || c == '[').count();
+            if bracket_depth <= 100 {
+                if let Err(e) = serde_json::from_str::<serde_json::Value>(&out) {
+                    debug_assert!(
+                        false,
+                        "repair result is not valid JSON (depth={}): {}\n---\n{}\n---",
+                        bracket_depth, e, &out
+                    );
+                }
+            }
         }
         Ok(out)
     }
 }
 
 impl Repairer {
-    /// Check that `{`/`[` and `}`/`]` brackets are balanced and properly nested
-    /// in the output, accounting for quoted strings.
-    #[cfg(debug_assertions)]
     fn is_output_balanced(s: &str) -> bool {
         let mut stack: Vec<char> = Vec::new();
         let mut in_string = false;
@@ -298,10 +306,5 @@ impl Repairer {
             }
         }
         stack.is_empty()
-    }
-
-    #[cfg(not(debug_assertions))]
-    fn is_output_balanced(_: &str) -> bool {
-        true
     }
 }

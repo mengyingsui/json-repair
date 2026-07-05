@@ -47,14 +47,17 @@ impl Repairer {
 /// Validate a number string is valid JSON and not suspiciously long.
 #[cfg(feature = "serde-validate")]
 fn validate_number(s: &str) -> bool {
-    s.len() > 100 || serde_json::from_str::<serde_json::Value>(s).is_ok()
+    if s.matches('.').count() > 1 || s.matches('e').count() + s.matches('E').count() > 1 {
+        return false;
+    }
+    serde_json::from_str::<serde_json::Value>(s).is_ok()
 }
 
 /// Validate a number string without serde_json — accept any f64-parseable string.
 #[cfg(not(feature = "serde-validate"))]
 fn validate_number(s: &str) -> bool {
-    if s.len() > 100 {
-        return true;
+    if s.matches('.').count() > 1 || s.matches('e').count() + s.matches('E').count() > 1 {
+        return false;
     }
     s.parse::<f64>().is_ok()
 }

@@ -155,3 +155,6 @@ crates/json-repair-core/fuzz/artifacts/
 crates/json-repair-core/fuzz/coverage/
 # Seed corpus is force-added; fuzzer-generated entries remain untracked
 crates/json-repair-core/fuzz/corpus/
+
+# CodeGraph local index (machine-specific)
+.codegraph/

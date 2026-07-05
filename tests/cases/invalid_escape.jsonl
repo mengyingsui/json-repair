@@ -6,3 +6,4 @@
 {"input": "{\"text\": \"newline\\nhere and star\\*there\"}", "expected": {"text": "newline\nhere and star\\*there"}}
 {"input": "{\"entities\": [\"\\*keeper\", \"\\*dwarf\", \"normal\"]}", "expected": {"entities": ["\\*keeper", "\\*dwarf", "normal"]}}
 {"input": "{\n            \"facts\": [{\n                \"what\": \"The team needs to find the first branch.\",\n                \"who\": \"\\*keeper, dwarf, bear, user\",\n                \"entities\": [\"\\*keeper\", \"dwarf\", \"Tree of Life\"]\n            }]\n        }", "expected": {"facts": [{"what": "The team needs to find the first branch.", "who": "\\*keeper, dwarf, bear, user", "entities": ["\\*keeper", "dwarf", "Tree of Life"]}]}}
+{"input": "{\"vho\": \"r*\\\n\"}", "expected": {"vho": "r*\n"}}

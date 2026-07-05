@@ -3,8 +3,8 @@ name = "json-repair-python"
 version = "0.1.0"
 edition = "2024"
 license = "GPL-2.0-only"
-repository = "https://gitee.com/mensui/json_repair"
-homepage = "https://gitee.com/mensui/json_repair"
+repository = "https://github.com/mengyingsui/json-repair"
+homepage = "https://github.com/mengyingsui/json-repair"
 description = "Python bindings for json-repair-core via PyO3"
 
 [lib]

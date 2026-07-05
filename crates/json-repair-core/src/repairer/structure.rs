@@ -84,17 +84,33 @@ impl Repairer {
                     self.out.pop();
                     self.out_chars -= 1;
                 }
-                self.emit_char('}');
                 let popped = self.brackets.pop();
-                debug_assert_eq!(
-                    popped, Some('}'),
-                    "object_loop: closing ] in object but top of bracket stack is not }}"
-                );
-                if self.brackets.is_empty() {
-                    self.last_depth0_pos = self.out_chars;
+                match popped {
+                    Some('}') => {
+                        self.emit_char('}');
+                        if self.brackets.is_empty() {
+                            self.last_depth0_pos = self.out_chars;
+                        }
+                        self.i += 1;
+                        self.just_emitted_value = true;
+                        self.expect_key = prev_expect;
+                        return;
+                    }
+                    Some(']') => {
+                        self.emit_char(']');
+                        if self.brackets.is_empty() {
+                            self.last_depth0_pos = self.out_chars;
+                        }
+                        self.i += 1;
+                        self.just_emitted_value = true;
+                        return;
+                    }
+                    _ => {
+                        self.i += 1;
+                        self.just_emitted_value = true;
+                        return;
+                    }
                 }
-                self.expect_key = prev_expect;
-                return;
             }
             if self.expect_key {
                 if !first
@@ -137,7 +153,7 @@ impl Repairer {
                 if self.i < self.n && self.chars[self.i] == ':' {
                     self.emit_char(':');
                     self.i += 1;
-                } else if self.i < self.n && self.chars[self.i] != ':' {
+                } else {
                     self.emit_char(':');
                 }
                 self.expect_key = false;
@@ -184,6 +200,15 @@ impl Repairer {
                 return;
             }
         }
+        if self.i < self.n && self.brackets.last() == Some(&'}') {
+            if self.out.ends_with(',') {
+                self.out.pop();
+                self.out_chars -= 1;
+            }
+            self.emit_char('}');
+            self.brackets.pop();
+            self.just_emitted_value = true;
+        }
         self.expect_key = prev_expect;
     }
 
@@ -227,18 +252,32 @@ impl Repairer {
                     self.out.pop();
                     self.out_chars -= 1;
                 }
-                self.emit_char(']');
                 let popped = self.brackets.pop();
-                debug_assert_eq!(
-                    popped, Some(']'),
-                    "array_loop: closing }} in array but top of bracket stack is not ]"
-                );
-                if self.brackets.is_empty() {
-                    self.last_depth0_pos = self.out_chars;
+                match popped {
+                    Some(']') => {
+                        self.emit_char(']');
+                        if self.brackets.is_empty() {
+                            self.last_depth0_pos = self.out_chars;
+                        }
+                        self.i += 1;
+                        self.just_emitted_value = true;
+                        return;
+                    }
+                    Some('}') => {
+                        self.emit_char('}');
+                        if self.brackets.is_empty() {
+                            self.last_depth0_pos = self.out_chars;
+                        }
+                        self.i += 1;
+                        self.just_emitted_value = true;
+                        continue;
+                    }
+                    _ => {
+                        self.i += 1;
+                        self.just_emitted_value = true;
+                        continue;
+                    }
                 }
-                self.i += 1;
-                self.just_emitted_value = true;
-                return;
             }
             if ch == ',' {
                 if !first && !self.out.ends_with(',') {

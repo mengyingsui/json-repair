@@ -36,9 +36,20 @@ additional `debug_assert!` guards (active in debug builds only).
 The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
 changes only; security posture is unchanged.
 
+**v0.3.7 / v0.1.7** adds:
+- **Stack overflow guard** — serde_json recursion limit bypass removed;
+  deeply nested output (>100 brackets) skips validation instead of crashing.
+- **Surrogate sanitisation** — `\uXXXX` in 0xD800–0xDFFF range emitted as
+  `\ufffd`; raw surrogate code points no longer appear in output.
+- **Runtime bracket balance** — `is_output_balanced` `debug_assert!` replaced
+  with `Err(JsonRepairError)`. Bracket imbalance now returns a proper error
+  in all build profiles, not just debug.
+- **Always-on number validation** — `validate_number` length bypass removed;
+  all numbers validated via `serde_json` per RFC 8259.
+
 ## Reporting a Vulnerability
 
-Report vulnerabilities privately to the maintainer via Gitee issues
-at https://gitee.com/mensui/json_repair/issues.
+Report vulnerabilities privately to the maintainer via GitHub issues
+at https://github.com/mengyingsui/json-repair/issues.
 
 Please do **not** open a public issue for security-critical bugs.

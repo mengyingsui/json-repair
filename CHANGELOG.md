@@ -1,5 +1,59 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Fuzzer crash regression tests** — JSONL entries and Rust tests for 7
+  crash patterns discovered by `cargo-fuzz`: invalid `\u` escapes, multi-E
+  scientific notation, control characters in unquoted values, trailing commas
+  at EOF, misordered brackets, surrogate escapes in strings, backslash at EOF,
+  and deeply nested brackets (128 & 400 levels).
+- **`test_deeply_nested_128_brackets`** — Rust test for exact fuzzer-triggered
+  stack overflow at serde_json's default 128 recursion limit.
+- **`test_backslash_at_eof_in_string`** — Rust test for `debug_assert!` false
+  positive on `\"` at end of output.
+
+### Changed
+- **`is_output_balanced`** (mod.rs:255) — `debug_assert!` replaced with
+  `Err(JsonRepairError)`. Output bracket imbalance now returns a proper error
+  instead of panicking in debug builds.
+- **serde_json validation** (mod.rs:261-274) — removed `de.disable_recursion_limit()`;
+  added `bracket_depth <= 100` guard to skip validation on deeply nested output
+  (prevents ASAN stack-overflow and `STATUS_STACK_BUFFER_OVERRUN`).
+- **`emit_escape`** (string.rs:12-31) — `\uXXXX` in surrogate range
+  (0xD800–0xDFFF) now emits `\ufffd` instead of the raw surrogate.
+- **`validate_number`** — removed length-bypass; all numbers validated via
+  `serde_json` for consistent RFC 8259 conformance.
+- **`structure.rs`** — `object_loop`/`array_loop` bracket handlers now `match`
+  on bracket stack before appending.
+- **CI Python job** now runs only `test_performance.py --benchmark-only` instead
+  of full pytest suite.
+- **`hypothesis`** removed from dev dependencies in `pyproject.toml`.
+- Rust crate `json-repair-core` bumped to **v0.1.7**.
+
+### Removed
+- **Python functional/fuzz tests** — all Hypothesis, property-based, and
+  scenario-specific test files removed from `tests/python/`. Only
+  `test_performance.py` remains for benchmarking.
+- **Temporary Rust stress test** (`crates/json-repair-core/tests/stress.rs`).
+
+### Fixed
+- **Multi-digit exponent (multi-E)** — `12.34E567E+0E12` no longer emits
+  invalid JSON with multiple `E` characters.
+- **Invalid `\u` escape** — `\u` followed by non-hex content no longer emits
+  bare `\u` (escaped as `\\u` sequence).
+- **Control characters in unquoted values** — control chars (e.g. `\x00`)
+  inside bare-word string values now properly `\uXXXX`-escaped.
+- **Trailing comma at EOF** — `[12,\n` → `[12]` instead of invalid `[12,]`.
+- **Misordered brackets in arrays** — `]` before `}` in last array element
+  now correctly closes the object first.
+- **Surrogate escapes in strings** — bare `\uXXXX` in 0xD800–0xDFFF range
+  emitted as `\ufffd` instead of raw surrogate code point.
+- **Backslash at EOF in string** — escaped `\\` followed by closing quote at
+  EOF no longer triggers `debug_assert!` false positive.
+- **serde_json stack overflow on deeply nested output** — 128-level bracket
+  nesting no longer crashes (guard threshold: 100).
+
 ## v0.3.6 🔒 (2026-07-04)
 
 ### Changed

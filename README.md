@@ -47,20 +47,20 @@ LLM-generated JSON often contains these errors — `json_repair` fixes them all:
 ### Python
 
 ```bash
-pip install git+https://gitee.com/mensui/json_repair.git
+pip install git+https://github.com/mengyingsui/json-repair.git
 ```
 
 Or with uv:
 
 ```bash
-uv add git+https://gitee.com/mensui/json_repair.git
+uv add git+https://github.com/mengyingsui/json-repair.git
 ```
 
 ### Rust
 
 ```toml
 [dependencies]
-json-repair-core = { git = "https://gitee.com/mensui/json_repair" }
+json-repair-core = { git = "https://github.com/mengyingsui/json-repair" }
 ```
 
 ## Usage
@@ -86,7 +86,7 @@ print(obj)
 
 ```toml
 [dependencies]
-json-repair-core = { git = "https://gitee.com/mensui/json_repair" }
+json-repair-core = { git = "https://github.com/mengyingsui/json-repair" }
 ```
 
 ```rust
@@ -153,39 +153,6 @@ Input text
 
 All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
-## Performance
-
-| Scenario | Python (via PyO3) | Rust (native) | Ratio |
-|----------|-------------------|---------------|-------|
-| Valid JSON passthrough | ~4 µs | ~0.65 µs | 6× |
-| Small corrupted | ~8 µs | ~4.0 µs | 2× |
-| Triple-quoted | ~7 µs | ~3.1 µs | 2× |
-| Embedded quotes | ~12 µs | ~3.6 µs | 3× |
-| Deep nested (6 levels) | ~13 µs | ~1.5 µs | 9× |
-| Realistic LLM output | ~20 µs | ~5.2 µs | 4× |
-| Medium corrupted (~5 KB) | ~0.26 ms | ~60 µs | 4× |
-| Large corrupted (~50 KB) | ~1.5 ms | ~0.20 ms | 8× |
-| Medium valid (~2.5 KB) | ~0.28 ms | ~24 µs | 12× |
-| Large valid (~9 KB) | ~1.4 ms | ~0.18 ms | 8× |
-| Unfixable semicolons (small) | ~17 µs | ~2.0 µs | 9× |
-| Unfixable semicolons (medium) | ~0.10 ms | ~11 µs | 9× |
-| Unfixable semicolons (large) | ~0.52 ms | ~44 µs | 12× |
-| Unfixable pipes | ~0.10 ms | ~12 µs | 8× |
-| Unfixable amps | ~0.10 ms | ~12 µs | 8× |
-| Unfixable missing colons | ~0.10 ms | ~11 µs | 9× |
-| Unfixable semicolons (bool) | ~34 µs | ~4.1 µs | 8× |
-| Unfixable LLM-like semicolons | ~0.42 ms | ~46 µs | 9× |
-
-All measurements on modern hardware (single-pass, O(n)). Run locally:
-
-```bash
-# Python benchmarks
-uv run pytest tests/python/test_performance.py --benchmark-only
-
-# Rust benchmarks
-cargo bench -p json-repair-core
-```
-
 ## Versions
 
 | Version | Date | Description |
@@ -213,7 +180,7 @@ cargo bench -p json-repair-core
 | v0.1.5 | 2026-06-23 | Leading comma skip; dot-number normalization |
 | v0.1.4 | 2026-06-22 | Trailing junk detection |
 | v0.1.3 | 2026-06-22 | Implicit object array wrapping |
-| v0.1.2 | 2026-06-22 | JS literal support; Hypothesis tests |
+| v0.1.2 | 2026-06-22 | JS literal support |
 | v0.1.1 | 2026-06-22 | Invalid escape sequence fix |
 | v0.1.0 | 2026-06-22 | Initial release |
 
@@ -221,18 +188,31 @@ cargo bench -p json-repair-core
 
 ```bash
 # Clone
-git clone https://gitee.com/mensui/json_repair.git
+git clone https://github.com/mengyingsui/json-repair.git
 cd json_repair
 
 # Install deps (Rust extension built automatically)
 uv sync
 
-# Run Python tests
-uv run pytest tests/python/ -v
+# ── Python (performance benchmarks only) ──
+uv run pytest tests/python/test_performance.py --benchmark-only
 
-# Run Rust tests + benches
+# ── Rust ──
+# Unit + integration tests
 cargo test -p json-repair-core
+
+# Lint
+cargo clippy -p json-repair-core --all-targets -- -D warnings
+
+# Benchmarks
 cargo bench -p json-repair-core
+
+# Fuzz testing (requires nightly + cargo-fuzz)
+# Windows: run from a Visual Studio Developer Command Prompt (x64),
+# then add the Clang/LLVM ASan runtime DLL to PATH:
+#   set PATH=D:\vs\community\Tools\Llvm\x64\bin;%PATH%
+$env:PATH = "D:\vs\community\Tools\Llvm\x64\bin;$env:PATH"  # PowerShell
+cargo +nightly fuzz run repair --fuzz-dir crates/json-repair-core/fuzz
 
 # Rebuild Rust .pyd (after Rust changes)
 uv build --wheel  # outputs to dist/
@@ -241,7 +221,27 @@ uv run maturin develop --release -m crates/json-repair-python/Cargo.toml
 
 # Lint / type check
 uv run ruff check json_repair/ tests/python/
+
+# ── Pre-commit (CI gate) ──
+# Install hooks (runs on every commit):
+uv run pre-commit install
+# Run all hooks manually:
+uv run pre-commit run --all-files
 ```
+
+### CI Pipeline
+
+The full CI workflow (`.github/workflows/ci.yml`) runs on every push:
+
+| Step | What it does |
+|------|-------------|
+| `lint` | `ruff check`, `ruff format --check`, `cargo clippy -D warnings` |
+| `test` | `cargo test` (all targets) |
+| `fuzz` | `cargo +nightly fuzz run … -max_total_time=900` (15 min) |
+| `wheels` | Builds `manylinux` / `musllinux` / `macos` wheels via `uv build --wheel` |
+| `coverage` | `cargo llvm-cov --html`, uploaded to Codecov |
+| `audit` | `cargo deny check advisories`, `pip-audit` |
+| `python-test` | `uv run pytest` against the built wheel |
 
 ## License
 

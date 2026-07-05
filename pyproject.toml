@@ -25,9 +25,9 @@ keywords = ["json", "repair", "llm", "malformed", "fix"]
 dependencies = []
 
 [project.urls]
-Homepage = "https://gitee.com/mensui/json_repair"
-Repository = "https://gitee.com/mensui/json_repair"
-Changelog = "https://gitee.com/mensui/json_repair/blob/master/CHANGELOG.md"
+Homepage = "https://github.com/mengyingsui/json-repair"
+Repository = "https://github.com/mengyingsui/json-repair"
+Changelog = "https://github.com/mengyingsui/json-repair/blob/master/CHANGELOG.md"
 
 [tool.maturin]
 manifest-path = "crates/json-repair-python/Cargo.toml"
@@ -40,7 +40,6 @@ pythonpath = ["tests/python"]
 [dependency-groups]
 dev = [
     "codegraph>=1.2.0",
-    "hypothesis>=6.155.7",
     "mypy>=2.1.0",
     "pip-audit>=2.8.0",
     "pre-commit>=4.6.0",
@@ -82,7 +81,7 @@ strict = true
 # ── Dev workflow ──────────────────────────────────────────────────────────
 #
 # First-time setup:              uv sync
-# Run tests:                     uv run pytest tests/python/ -v
+# Run performance tests:         uv run pytest tests/python/test_performance.py --benchmark-only
 # Run Rust benches:              cargo bench -p json-repair-core
 # Run Python benches:            uv run pytest tests/python/test_performance.py --benchmark-only
 # Lint:                          uv run ruff check json_repair/ tests/python/

@@ -1,5 +1,46 @@
 # Changelog — json-repair-core
 
+## v0.1.7 (2026-07-05)
+
+### Added
+- **Fuzzer crash regression tests** — JSONL entries and Rust tests for 7
+  crash patterns: invalid `\u`, multi-E, control chars, trailing comma,
+  misordered brackets, surrogate escape, backslash-at-EOF, deeply nested
+  brackets (128 & 400 levels).
+- `test_deeply_nested_128_brackets` — reproduces exact fuzzer stack overflow.
+- `test_backslash_at_eof_in_string` — reproduces `debug_assert!` false positive.
+
+### Changed
+- **`is_output_balanced`** (`mod.rs:255`) — `debug_assert!` replaced with
+  `Err(JsonRepairError)`. Bracket imbalance returns a proper error instead
+  of panicking in debug builds.
+- **serde_json validation** (`mod.rs:261-274`) — `de.disable_recursion_limit()`
+  removed; `bracket_depth <= 100` guard skips validation on deeply nested
+  output (prevents ASAN `stack-overflow` and `STATUS_STACK_BUFFER_OVERRUN`).
+- **`emit_escape`** (`string.rs:12-31`) — `\uXXXX` in surrogate range
+  (0xD800–0xDFFF) now emits `\ufffd` instead of the raw surrogate.
+- **`validate_number`** — removed length-bypass; all numbers validated via
+  `serde_json` for consistent RFC 8259 conformance.
+- **`structure.rs`** — `object_loop`/`array_loop` bracket handlers `match`
+  on bracket stack before appending.
+
+### Fixed
+- **Multi-E** — `12.34E567E+0E12` no longer emits invalid JSON.
+- **Invalid `\u` escape** — non-hex after `\u` emits `\\u` literal.
+- **Control chars in unquoted values** — `\x00` inside bare-word values
+  properly `\uXXXX`-escaped.
+- **Surrogate escapes** — `\uD800`–`\uDFFF` emitted as `\ufffd`.
+- **Backslash at EOF in string** — `\"` at output end no longer triggers
+  `debug_assert!` false positive.
+- **serde_json stack overflow** — 128-level bracket nesting guarded at 100.
+- **Bracket-misorder in arrays** — `]` before `}` correctly closes object first.
+
+### Security
+- **Stack overflow guard** — serde_json recursion limit bypass removed;
+  deeply nested output (>100 brackets) skips validation instead of crashing.
+- **Surrogate sanitisation** — raw surrogate code points no longer emitted.
+- All guarantees from v0.1.4+ preserved.
+
 ## v0.1.6 (2026-07-04)
 
 ### Changed

@@ -1,6 +1,6 @@
 # json-repair-core
 
-Core Rust library for repairing malformed JSON from LLM outputs. Used by the [`json-repair`](https://gitee.com/mensui/json_repair) Python package (gitee.com).
+Core Rust library for repairing malformed JSON from LLM outputs. Used by the [`json-repair`](https://github.com/mengyingsui/json-repair) Python package (GitHub).
 
 ## Features
 
@@ -9,7 +9,8 @@ Core Rust library for repairing malformed JSON from LLM outputs. Used by the [`j
 - Heuristic string-closing logic tuned for LLM natural-language embedded quotes
 - Modular architecture: `repairer/` submodules (`string`, `number`, `literal`, `keys`, `structure`, `comment`, `junk`)
 - Cargo feature `serde-validate` (`--no-default-features` to make `serde_json` optional)
-- Debug-only assertions and `repair_json_debug` API (zero-cost in release)
+- Runtime validation for bracket balance (returns `Err` on imbalance, never panics)
+- `repair_json_debug` API with extra assertions (zero-cost in release)
 
 ## Usage
 

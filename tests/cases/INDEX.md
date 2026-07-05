@@ -16,32 +16,32 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `broken_patterns.jsonl` | 16 | Mixed defect types — embedded quotes, unquoted keys, trailing commas, missing commas/colons, comments, unescaped newlines, invalid escapes, Python/JS literals, extra text. (Input-only: validity + idempotence.) |
 | `colon_misplaced_as_comma.jsonl` | 2 | Comma used instead of colon after key — `"key", "value": "text"` → `"key":null,"value":"text"` (null for missing value, comma remains as separator). |
 | `comments.jsonl` | 5 | C-style //, /* */, #, and SQL-style `--` comments stripped before parsing. |
-| `complex_scenarios.jsonl` | 5 | Realistic multi-fault inputs — mixed quote styles, comments, trailing commas, unquoted keys, unescaped inner quotes, None. |
-| `control_characters.jsonl` | 2 | Literal \n and \t preserved as control chars in output. |
+| `complex_scenarios.jsonl` | 9 | Realistic multi-fault inputs — mixed quote styles, comments, trailing commas, unquoted keys, unescaped inner quotes, None. |
+| `control_characters.jsonl` | 3 | Literal \n and \t preserved as control chars in output. |
 | `csv_escaping.jsonl` | 2 | Doubled quotes "" decoded to single " (CSV convention). |
 | `double_commas.jsonl` | 8 | Extra commas ,, / ,,, in objects and arrays — including after )-ending string values (the block-26 Flutter pattern). |
 | `duplicate_brace.jsonl` | 3 | Extra `{` after object opening `{` — `{{"key": "value"}` → `{"key": "value"}`. |
-| `edge_cases.jsonl` | 8 | Empty objects/arrays, bare strings/numbers/booleans, multi-byte Unicode (Chinese), special symbols, Windows backslash paths. |
+| `edge_cases.jsonl` | 19 | Empty objects/arrays, bare strings/numbers/booleans, multi-byte Unicode (Chinese), special symbols, Windows backslash paths, backslash-at-EOF, surrogate escapes. |
 | `embedded_quotes_large.jsonl` | 1 | Large multi-segment JSON with embedded ASCII " in both text values and entity arrays, plus literal \n line breaks. (Input-only.) |
 | `extra_text.jsonl` | 3 | Human-language text before/after JSON ("Here is your JSON: …"). |
 | `four_quote.jsonl` | 2 | """" quadruple-quoted strings (triple-quote variant). |
-| `invalid_escape.jsonl` | 8 | Backslash sequences that aren't valid JSON escapes (\*, \(), \)) — backslash preserved as literal. |
+| `invalid_escape.jsonl` | 9 | Backslash sequences that aren't valid JSON escapes (\*, \(), \), \u...) — backslash preserved as literal. |
 | `leading_comma.jsonl` | 4 | Leading comma before first array element removed. |
 | `leading_dot_numbers.jsonl` | 5 | .5 → 0.5, 5. → 5.0 normalization. |
 | `markdown_code_block.jsonl` | 1 | JSON extracted from ```json … ``` fence. |
-| `misordered_brackets.jsonl` | 11 | Array's last object has ] misplaced before/instead of } — simplified + real-world Chinese-text cases from json_failures.txt. |
+| `misordered_brackets.jsonl` | 15 | Array's last object has ] misplaced before/instead of } — simplified + real-world Chinese-text cases from json_failures.txt. |
 | `missing_colons.jsonl` | 2 | Colon inserted between key and value. Also colon misplaced inside key ("key:value" → "key":"value"). |
 | `missing_key_quote.jsonl` | 3 | Missing opening `"` on key — `key": value` → `"key": value`. |
 | `missing_commas.jsonl` | 3 | Commas inserted between elements/key-value pairs. |
 | `mixed_quotes.jsonl` | 3 | Mixed single/double quote boundary: ','word":" inside a double-quoted value — LLM output where a single-quoted key leaks into the preceding text value. |
 | `python_literals.jsonl` | 3 | True/False/None → true/false/null. |
-| `prefix_tags.jsonl` | 8 | Metadata tags `[TEXT_START]`/`[TEXT_END]`/`[X]` and code fences before JSON — `[TAG_A][TAG_B]{"a":1}`; real `[1,2,3]` arrays preserved. |
+| `prefix_tags.jsonl` | 9 | Metadata tags `[TEXT_START]`/`[TEXT_END]`/`[X]` and code fences before JSON — `[TAG_A][TAG_B]{"a":1}`; real `[1,2,3]` arrays preserved. |
 | `single_quoted.jsonl` | 3 | Single-quoted keys/values converted to double quotes. |
 | `trailing_commas.jsonl` | 3 | Trailing comma after last element removed, including nested. |
 | `trailing_junk.jsonl` | 3 | Extraneous text after valid JSON discarded (-lnd, junk, log lines). |
-| `triple_quoted.jsonl` | 5 | """…""" multiline strings — inner quotes, embedded newlines, empty. |
+| `triple_quoted.jsonl` | 6 | """…""" multiline strings — inner quotes, embedded newlines, empty. |
 | `truncated.jsonl` | 8 | Missing closing braces/brackets/quotes — parser infers and closes. Also handles missing value after colon (emits null). |
-| `unescaped_quotes.jsonl` | 3 | Unescaped " inside strings — parser deduces delimiter vs content. Handles `"Stop Doing"`, `"Pomodoro Timer"`, `"Done"` in long text values; also `"The Climb"` followed by `,` and `"buddy movie"` in prose. |
+| `unescaped_quotes.jsonl` | 4 | Unescaped " inside strings — parser deduces delimiter vs content. Handles `"Stop Doing"`, `"Pomodoro Timer"`, `"Done"` in long text values; also `"The Climb"` followed by `,` and `"buddy movie"` in prose. |
 | `unquoted_keys.jsonl` | 3 | {key: "value"} style unquoted object keys. |
 | `unquoted_values.jsonl` | 8 | Unquoted string values like {"name": John} — also multi-word values with spaces, values containing escaped quotes. |
 | `unterminated_string.jsonl` | 1 | String value missing closing " before , — next key's opening " is otherwise consumed as the string terminator. |

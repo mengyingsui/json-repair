@@ -9,9 +9,28 @@ impl Repairer {
         if VALID_ESCAPES.contains(ch) {
             self.emit_char('\\');
             self.emit_char(ch);
-        } else if ch == 'u' && self.peek(1).is_ascii_hexdigit() {
-            self.emit_char('\\');
-            self.emit_char('u');
+        } else if ch == 'u'
+            && self.peek(1).is_ascii_hexdigit()
+            && self.peek(2).is_ascii_hexdigit()
+            && self.peek(3).is_ascii_hexdigit()
+            && self.peek(4).is_ascii_hexdigit()
+        {
+            let hex_val = u32::from_str_radix(
+                &self.chars[self.i + 1..self.i + 5].iter().collect::<String>(),
+                16,
+            )
+            .unwrap_or(0xFFFD);
+            if (0xD800..=0xDFFF).contains(&hex_val) {
+                let _ = write!(self.out, "\\ufffd");
+                self.out_chars += 6;
+                self.i += 4;
+            } else {
+                self.emit_char('\\');
+                self.emit_char('u');
+            }
+        } else if (ch as u32) < 0x20 {
+            let _ = write!(self.out, "\\u{:04x}", ch as u32);
+            self.out_chars += 6;
         } else {
             self.emit_str("\\\\");
             self.emit_char(ch);
@@ -64,7 +83,7 @@ impl Repairer {
         if nc == '"' {
             return true;
         }
-        if self.expect_key && nc == ':' {
+        if self.expect_key && (nc == ':' || nc == '{' || nc == '[') {
             return true;
         }
         if nc.is_ascii_alphabetic() || nc == '_' {
@@ -205,13 +224,7 @@ impl Repairer {
             self.i += 1;
         }
         self.state = crate::repairer::ParserState::Normal;
-        if !self.out.ends_with('"') {
-            self.emit_char('"');
-        }
-        debug_assert!(
-            self.out.ends_with('"'),
-            "parse_string: output missing closing quote at eof"
-        );
+        self.emit_char('"');
     }
 
     pub(super) fn parse_triple_string(&mut self) {

@@ -9,11 +9,11 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.1.6"
+version = "0.1.7"
 edition = "2024"
 license = "GPL-2.0-only"
-repository = "https://gitee.com/mensui/json_repair"
-homepage = "https://gitee.com/mensui/json_repair"
+repository = "https://github.com/mengyingsui/json-repair"
+homepage = "https://github.com/mengyingsui/json-repair"
 rust-version = "1.85"
 
 [workspace.dependencies]

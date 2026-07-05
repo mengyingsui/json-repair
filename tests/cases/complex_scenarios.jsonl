@@ -3,3 +3,8 @@
 {"input": "{\"l1\": {\"l2\": {\"l3\": [{\"k\": \"v\"}]}}}", "expected": {"l1": {"l2": {"l3": [{"k": "v"}]}}}}
 {"input": "{'name': 'O'Brien', \"city\": \"Dublin\"}", "expected": {"name": "O'Brien", "city": "Dublin"}}
 {"input": "{\n            name: 'Test',\n            // a comment\n            \"message\": \"He said \"try it\" to me\",\n            \"items\": [1, 2, 3,],\n            \"nested\": {'key': \"value\",}\n            extra_key: None,\n        }", "expected": {"name": "Test", "message": "He said \"try it\" to me", "items": [1, 2, 3], "nested": {"key": "value"}, "extra_key": null}}
+
+{"input": "{\n  \"response\": \"The user said \"hello\" and I replied \"hi there\"\",\n  \"sentiment\": \"positive\"\n}", "expected": {"response": "The user said \"hello\" and I replied \"hi there\"", "sentiment": "positive"}}
+{"input": "{\"x\": \"hello\"},\n{\"y\": \"world\"}", "expected": {"x": "hello"}}
+{"input": "{\"key\": \"value with }, { pattern inside\"}", "expected": {"key": "value with }, { pattern inside"}}
+{"input": "{\"a\": \"}, {\"}", "expected": {"a": "}, {"}}
