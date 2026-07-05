@@ -38,21 +38,21 @@ jobs:
       - name: Rust benchmark summary
         shell: bash
         run: |
-          python -c "
-import re
-with open('rust_bench_output.txt') as f:
-    lines = f.readlines()
-out = open('$GITHUB_STEP_SUMMARY', 'a')
-out.write('## Rust Benchmark Results\n\n')
-out.write('| Benchmark | Time |\n|-----------|------|\n')
-for i, line in enumerate(lines):
-    m = re.match(r'^json_repair/\S+', line)
-    if m and i + 1 < len(lines):
-        tm = re.search(r'\[([^\]]+)\]', lines[i+1])
-        if tm:
-            out.write(f'| {m.group()} | {tm.group(1)} |\n')
-out.close()
-"
+          python << 'PYEOF'
+          import os, re
+          with open('rust_bench_output.txt') as f:
+              lines = f.readlines()
+          step_summary = os.environ['GITHUB_STEP_SUMMARY']
+          with open(step_summary, 'a') as out:
+              out.write('## Rust Benchmark Results\n\n')
+              out.write('| Benchmark | Time |\n|-----------|------|\n')
+              for i, line in enumerate(lines):
+                  m = re.match(r'^json_repair/\S+', line)
+                  if m and i + 1 < len(lines):
+                      tm = re.search(r'\[([^\]]+)\]', lines[i+1])
+                      if tm:
+                          out.write(f'| {m.group()} | {tm.group(1)} |\n')
+          PYEOF
 
   # ── Rust dependency audits ───────────────────────────────────────────────
   rust-audit:
@@ -107,19 +107,19 @@ out.close()
       - name: Python benchmark summary
         shell: bash
         run: |
-          python -c "
-import json, os
-with open('py_bench.json') as f:
-    data = json.load(f)
-step_summary = os.environ['GITHUB_STEP_SUMMARY']
-with open(step_summary, 'a') as out:
-    out.write('## Python Benchmark Results\n\n')
-    out.write('| Benchmark | Mean (µs) |\n|-----------|-----------|\n')
-    for b in data['benchmarks']:
-        mean = b['stats']['mean'] * 1e6
-        name = b['name'].replace('test_repair_speed[', '').rstrip(']')
-        out.write(f'| {name} | {mean:.2f} |\n')
-"
+          python << 'PYEOF'
+          import json, os
+          with open('py_bench.json') as f:
+              data = json.load(f)
+          step_summary = os.environ['GITHUB_STEP_SUMMARY']
+          with open(step_summary, 'a') as out:
+              out.write('## Python Benchmark Results\n\n')
+              out.write('| Benchmark | Mean (µs) |\n|-----------|-----------|\n')
+              for b in data['benchmarks']:
+                  mean = b['stats']['mean'] * 1e6
+                  name = b['name'].replace('test_repair_speed[', '').rstrip(']')
+                  out.write(f'| {name} | {mean:.2f} |\n')
+          PYEOF
 
       - uses: codecov/codecov-action@v6
         with:
