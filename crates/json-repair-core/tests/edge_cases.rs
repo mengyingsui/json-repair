@@ -92,7 +92,10 @@ fn test_invalid_unicode_escape_in_string() {
     let parsed: serde_json::Value = serde_json::from_str(&result)
         .unwrap_or_else(|e| panic!("invalid JSON: {}\n---\n{}\n---", e, result));
     let obj = parsed.as_object().unwrap();
-    assert_eq!(obj["key"], "\\uehu", "invalid \\u escape should be preserved as literal text");
+    assert_eq!(
+        obj["key"], "\\uehu",
+        "invalid \\u escape should be preserved as literal text"
+    );
 }
 
 #[test]
@@ -150,9 +153,9 @@ const CORPUS_INPUTS: &[&str] = &[
     "{\"events\": [{\"step\"valxt\": \"plans.\", time\": n\"\"u\"}ll}]}]}",
     "{\"a\":\"}\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\":\"}",
     // Misordered brackets inside strings
-    "{\"key\": \"}\" }",        // closing bracket inside a string before real close
-    "{\"key\": [\"{\"} ]",      // opening bracket inside string, real bracket later
-    "[\"}\", { \"key\": \"]\" }]",  // nested brackets inside strings
+    "{\"key\": \"}\" }",   // closing bracket inside a string before real close
+    "{\"key\": [\"{\"} ]", // opening bracket inside string, real bracket later
+    "[\"}\", { \"key\": \"]\" }]", // nested brackets inside strings
     // Implicit array / array edge cases
     "[1, 2, 3, ]",
     "1, 2, 3",
@@ -247,17 +250,21 @@ fn test_backslash_at_eof_in_string() {
     // emits closing ", making output end with \" — old debug_assert! incorrectly
     // flagged this as an error. Output must be valid JSON.
     let inputs = [
-        ("\"\\\\", r#""\\""#),                             // "\\ -> "\\" (string: \)
-        ("{\"a\": \"\\\\", r#"{"a": "\\"}"#),              // object with backslash value
-        ("\"\\", r#""""#),                                  // single backslash, empty string
-        ("\"\\\\\\", r#""\\""#),                            // three backslashes -> "\\" (string: \)
+        ("\"\\\\", r#""\\""#),                // "\\ -> "\\" (string: \)
+        ("{\"a\": \"\\\\", r#"{"a": "\\"}"#), // object with backslash value
+        ("\"\\", r#""""#),                    // single backslash, empty string
+        ("\"\\\\\\", r#""\\""#),              // three backslashes -> "\\" (string: \)
     ];
     for &(input, expected_json) in &inputs {
         let result = json_repair_core::repair_json(input);
         assert!(result.is_ok(), "repair should succeed for: {:?}", input);
         let repaired = result.unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&repaired)
-            .unwrap_or_else(|e| panic!("invalid JSON: {}\n---\ninput: {:?}\noutput: {}\n---", e, input, repaired));
+        let parsed: serde_json::Value = serde_json::from_str(&repaired).unwrap_or_else(|e| {
+            panic!(
+                "invalid JSON: {}\n---\ninput: {:?}\noutput: {}\n---",
+                e, input, repaired
+            )
+        });
         // Verify the parsed value matches expected JSON
         let expected: serde_json::Value = serde_json::from_str(expected_json)
             .unwrap_or_else(|e| panic!("bad expected_json: {} for {:?}", e, expected_json));
@@ -272,29 +279,37 @@ fn test_deeply_nested_128_brackets() {
     // debug_assert! (mod.rs) or stack overflow.
     let input = format!("{}{}", "[".repeat(128), "]".repeat(128));
     let result = json_repair_core::repair_json(&input);
-    assert!(result.is_ok(), "128-depth nesting should repair: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "128-depth nesting should repair: {:?}",
+        result.err()
+    );
     let repaired = result.unwrap();
     use serde::Deserialize;
     let mut de = serde_json::Deserializer::from_str(&repaired);
     de.disable_recursion_limit();
     let parsed = serde_json::Value::deserialize(&mut de);
-    assert!(parsed.is_ok(), "128-depth output must be valid JSON: {}", parsed.unwrap_err());
+    assert!(
+        parsed.is_ok(),
+        "128-depth output must be valid JSON: {}",
+        parsed.unwrap_err()
+    );
 }
 
 #[test]
 fn test_deeply_nested_brackets() {
     // serde_json default recursion limit (128) would reject 400-deep output,
     // so we use disable_recursion_limit() for verification.
-    let input = format!(
-        "{}{}",
-        "[".repeat(400),
-        "]".repeat(400)
-    );
+    let input = format!("{}{}", "[".repeat(400), "]".repeat(400));
     let result = json_repair_core::repair_json(&input);
     assert!(result.is_ok(), "deeply nested brackets should repair");
     let repaired = result.unwrap();
     let mut de = serde_json::Deserializer::from_str(&repaired);
     de.disable_recursion_limit();
     let parsed = serde_json::Value::deserialize(&mut de);
-    assert!(parsed.is_ok(), "must be valid JSON: {}", parsed.unwrap_err());
+    assert!(
+        parsed.is_ok(),
+        "must be valid JSON: {}",
+        parsed.unwrap_err()
+    );
 }

@@ -16,7 +16,9 @@ impl Repairer {
             && self.peek(4).is_ascii_hexdigit()
         {
             let hex_val = u32::from_str_radix(
-                &self.chars[self.i + 1..self.i + 5].iter().collect::<String>(),
+                &self.chars[self.i + 1..self.i + 5]
+                    .iter()
+                    .collect::<String>(),
                 16,
             )
             .unwrap_or(0xFFFD);
@@ -39,8 +41,7 @@ impl Repairer {
 
     pub(super) fn is_closing_quote(&self) -> bool {
         let mut j = self.i + 1;
-        while j < self.n
-            && (self.chars[j] == ' ' || self.chars[j] == '\t' || self.chars[j] == '\r')
+        while j < self.n && (self.chars[j] == ' ' || self.chars[j] == '\t' || self.chars[j] == '\r')
         {
             j += 1;
         }
@@ -133,9 +134,7 @@ impl Repairer {
                     self.i += 1;
                     let mut j = self.i + 1;
                     while j < self.n
-                        && (self.chars[j] == ' '
-                            || self.chars[j] == '\t'
-                            || self.chars[j] == '\r')
+                        && (self.chars[j] == ' ' || self.chars[j] == '\t' || self.chars[j] == '\r')
                     {
                         j += 1;
                     }

@@ -66,8 +66,7 @@ impl Repairer {
                         j += 1;
                     }
                     if depth == 0 && is_metatag && j - self.i <= 64 {
-                        let inner: String =
-                            text_chars[self.i + 1..j - 1].iter().collect();
+                        let inner: String = text_chars[self.i + 1..j - 1].iter().collect();
                         if inner
                             .chars()
                             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
@@ -93,8 +92,7 @@ impl Repairer {
                     }
                 }
                 if unbraced_start != -1 {
-                    let wrapped: String =
-                        text_chars[unbraced_start as usize..].iter().collect();
+                    let wrapped: String = text_chars[unbraced_start as usize..].iter().collect();
                     text_chars = format!("{{{wrapped}").chars().collect();
                     self.chars = text_chars;
                     self.n = self.chars.len();

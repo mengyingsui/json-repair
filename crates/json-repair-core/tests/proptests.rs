@@ -27,8 +27,8 @@ fn json_value() -> impl Strategy<Value = serde_json::Value> {
 fn broken_inputs_static() -> &'static [&'static str] {
     use std::sync::LazyLock;
     static INPUTS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/cases/broken_patterns.jsonl");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/cases/broken_patterns.jsonl");
         let content = std::fs::read_to_string(path).unwrap();
         let mut inputs = Vec::new();
         for line in content.lines() {
@@ -101,8 +101,7 @@ fn numeric_corruption_input() -> impl Strategy<Value = String> {
         // "number + junk" patterns — the core "123abc" class of bug
         (any::<u64>(), "[a-z_]{1,10}").prop_map(|(n, suffix)| format!("{n}{suffix}")),
         (any::<i64>(), "[a-z]{1,5}").prop_map(|(n, suffix)| format!("{n}{suffix}")),
-        (r"[0-9]{1,3}\.[0-9]{1,3}", "[a-zA-Z]{1,5}")
-            .prop_map(|(n, suffix)| format!("{n}{suffix}")),
+        (r"[0-9]{1,3}\.[0-9]{1,3}", "[a-zA-Z]{1,5}").prop_map(|(n, suffix)| format!("{n}{suffix}")),
         // multiple decimal points
         r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}",
         // trailing dot

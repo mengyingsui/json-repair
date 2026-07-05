@@ -28,7 +28,8 @@ fn test_single_char_tag() {
 
 #[test]
 fn test_text_code_fence_skipped() {
-    let result = roundtrip("[TEXT_START]\n```text\nsome text\n```\n[TEXT_END]\n{\"hello\": \"world\"}");
+    let result =
+        roundtrip("[TEXT_START]\n```text\nsome text\n```\n[TEXT_END]\n{\"hello\": \"world\"}");
     assert_eq!(result, serde_json::json!({"hello": "world"}));
 }
 
@@ -40,7 +41,8 @@ fn test_json_code_fence_parsed() {
 
 #[test]
 fn test_text_then_json_fence() {
-    let result = roundtrip("[TEXT_START]\n```text\nstuff\n```\n[TEXT_END]\n```json\n{\"a\": 1}\n```");
+    let result =
+        roundtrip("[TEXT_START]\n```text\nstuff\n```\n[TEXT_END]\n```json\n{\"a\": 1}\n```");
     assert_eq!(result, serde_json::json!({"a": 1}));
 }
 
@@ -58,6 +60,7 @@ fn test_real_array_strings_not_skipped() {
 
 #[test]
 fn test_metatag_and_text_before_json() {
-    let result = roundtrip("prefix text then [TEXT_START] tags [TEXT_END] before {\"key\": \"value\"}");
+    let result =
+        roundtrip("prefix text then [TEXT_START] tags [TEXT_END] before {\"key\": \"value\"}");
     assert_eq!(result, serde_json::json!({"key": "value"}));
 }

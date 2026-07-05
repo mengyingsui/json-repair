@@ -1,18 +1,18 @@
-use std::path::Path;
 use std::fs;
 use std::panic;
+use std::path::Path;
 
 #[test]
 fn test_all_corpus_entries_produce_balanced_output() {
-    let corpus_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("fuzz/corpus/repair");
+    let corpus_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("fuzz/corpus/repair");
     if !corpus_dir.exists() {
         eprintln!("corpus dir not found: {:?}", corpus_dir);
         return;
     }
     let mut i = 0u32;
     let mut bad: Option<(String, String, String)> = None;
-    let mut entries: Vec<_> = fs::read_dir(&corpus_dir).unwrap()
+    let mut entries: Vec<_> = fs::read_dir(&corpus_dir)
+        .unwrap()
         .filter_map(|e| e.ok())
         .collect();
     entries.sort_by_key(|e| e.file_name());
@@ -24,9 +24,7 @@ fn test_all_corpus_entries_produce_balanced_output() {
         }
         i += 1;
         let path = entry.path().display().to_string();
-        let result = panic::catch_unwind(|| {
-            json_repair_core::repair_json(&s)
-        });
+        let result = panic::catch_unwind(|| json_repair_core::repair_json(&s));
         match result {
             Ok(Ok(out)) => {
                 // Manually check brackets (same logic as is_output_balanced)
@@ -35,16 +33,33 @@ fn test_all_corpus_entries_produce_balanced_output() {
                 let mut esc = false;
                 let mut is_bad = false;
                 for c in out.chars() {
-                    if esc { esc = false; continue; }
-                    if c == '\\' { esc = true; continue; }
-                    if c == '"' { in_string = !in_string; continue; }
-                    if in_string { continue; }
+                    if esc {
+                        esc = false;
+                        continue;
+                    }
+                    if c == '\\' {
+                        esc = true;
+                        continue;
+                    }
+                    if c == '"' {
+                        in_string = !in_string;
+                        continue;
+                    }
+                    if in_string {
+                        continue;
+                    }
                     match c {
                         '{' | '[' => stack.push(c),
                         '}' if stack.pop() == Some('{') => {}
-                        '}' => { is_bad = true; break; }
+                        '}' => {
+                            is_bad = true;
+                            break;
+                        }
                         ']' if stack.pop() == Some('[') => {}
-                        ']' => { is_bad = true; break; }
+                        ']' => {
+                            is_bad = true;
+                            break;
+                        }
                         _ => {}
                     }
                 }
@@ -71,7 +86,10 @@ fn test_all_corpus_entries_produce_balanced_output() {
     if let Some((path, input, msg)) = bad {
         panic!(
             "BAD corpus entry: {}\ninput (len={}): {:?}\nmsg: {}",
-            path, input.len(), input, msg
+            path,
+            input.len(),
+            input,
+            msg
         );
     }
     eprintln!("All {i} corpus entries processed OK");

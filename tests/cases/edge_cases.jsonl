@@ -17,3 +17,4 @@
 {"input": "{\"\\u0001\\u0000\\u0000e\\ude22stest\": null}", "expected": {"\u0001\u0000\u0000e\ufffdstest": null}}
 {"input": "{\"a\": \"\\\\", "expected": {"a": "\\"}}
 {"input": "\"\\\\", "expected": "\\"}
+{"input": "{\n  \"entities\": [\n    {\"name\": \"user\", \"type\": \"PERSON\"},  // inline comment\n    {\"name\": \"Canterbury\", \"type\": \"LOCATION\"},  // duplicate key comment\n    {\"name\": \"Canterbury\", \"type\": \"ORGANIZATION\"},  // repeated\n    {\"name\": \"Canterbury\", \"type\": \"PRODUCT\"}  // truncated", "expected": {"entities": [{"name": "user", "type": "PERSON"}, {"name": "Canterbury", "type": "LOCATION"}, {"name": "Canterbury", "type": "ORGANIZATION"}, {"name": "Canterbury", "type": "PRODUCT"}]}}

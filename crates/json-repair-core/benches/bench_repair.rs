@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -13,8 +13,7 @@ struct BenchEntry {
 }
 
 fn load_entries() -> Vec<BenchEntry> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/cases/bench_data.jsonl");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/cases/bench_data.jsonl");
     let content = fs::read_to_string(&path).unwrap();
     content
         .lines()

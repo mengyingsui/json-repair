@@ -2,11 +2,7 @@ use super::{ParseFrame, Repairer};
 
 impl Repairer {
     /// Continue an object loop after a nested value has been completed.
-    pub(super) fn resume_object(
-        &mut self,
-        stack: &mut Vec<ParseFrame>,
-        prev_expect: bool,
-    ) {
+    pub(super) fn resume_object(&mut self, stack: &mut Vec<ParseFrame>, prev_expect: bool) {
         self.expect_key = true;
         self.just_emitted_value = true;
         self.object_loop(stack, prev_expect, false);
@@ -46,7 +42,8 @@ impl Repairer {
                 self.emit_char('}');
                 let popped = self.brackets.pop();
                 debug_assert_eq!(
-                    popped, Some('}'),
+                    popped,
+                    Some('}'),
                     "object_loop: closing }} but top of bracket stack is not }}"
                 );
                 if self.brackets.is_empty() {
@@ -124,15 +121,11 @@ impl Repairer {
                 }
                 if ch.is_ascii_alphabetic() {
                     let mut j = self.i + 1;
-                    while j < self.n
-                        && (self.chars[j].is_alphanumeric() || self.chars[j] == '_')
-                    {
+                    while j < self.n && (self.chars[j].is_alphanumeric() || self.chars[j] == '_') {
                         j += 1;
                     }
                     while j < self.n
-                        && (self.chars[j] == ' '
-                            || self.chars[j] == '\t'
-                            || self.chars[j] == '\r')
+                        && (self.chars[j] == ' ' || self.chars[j] == '\t' || self.chars[j] == '\r')
                     {
                         j += 1;
                     }
@@ -237,7 +230,8 @@ impl Repairer {
                 self.emit_char(']');
                 let popped = self.brackets.pop();
                 debug_assert_eq!(
-                    popped, Some(']'),
+                    popped,
+                    Some(']'),
                     "array_loop: closing ] but top of bracket stack is not ]"
                 );
                 if self.brackets.is_empty() {
@@ -306,11 +300,7 @@ impl Repairer {
         }
     }
 
-    pub(super) fn resume_implicit_array(
-        &mut self,
-        stack: &mut Vec<ParseFrame>,
-        first: bool,
-    ) {
+    pub(super) fn resume_implicit_array(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
         self.just_emitted_value = true;
         self.skip_ws();
         if self.i < self.n && self.chars[self.i] == ',' {
@@ -319,11 +309,7 @@ impl Repairer {
         self.implicit_array_loop(stack, first);
     }
 
-    pub(super) fn implicit_array_loop(
-        &mut self,
-        stack: &mut Vec<ParseFrame>,
-        first: bool,
-    ) {
+    pub(super) fn implicit_array_loop(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
         self.skip_ws();
         if self.i < self.n && self.chars[self.i] == '{' {
             if !first {

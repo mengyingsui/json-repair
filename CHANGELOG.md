@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.7 🔒 (2026-07-05)
 
 ### Added
 - **Fuzzer crash regression tests** — JSONL entries and Rust tests for 7

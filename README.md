@@ -1,6 +1,6 @@
 # json_repair
 
-[![Security: v0.3.6+](https://img.shields.io/badge/Security-v0.3.6%2B-2ea44f?labelColor=333)](SECURITY.md)
+[![Security: v0.3.7+](https://img.shields.io/badge/Security-v0.3.7%2B-2ea44f?labelColor=333)](SECURITY.md)
 
 Repair malformed JSON from LLM outputs in a **single pass** — now powered by Rust.
 
@@ -157,6 +157,7 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.3.7 🔒 | 2026-07-05 | **Fuzzer crash fixes, CI bench summary** — 3 crash fixes (STATUS_STACK_BUFFER_OVERRUN, ASAN stack overflow); surrogate sanitization; runtime bracket balance check; serde_json depth guard; JSONL/Rust crash regression tests; CI bench summary via GITHUB_STEP_SUMMARY; clippy/deny fixes. See [`SECURITY.md`](SECURITY.md) |
 | v0.3.6 🔒 | 2026-07-04 | **PyO3 0.29, CI hardening** — Cargo.lock tracked; Actions bumped to checkout@v5, upload-artifact@v5; `allow_threads` → `detach` for pyo3 0.29 compat; wheel build via `uv build --wheel`; trailing-comma EOF fix from fuzzer. |
 | v0.3.5 🔒 | 2026-07-04 | **Module refactoring** — repairer split into 7 submodules; Cargo feature `serde-validate`; debug assertions; refreshed benchmarks. |
 | v0.3.4 🔒 | 2026-07-04 | **Leading-zero normalisation** — numbers with leading zeros stripped to RFC 8259; `is_closing_quote` comma/key hardening; numeric-corruption proptests. |

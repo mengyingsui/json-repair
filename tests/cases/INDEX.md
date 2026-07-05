@@ -21,7 +21,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `csv_escaping.jsonl` | 2 | Doubled quotes "" decoded to single " (CSV convention). |
 | `double_commas.jsonl` | 8 | Extra commas ,, / ,,, in objects and arrays — including after )-ending string values (the block-26 Flutter pattern). |
 | `duplicate_brace.jsonl` | 3 | Extra `{` after object opening `{` — `{{"key": "value"}` → `{"key": "value"}`. |
-| `edge_cases.jsonl` | 19 | Empty objects/arrays, bare strings/numbers/booleans, multi-byte Unicode (Chinese), special symbols, Windows backslash paths, backslash-at-EOF, surrogate escapes. |
+| `edge_cases.jsonl` | 20 | Empty objects/arrays, bare strings/numbers/booleans, multi-byte Unicode (Chinese), special symbols, Windows backslash paths, backslash-at-EOF, surrogate escapes, `//` comments + truncated closing brackets + duplicate keys. |
 | `embedded_quotes_large.jsonl` | 1 | Large multi-segment JSON with embedded ASCII " in both text values and entity arrays, plus literal \n line breaks. (Input-only.) |
 | `extra_text.jsonl` | 3 | Human-language text before/after JSON ("Here is your JSON: …"). |
 | `four_quote.jsonl` | 2 | """" quadruple-quoted strings (triple-quote variant). |

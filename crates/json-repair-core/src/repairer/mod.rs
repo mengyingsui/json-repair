@@ -59,11 +59,7 @@ impl Repairer {
 
     fn peek(&self, offset: usize) -> char {
         let pos = self.i + offset;
-        if pos < self.n {
-            self.chars[pos]
-        } else {
-            '\0'
-        }
+        if pos < self.n { self.chars[pos] } else { '\0' }
     }
 
     fn peek_is(&self, s: &str) -> bool {
@@ -103,7 +99,10 @@ impl Repairer {
             }
             self.emit_char(b);
         }
-        debug_assert!(self.brackets.is_empty(), "close_brackets: unclosed brackets remain");
+        debug_assert!(
+            self.brackets.is_empty(),
+            "close_brackets: unclosed brackets remain"
+        );
         self.last_depth0_pos = self.out_chars;
         debug_assert!(
             self.last_depth0_pos <= self.out.len(),
@@ -157,9 +156,7 @@ impl Repairer {
                 self.parse_string();
             }
             '\'' => self.parse_single_quoted_string(),
-            't' | 'f' | 'n' | 'T' | 'F' | 'N' | 'i' | 'I' | 'u' | 'U' => {
-                self.parse_literal()
-            }
+            't' | 'f' | 'n' | 'T' | 'F' | 'N' | 'i' | 'I' | 'u' | 'U' => self.parse_literal(),
             '-' => {
                 if self.peek_is("--") {
                     self.skip_comment();
@@ -252,21 +249,21 @@ impl Repairer {
         self.close_brackets();
         self.skip_suffix_junk();
         let out = std::mem::take(&mut self.out);
-        if !Repairer::is_output_balanced(&out) {
-            return Err(JsonRepairError {
-                message: "repaired output has unbalanced brackets".to_string(),
-                position: None,
-            });
-        }
         #[cfg(debug_assertions)]
         {
+            if !Repairer::is_output_balanced(&out) {
+                return Err(JsonRepairError {
+                    message: "repaired output has unbalanced brackets".to_string(),
+                    position: None,
+                });
+            }
             let bracket_depth = out.chars().filter(|&c| c == '{' || c == '[').count();
             if bracket_depth <= 100 {
                 if let Err(e) = serde_json::from_str::<serde_json::Value>(&out) {
                     debug_assert!(
                         false,
                         "repair result is not valid JSON (depth={}): {}\n---\n{}\n---",
-                        bracket_depth, e, &out
+                        bracket_depth, e, out
                     );
                 }
             }
@@ -276,8 +273,9 @@ impl Repairer {
 }
 
 impl Repairer {
+    #[cfg_attr(not(debug_assertions), allow(dead_code))]
     fn is_output_balanced(s: &str) -> bool {
-        let mut stack: Vec<char> = Vec::new();
+        let mut stack = vec![];
         let mut in_string = false;
         let mut esc = false;
         for c in s.chars() {
@@ -297,11 +295,12 @@ impl Repairer {
                 continue;
             }
             match c {
-                '{' | '[' => stack.push(c),
-                '}' if stack.pop() == Some('{') => {}
-                '}' => return false,
-                ']' if stack.pop() == Some('[') => {}
-                ']' => return false,
+                '{' => stack.push('}'),
+                '[' => stack.push(']'),
+                '}' | ']' if stack.pop() != Some(c) => {
+                    return false;
+                }
+                '}' | ']' => {}
                 _ => {}
             }
         }
