@@ -51,7 +51,10 @@ jobs:
                   if m and i + 1 < len(lines):
                       tm = re.search(r'\[([^\]]+)\]', lines[i+1])
                       if tm:
-                          out.write(f'| {m.group()} | {tm.group(1)} |\n')
+                          parts = tm.group(1).split()
+                          mean = f'{parts[2]} {parts[3]}'
+                          name = m.group().split('/')[1]
+                          out.write(f'| {name} | {mean} |\n')
           PYEOF
 
   # ── Rust dependency audits ───────────────────────────────────────────────
