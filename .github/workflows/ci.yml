@@ -114,7 +114,7 @@ jobs:
           step_summary = os.environ['GITHUB_STEP_SUMMARY']
           with open(step_summary, 'a') as out:
               out.write('## Python Benchmark Results\n\n')
-              out.write('| Benchmark | Mean (µs) |\n|-----------|-----------|\n')
+              out.write('| Benchmark | Mean (us) |\n|-----------|-----------|\n')
               for b in data['benchmarks']:
                   mean = b['stats']['mean'] * 1e6
                   name = b['name'].replace('test_repair_speed[', '').rstrip(']')

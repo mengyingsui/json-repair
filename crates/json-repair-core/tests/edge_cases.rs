@@ -136,7 +136,7 @@ fn test_trailing_comma_after_value() {
 fn test_huge_pure_digit_number_not_emitted() {
     // Fuzz crash: 400-digit number overflows f64, must not be emitted as-is.
     // validate_number must reject it (serde_json rejects numbers > f64::MAX).
-    let input: String = std::iter::repeat('9').take(400).collect();
+    let input = "9".repeat(400);
     let result = json_repair_core::repair_json(&input).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&result)
         .unwrap_or_else(|e| panic!("invalid JSON: {}\n---\n{}\n---", e, result));
