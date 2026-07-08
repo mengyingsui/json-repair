@@ -7,8 +7,9 @@
 - **Non-standard key-value separators** — when a character other than `:`
   separates a key from a non-string value (e.g. `{"key"; 1}`, `{"key"| 2}`,
   `{"key"& 3}`, or `{"key" 4}`), the string parser treats the `"` before
-  the separator as embedded content and escapes it, producing garbled output
-  that is still not valid JSON after repair.
+  the separator as embedded content and escapes it. The output is
+  syntactically valid JSON but semantically wrong — the entire input
+  collapses into a single string key with `null` value.
 - **Nested unescaped quotes in deeply ambiguous contexts** — the heuristic
   uses a short lookahead to decide whether `"` closes the string or is
   embedded content. When natural-language text contains multiple adjacent
@@ -31,8 +32,9 @@
 For most malformed inputs encountered in practice (embedded quotes, missing
 brackets, trailing commas, etc.) the repaired output is valid JSON.
 
-However, some patterns are **currently unfixable** — the repairer produces
-output that is still syntactically invalid. These include:
+However, some patterns produce output that is **syntactically valid but
+semantically wrong** — the repairer collapses the entire input into a
+single string key with `null` value. These include:
 - Non-standard key-value separators (e.g. `";"`, `"|"`, `"&"` with
   non-string values like `{"key"; 1}`)
 - Backslash before closing quote (`"\`)
@@ -127,16 +129,19 @@ trailing `\n```\s*` pattern.
 
 ### Embedded quote accuracy depends on context
 
-The string parser looks ahead at the next non-whitespace character:
+The string parser uses a multi-strategy heuristic:
 
-| Next char | Decision |
-|-----------|----------|
-| `,` `}` `]` `:` `\n` | Closing quote |
-| `"` | Closing quote (next string follows — common missing-comma case) |
+| Next non-whitespace char | Decision |
+|--------------------------|----------|
+| `,` `:` `\n` `"` | Closing quote |
+| `]` / `}` | Uses **bracket-stack + string-aware balance scan**:<br>1. If closing bracket doesn't match the current open bracket → **Embedded** (the bracket can't be a real closer).<br>2. If it matches, a forward scan checks whether treating this `"` as a terminator leads to a balanced close. The scan is string-aware (brackets inside unterminated j unk strings don't count) and requires an out-of-string `:` before `}` when structural `,` follows the terminator — preventing mimic junk like `"c", "d"}` from being falsely accepted. |
 | anything else | Embedded content → escape |
 
-This is tuned for LLM output where unescaped natural-language quotes
-are common, but unusual formatting can still produce false positives.
+This handles natural-language `"He said "]boom" loudly"` and similar
+embedded quotes before `]`/`}` without false positives from structural
+trailing junk. False positives are still possible in degenerate cases
+(e.g. mimic junk that perfectly matches a valid object tail including
+key colons), but the common patterns are now safe.
 
 ## Performance
 
@@ -146,7 +151,7 @@ Single-pass, O(n) character-by-character in Rust. A 100 KB input
 typically completes in under 1 ms on modern hardware.
 
 Both Python and Rust benchmarks now read from the same shared data file
-`tests/cases/bench_data.jsonl` (19 cases covering fixable and unfixable
+`tests/cases/bench_data.jsonl` (20 cases covering fixable and unfixable
 inputs of varying sizes). Run:
 
     cargo bench -p json-repair-core              # Rust (criterion)

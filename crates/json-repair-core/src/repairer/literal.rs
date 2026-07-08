@@ -1,31 +1,39 @@
 use super::Repairer;
 
 impl Repairer {
+    /// Case-insensitive prefix match against a pattern, starting at `self.i`.
+    /// Returns the length of the match (pat len) or 0 if no match.
+    #[inline]
+    fn match_lit(&self, pat: &str) -> bool {
+        let plen = pat.len();
+        if self.i + plen > self.n {
+            return false;
+        }
+        pat.bytes()
+            .enumerate()
+            .all(|(j, p)| self.chars[self.i + j].to_ascii_lowercase() == p as char)
+    }
+
     pub(super) fn parse_literal(&mut self) {
-        let end = (self.i + 9).min(self.n);
-        let lower: String = self.chars[self.i..end]
-            .iter()
-            .collect::<String>()
-            .to_lowercase();
-        if lower.starts_with("true") {
+        if self.match_lit("true") {
             self.emit_str("true");
             self.i += 4;
-        } else if lower.starts_with("false") {
+        } else if self.match_lit("false") {
             self.emit_str("false");
             self.i += 5;
-        } else if lower.starts_with("null") || lower.starts_with("none") {
+        } else if self.match_lit("null") || self.match_lit("none") {
             self.emit_str("null");
             self.i += 4;
-        } else if lower.starts_with("undefined") {
+        } else if self.match_lit("undefined") {
             self.emit_str("null");
             self.i += 9;
-        } else if lower.starts_with("nan") {
+        } else if self.match_lit("nan") {
             self.emit_str("null");
             self.i += 3;
-        } else if lower.starts_with("infinity") || lower.starts_with("+infinity") {
+        } else if self.match_lit("infinity") {
             self.emit_str("null");
             self.i += 8;
-        } else if lower.starts_with("-infinity") {
+        } else if self.match_lit("+infinity") || self.match_lit("-infinity") {
             self.emit_str("null");
             self.i += 9;
         } else {

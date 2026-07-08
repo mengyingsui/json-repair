@@ -1,6 +1,50 @@
 use super::{ParseFrame, Repairer};
 
+/// Whether `ch` can start a JSON value (string, number, literal, object, array).
+#[inline]
+fn is_value_start(ch: char) -> bool {
+    matches!(
+        ch,
+        '"' | '{'
+            | '['
+            | '\''
+            | 't'
+            | 'f'
+            | 'n'
+            | 'T'
+            | 'F'
+            | 'N'
+            | 'i'
+            | 'I'
+            | 'u'
+            | 'U'
+            | '-'
+            | '.'
+    ) || ch.is_ascii_digit()
+}
+
+/// Whether `ch` can start an object key (quoted, single-quoted, unquoted, or comment).
+#[inline]
+fn is_key_start(ch: char) -> bool {
+    matches!(ch, '"' | '_' | '/' | '\'') || ch.is_ascii_alphabetic()
+}
+
 impl Repairer {
+    /// Check whether the bare word at `self.i` looks like an object key:
+    /// it must be followed by `,`, `"`, or `:` (after optional whitespace).
+    ///
+    /// Used to disambiguate `"word"` as a key vs. an unquoted string value.
+    fn looks_like_key(&self) -> bool {
+        let mut j = self.i + 1;
+        while j < self.n && (self.chars[j].is_alphanumeric() || self.chars[j] == '_') {
+            j += 1;
+        }
+        while j < self.n && matches!(self.chars[j], ' ' | '\t' | '\r') {
+            j += 1;
+        }
+        j < self.n && matches!(self.chars[j], ',' | '"' | ':')
+    }
+
     /// Continue an object loop after a nested value has been completed.
     pub(super) fn resume_object(&mut self, stack: &mut Vec<ParseFrame>, prev_expect: bool) {
         self.expect_key = true;
@@ -19,10 +63,7 @@ impl Repairer {
         loop {
             self.skip_ws();
             if self.i >= self.n {
-                if self.out.ends_with(',') {
-                    self.out.pop();
-                    self.out_chars -= 1;
-                }
+                self.trim_trailing_comma();
                 break;
             }
             let ch = self.chars[self.i];
@@ -35,10 +76,7 @@ impl Repairer {
                 continue;
             }
             if ch == '}' {
-                if self.out.ends_with(',') {
-                    self.out.pop();
-                    self.out_chars -= 1;
-                }
+                self.trim_trailing_comma();
                 self.emit_char('}');
                 let popped = self.brackets.pop();
                 debug_assert_eq!(
@@ -71,16 +109,13 @@ impl Repairer {
                 while j < self.n && self.chars[j].is_ascii_whitespace() {
                     j += 1;
                 }
-                if j >= self.n || "},\u{5d}:".contains(self.chars[j]) {
+                if j >= self.n || matches!(self.chars[j], '}' | ',' | ']' | ':') {
                     self.i += 1;
                     continue;
                 }
             }
             if ch == ']' {
-                if self.out.ends_with(',') {
-                    self.out.pop();
-                    self.out_chars -= 1;
-                }
+                self.trim_trailing_comma();
                 let popped = self.brackets.pop();
                 match popped {
                     Some('}') => {
@@ -110,28 +145,11 @@ impl Repairer {
                 }
             }
             if self.expect_key {
-                if !first
-                    && ch != '"'
-                    && ch != '_'
-                    && ch != '/'
-                    && ch != '\''
-                    && !ch.is_ascii_alphabetic()
-                {
+                if !first && !is_key_start(ch) {
                     break;
                 }
-                if ch.is_ascii_alphabetic() {
-                    let mut j = self.i + 1;
-                    while j < self.n && (self.chars[j].is_alphanumeric() || self.chars[j] == '_') {
-                        j += 1;
-                    }
-                    while j < self.n
-                        && (self.chars[j] == ' ' || self.chars[j] == '\t' || self.chars[j] == '\r')
-                    {
-                        j += 1;
-                    }
-                    if j >= self.n || !",\":".contains(self.chars[j]) {
-                        break;
-                    }
+                if ch.is_ascii_alphabetic() && !self.looks_like_key() {
+                    break;
                 }
                 if !first
                     && self.just_emitted_value
@@ -150,30 +168,11 @@ impl Repairer {
                     self.emit_char(':');
                 }
                 self.expect_key = false;
-                // Parse value and come back
                 stack.push(ParseFrame::ResumeObject { prev_expect });
                 stack.push(ParseFrame::Value);
                 return;
             } else {
-                if !first
-                    && ch != '"'
-                    && ch != '{'
-                    && ch != '['
-                    && ch != '\''
-                    && ch != 't'
-                    && ch != 'f'
-                    && ch != 'n'
-                    && ch != 'T'
-                    && ch != 'F'
-                    && ch != 'N'
-                    && ch != 'i'
-                    && ch != 'I'
-                    && ch != 'u'
-                    && ch != 'U'
-                    && ch != '-'
-                    && ch != '.'
-                    && !ch.is_ascii_digit()
-                {
+                if !first && !is_value_start(ch) {
                     break;
                 }
                 if !first
@@ -187,17 +186,13 @@ impl Repairer {
                 {
                     self.emit_char(',');
                 }
-                // Parse value and come back
                 stack.push(ParseFrame::ResumeObject { prev_expect });
                 stack.push(ParseFrame::Value);
                 return;
             }
         }
         if self.i < self.n && self.brackets.last() == Some(&'}') {
-            if self.out.ends_with(',') {
-                self.out.pop();
-                self.out_chars -= 1;
-            }
+            self.trim_trailing_comma();
             self.emit_char('}');
             self.brackets.pop();
             self.just_emitted_value = true;
@@ -215,18 +210,12 @@ impl Repairer {
         loop {
             self.skip_ws();
             if self.i >= self.n {
-                if self.out.ends_with(',') {
-                    self.out.pop();
-                    self.out_chars -= 1;
-                }
+                self.trim_trailing_comma();
                 break;
             }
             let ch = self.chars[self.i];
             if ch == ']' {
-                if self.out.ends_with(',') {
-                    self.out.pop();
-                    self.out_chars -= 1;
-                }
+                self.trim_trailing_comma();
                 self.emit_char(']');
                 let popped = self.brackets.pop();
                 debug_assert_eq!(
@@ -242,10 +231,7 @@ impl Repairer {
                 return;
             }
             if ch == '}' {
-                if self.out.ends_with(',') {
-                    self.out.pop();
-                    self.out_chars -= 1;
-                }
+                self.trim_trailing_comma();
                 let popped = self.brackets.pop();
                 match popped {
                     Some(']') => {
@@ -319,9 +305,8 @@ impl Repairer {
             stack.push(ParseFrame::Value);
             return;
         }
-        if !first && self.out.ends_with(',') {
-            self.out.pop();
-            self.out_chars -= 1;
+        if !first {
+            self.trim_trailing_comma();
         }
         self.emit_char(']');
     }

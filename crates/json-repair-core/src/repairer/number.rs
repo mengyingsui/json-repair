@@ -3,7 +3,9 @@ use super::Repairer;
 impl Repairer {
     pub(super) fn parse_number(&mut self) {
         let start = self.i;
-        while self.i < self.n && "-0123456789.eE+".contains(self.chars[self.i]) {
+        while self.i < self.n
+            && matches!(self.chars[self.i], '-' | '0'..='9' | '.' | 'e' | 'E' | '+')
+        {
             self.i += 1;
         }
         if self.i < self.n && self.chars[self.i].is_ascii_alphabetic() {

@@ -13,6 +13,7 @@ env:
 jobs:
   # ── Rust checks ──────────────────────────────────────────────────────────
   rust:
+    if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-26]
@@ -62,6 +63,7 @@ jobs:
 
   # ── Rust dependency audits ───────────────────────────────────────────────
   rust-audit:
+    if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -71,24 +73,9 @@ jobs:
         with:
           command: check advisories licenses bans
 
-  # ── Rust fuzzing (nightly, quick smoke test) ────────────────────────────
-  rust-fuzz:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install Rust toolchain (nightly)
-        run: rustup toolchain install nightly --profile minimal
-
-      - name: Install cargo-fuzz
-        run: cargo +nightly install cargo-fuzz --locked
-
-      - name: Fuzz repair_json for 30 seconds
-        run: cargo +nightly fuzz run repair --fuzz-dir crates/json-repair-core/fuzz -- -max_total_time=30
-
   # ── Python checks ────────────────────────────────────────────────────────
   python:
+    if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-26]

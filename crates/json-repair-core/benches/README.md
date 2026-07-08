@@ -2,7 +2,7 @@
 
 The Rust and Python benchmarks both read from the **shared data file**
 [`tests/cases/bench_data.jsonl`](../../tests/cases/bench_data.jsonl), which
-contains 19 test cases (11 fixable + 8 unfixable) of varying sizes and
+contains 20 test cases (12 fixable + 8 unfixable) of varying sizes and
 complexity. This ensures identical input data for fair cross-language
 comparison.
 

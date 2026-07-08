@@ -38,15 +38,15 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | `prefix_tags.jsonl` | 9 | Metadata tags `[TEXT_START]`/`[TEXT_END]`/`[X]` and code fences before JSON — `[TAG_A][TAG_B]{"a":1}`; real `[1,2,3]` arrays preserved. |
 | `single_quoted.jsonl` | 3 | Single-quoted keys/values converted to double quotes. |
 | `trailing_commas.jsonl` | 3 | Trailing comma after last element removed, including nested. |
-| `trailing_junk.jsonl` | 3 | Extraneous text after valid JSON discarded (-lnd, junk, log lines). |
+| `trailing_junk.jsonl` | 6 | Extraneous text after valid JSON discarded (-lnd, junk, log lines, bracket-in-junk-string, mimic-junk). |
 | `triple_quoted.jsonl` | 6 | """…""" multiline strings — inner quotes, embedded newlines, empty. |
 | `truncated.jsonl` | 8 | Missing closing braces/brackets/quotes — parser infers and closes. Also handles missing value after colon (emits null). |
-| `unescaped_quotes.jsonl` | 4 | Unescaped " inside strings — parser deduces delimiter vs content. Handles `"Stop Doing"`, `"Pomodoro Timer"`, `"Done"` in long text values; also `"The Climb"` followed by `,` and `"buddy movie"` in prose. |
+| `unescaped_quotes.jsonl` | 11 | Unescaped " inside strings — parser deduces delimiter vs content. Handles `"Stop Doing"`, `"Pomodoro Timer"`, `"Done"` in long text values; also `"The Climb"` followed by `,` and `"buddy movie"` in prose. Plus embedded quotes before `]`/`}` with bracket-stack + string-aware balance scan. |
 | `unquoted_keys.jsonl` | 3 | {key: "value"} style unquoted object keys. |
 | `unquoted_values.jsonl` | 8 | Unquoted string values like {"name": John} — also multi-word values with spaces, values containing escaped quotes. |
 | `unterminated_string.jsonl` | 1 | String value missing closing " before , — next key's opening " is otherwise consumed as the string terminator. |
 | `valid_pass_through.jsonl` | 9 | Already-valid JSON — must pass through unchanged (regression guard). |
-| `bench_data.jsonl` | 19 | ⚡ Benchmark input data (no `expected` field). Used by both Rust (`crates/json-repair-core/benches/`) and Python (`tests/python/test_performance.py`) benchmarks. |
+| `bench_data.jsonl` | 20 | ⚡ Benchmark input data (no `expected` field). Used by both Rust (`crates/json-repair-core/benches/`) and Python (`tests/python/test_performance.py`) benchmarks. |
 
 ## Quick Reference by Feature
 
@@ -75,7 +75,7 @@ Lines use the format: `{"input": "...", "expected": ...}`.
 | Python literals | `python_literals.jsonl` | `'{"a": True, "b": None}'` |
 | Single-quoted keys/values | `single_quoted.jsonl` | `"{'a': 'value'}"` |
 | Trailing comma | `trailing_commas.jsonl` | `'{"a": 1,}'` |
-| Trailing junk | `trailing_junk.jsonl` | `'{"a":1}-lnd'` |
+| Trailing junk | `trailing_junk.jsonl` | `'{"a":1}-lnd'`, `'"c", "d}"` |
 | Triple-quote | `triple_quoted.jsonl` | `'{"a": """hello"""}'` |
 | Truncated | `truncated.jsonl` | `'{"a": 1'` |
 | Unbraced object wrapping | `complex_scenarios.jsonl` `[0]` | `'"key": "value"'` |

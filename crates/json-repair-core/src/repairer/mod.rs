@@ -6,6 +6,8 @@ mod number;
 mod string;
 mod structure;
 
+use std::fmt::Write;
+
 use crate::error::JsonRepairError;
 
 const MAX_PARSE_DEPTH: usize = 512;
@@ -62,13 +64,22 @@ impl Repairer {
         if pos < self.n { self.chars[pos] } else { '\0' }
     }
 
+    /// Check whether the next `s.len()` chars match `s`.
+    ///
+    /// Only correct for ASCII patterns (all call sites pass ASCII literals
+    /// like `"\"\"\""`, `"--"`, `"//"`).  A non-ASCII pattern would silently
+    /// under-compare because `s.len()` counts bytes, not chars.
     fn peek_is(&self, s: &str) -> bool {
-        let end = self.i + s.chars().count();
+        debug_assert!(
+            s.is_ascii(),
+            "peek_is: non-ASCII pattern {s:?} — use char count instead"
+        );
+        let end = self.i + s.len();
         if end > self.n {
             return false;
         }
-        for (j, c) in s.chars().enumerate() {
-            if self.chars[self.i + j] != c {
+        for (j, b) in s.bytes().enumerate() {
+            if self.chars[self.i + j] != b as char {
                 return false;
             }
         }
@@ -91,12 +102,32 @@ impl Repairer {
         }
     }
 
+    /// Remove a trailing comma from `self.out` if present.
+    ///
+    /// Called before emitting a closing bracket (`}` or `]`) to avoid
+    /// producing invalid JSON like `{"a":1,}`.
+    #[inline]
+    fn trim_trailing_comma(&mut self) {
+        if self.out.ends_with(',') {
+            self.out.pop();
+            self.out_chars -= 1;
+        }
+    }
+
+    /// Write `\uXXXX` (the JSON escape for a control or non-ASCII char) to
+    /// `self.out` and update the byte counter.
+    ///
+    /// Centralises the `write!(self.out, "\\u{:04x}", …) + out_chars += 6`
+    /// pattern so the escape length is maintained in exactly one place.
+    #[inline]
+    fn emit_unicode_escape(&mut self, code: u32) {
+        let _ = write!(self.out, "\\u{:04x}", code);
+        self.out_chars += 6;
+    }
+
     fn close_brackets(&mut self) {
         while let Some(b) = self.brackets.pop() {
-            if self.out.ends_with(',') {
-                self.out.pop();
-                self.out_chars -= 1;
-            }
+            self.trim_trailing_comma();
             self.emit_char(b);
         }
         debug_assert!(
@@ -300,7 +331,6 @@ impl Repairer {
                 '}' | ']' if stack.pop() != Some(c) => {
                     return false;
                 }
-                '}' | ']' => {}
                 _ => {}
             }
         }

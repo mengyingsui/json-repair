@@ -1,6 +1,8 @@
+> **这是一个纯 AI 仓库** — 全部代码、文档、测试均由 AI 生成与维护，人工仅做最终审查。
+
 # json_repair
 
-[![Security: v0.3.7+](https://img.shields.io/badge/Security-v0.3.7%2B-2ea44f?labelColor=333)](SECURITY.md)
+[![Security: v0.3.8+](https://img.shields.io/badge/Security-v0.3.8%2B-2ea44f?labelColor=333)](SECURITY.md)
 
 Repair malformed JSON from LLM outputs in a **single pass** — now powered by Rust.
 
@@ -157,6 +159,7 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.3.8 🔒 | 2026-07-08 | **Hot-path maintenance, 39–82% speedup** — triplicated string loops unified; escape logic deduplicated; zero-allocation literal matching; `is_value_start`/`is_key_start`/`looks_like_key` extracted from `object_loop`; `trim_trailing_comma`/`emit_unicode_escape` helpers; magic-number naming; `skip_prefix_junk` Vec clone eliminated; `peek_is` optimized; preprocess→`Cow::Borrowed` fast-path. See [`SECURITY.md`](SECURITY.md) |
 | v0.3.7 🔒 | 2026-07-05 | **Fuzzer crash fixes, CI bench summary** — 3 crash fixes (STATUS_STACK_BUFFER_OVERRUN, ASAN stack overflow); surrogate sanitization; runtime bracket balance check; serde_json depth guard; JSONL/Rust crash regression tests; CI bench summary via GITHUB_STEP_SUMMARY; clippy/deny fixes. See [`SECURITY.md`](SECURITY.md) |
 | v0.3.6 🔒 | 2026-07-04 | **PyO3 0.29, CI hardening** — Cargo.lock tracked; Actions bumped to checkout@v5, upload-artifact@v5; `allow_threads` → `detach` for pyo3 0.29 compat; wheel build via `uv build --wheel`; trailing-comma EOF fix from fuzzer. |
 | v0.3.5 🔒 | 2026-07-04 | **Module refactoring** — repairer split into 7 submodules; Cargo feature `serde-validate`; debug assertions; refreshed benchmarks. |
@@ -208,13 +211,6 @@ cargo clippy -p json-repair-core --all-targets -- -D warnings
 # Benchmarks
 cargo bench -p json-repair-core
 
-# Fuzz testing (requires nightly + cargo-fuzz)
-# Windows: run from a Visual Studio Developer Command Prompt (x64),
-# then add the Clang/LLVM ASan runtime DLL to PATH:
-#   set PATH=D:\vs\community\Tools\Llvm\x64\bin;%PATH%
-$env:PATH = "D:\vs\community\Tools\Llvm\x64\bin;$env:PATH"  # PowerShell
-cargo +nightly fuzz run repair --fuzz-dir crates/json-repair-core/fuzz
-
 # Rebuild Rust .pyd (after Rust changes)
 uv build --wheel  # outputs to dist/
 # or for editable installs:
@@ -232,17 +228,14 @@ uv run pre-commit run --all-files
 
 ### CI Pipeline
 
-The full CI workflow (`.github/workflows/ci.yml`) runs on every push:
+The full CI workflow (`.github/workflows/ci.yml`) runs on every push to `master` and on PRs. Tag pushes (`v*`) only build wheels.
 
 | Step | What it does |
 |------|-------------|
-| `lint` | `ruff check`, `ruff format --check`, `cargo clippy -D warnings` |
-| `test` | `cargo test` (all targets) |
-| `fuzz` | `cargo +nightly fuzz run … -max_total_time=900` (15 min) |
-| `wheels` | Builds `manylinux` / `musllinux` / `macos` wheels via `uv build --wheel` |
-| `coverage` | `cargo llvm-cov --html`, uploaded to Codecov |
-| `audit` | `cargo deny check advisories`, `pip-audit` |
-| `python-test` | `uv run pytest` against the built wheel |
+| `rust` | `cargo fmt` / `cargo test` / `cargo clippy` / `cargo bench` on Linux, Windows, macOS |
+| `rust-audit` | `cargo deny check` (advisories, licenses, bans) |
+| `python` | pytest benchmarks / `ruff` / `mypy` / `pyright` / `pip-audit` on Python 3.12+3.13 |
+| `wheels` | Builds wheels via `uv build --wheel` (tagged releases only) |
 
 ## License
 

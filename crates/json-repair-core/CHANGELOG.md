@@ -1,5 +1,37 @@
 # Changelog — json-repair-core
 
+## v0.1.8 (2026-07-08)
+
+### Changed
+- **Triplicated string-loop extraction** (`string.rs`) — `emit_string_body_char`,
+  `handle_escaped`, `BodyAction` enum extracted from the identical character
+  loops in `parse_string`, `parse_triple_string`, `parse_single_quoted_string`.
+- **Escape-logic deduplication** (`keys.rs` + `string.rs`) — `emit_unquoted_char`
+  unifies escape branches across key and value unquoted-string parsing.
+- **`object_loop` splitting** (`structure.rs`) — `is_value_start`,
+  `is_key_start`, `looks_like_key` extracted from nested condition block.
+- **`trim_trailing_comma` helper** (`repairer/mod.rs`) — eliminates 6+
+  repetitions of `if out.ends_with(',')` across the codebase.
+- **`emit_unicode_escape` helper** (`repairer/mod.rs` + `string.rs`) —
+  centralises `write!` + byte-counter pattern.
+- **Constants for magic numbers** (`string.rs`) — `CONTROL_CHAR_MAX` (0x20),
+  `SURROGATE_LO` (0xD800), `SURROGATE_HI` (0xDFFF), `METATAG_MAX_LEN` (64).
+- **`skip_prefix_junk` Vec clone eliminated** (`junk.rs`) — common path no
+  longer clones the full `self.chars` vector.
+- **`peek_is` `chars().count()` → `s.len()`** (`repairer/mod.rs`) — ASCII
+  patterns now use byte-length comparison with `debug_assert!`.
+- **Preprocess `Cow::Borrowed` fast-path** (`preprocess.rs`) — zero allocation
+  when input has no colon-in-key or mixed-quote patterns.
+
+### Performance
+- **`parse_literal`** (`literal.rs`) — `collect::<String>().to_lowercase()` dual
+  heap allocation replaced with per-char case-insensitive `match_lit()`.
+- **`emit_escape` hex parsing** (`string.rs`) — `collect<String>()` +
+  `from_str_radix` replaced with `to_digit(16)`-based bit-shift accumulation.
+- **`.contains()` → `matches!()`** on all hot paths — compiler generates
+  jump tables instead of loop-searches.
+- **39–82% speedup** on corrupted benchmarks vs v0.1.7.
+
 ## v0.1.7 (2026-07-05)
 
 ### Added

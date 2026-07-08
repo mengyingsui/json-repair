@@ -1,52 +1,51 @@
 use super::Repairer;
 
 const IMPLICIT_SEQUENCE_MIN_LENGTH: usize = 8192;
+const METATAG_MAX_LEN: usize = 64;
 
 impl Repairer {
+    /// Skip non-JSON text before the first `{` or `[`.
+    ///
+    /// Handles markdown code fences, `[TEXT_*]`-style metatags, markdown
+    /// link parens, and unbraced `"key": value` patterns.
+    ///
+    /// On return, `self.i` points at the first `{` or `[` of the JSON body
+    /// (or at the original position if no JSON container was found).
+    /// For unbraced input, `self.chars` is rewritten to prepend `{` so the
+    /// parser treats the bare key as the first object member.
     pub(super) fn skip_prefix_junk(&mut self) {
         let mut start = 0;
         while start < self.n && self.chars[start].is_ascii_whitespace() {
             start += 1;
         }
-        let mut text_chars: Vec<char> = self.chars[start..].to_vec();
-        let text_n = text_chars.len();
-        let saved = self.i;
-        let mut unbraced_start: isize = -1;
-        self.i = 0;
-        loop {
-            if self.i >= text_n {
-                break;
-            }
-            let ch = text_chars[self.i];
-            if ch == '`'
-                && self.i + 2 < text_n
-                && text_chars[self.i + 1] == '`'
-                && text_chars[self.i + 2] == '`'
-            {
-                self.i += 3;
-                let lang_start = self.i;
-                while self.i < text_n && text_chars[self.i] != '\n' {
-                    self.i += 1;
+        let mut i = start;
+        let mut unbraced_start: Option<usize> = None;
+
+        while i < self.n {
+            let ch = self.chars[i];
+            if ch == '`' && i + 2 < self.n && self.chars[i + 1] == '`' && self.chars[i + 2] == '`' {
+                i += 3;
+                let lang_start = i;
+                while i < self.n && self.chars[i] != '\n' {
+                    i += 1;
                 }
-                let lang: String = text_chars[lang_start..self.i].iter().collect();
+                let lang: String = self.chars[lang_start..i].iter().collect();
                 let lang_trimmed = lang.trim();
                 let is_json_fence = lang_trimmed.is_empty() || lang_trimmed == "json";
-                if self.i < text_n {
-                    self.i += 1;
+                if i < self.n {
+                    i += 1;
                 }
                 if !is_json_fence {
-                    let mut code_depth = 1u32;
-                    while self.i < text_n && code_depth > 0 {
-                        if self.i + 2 < text_n
-                            && text_chars[self.i] == '`'
-                            && text_chars[self.i + 1] == '`'
-                            && text_chars[self.i + 2] == '`'
+                    while i < self.n {
+                        if i + 2 < self.n
+                            && self.chars[i] == '`'
+                            && self.chars[i + 1] == '`'
+                            && self.chars[i + 2] == '`'
                         {
-                            self.i += 3;
-                            code_depth -= 1;
-                        } else {
-                            self.i += 1;
+                            i += 3;
+                            break;
                         }
+                        i += 1;
                     }
                 }
                 continue;
@@ -54,10 +53,10 @@ impl Repairer {
             if ch == '{' || ch == '[' {
                 if ch == '[' {
                     let mut depth = 1i32;
-                    let mut j = self.i + 1;
-                    let mut is_metatag = j < text_n;
-                    while j < text_n && depth > 0 {
-                        match text_chars[j] {
+                    let mut j = i + 1;
+                    let mut is_metatag = j < self.n;
+                    while j < self.n && depth > 0 {
+                        match self.chars[j] {
                             '[' => depth += 1,
                             ']' => depth -= 1,
                             '{' | '"' => is_metatag = false,
@@ -65,36 +64,35 @@ impl Repairer {
                         }
                         j += 1;
                     }
-                    if depth == 0 && is_metatag && j - self.i <= 64 {
-                        let inner: String = text_chars[self.i + 1..j - 1].iter().collect();
+                    if depth == 0 && is_metatag && j - i <= METATAG_MAX_LEN {
+                        let inner: String = self.chars[i + 1..j - 1].iter().collect();
                         if inner
                             .chars()
                             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
                         {
-                            self.i = j;
+                            i = j;
                             continue;
                         }
                     }
-                    if j < text_n && text_chars[j] == '(' {
-                        let mut link_depth = 1i32;
+                    if j < self.n && self.chars[j] == '(' {
                         let mut k = j + 1;
-                        while k < text_n && link_depth > 0 {
-                            if text_chars[k] == '(' {
+                        let mut link_depth = 1i32;
+                        while k < self.n && link_depth > 0 {
+                            if self.chars[k] == '(' {
                                 link_depth += 1;
                             }
-                            if text_chars[k] == ')' {
+                            if self.chars[k] == ')' {
                                 link_depth -= 1;
                             }
                             k += 1;
                         }
-                        self.i = k;
+                        i = k;
                         continue;
                     }
                 }
-                if unbraced_start != -1 {
-                    let wrapped: String = text_chars[unbraced_start as usize..].iter().collect();
-                    text_chars = format!("{{{wrapped}").chars().collect();
-                    self.chars = text_chars;
+                if let Some(start_pos) = unbraced_start {
+                    let wrapped: String = self.chars[start_pos..].iter().collect();
+                    self.chars = format!("{{{wrapped}").chars().collect();
                     self.n = self.chars.len();
                     self.i = 0;
                     return;
@@ -102,35 +100,34 @@ impl Repairer {
                 break;
             }
             if ch == '"' {
-                let str_start = self.i;
-                self.i += 1;
-                while self.i < text_n {
-                    let c = text_chars[self.i];
+                let str_start = i;
+                i += 1;
+                while i < self.n {
+                    let c = self.chars[i];
                     if c == '\\' {
-                        self.i += 2;
+                        i += 2;
                     } else if c == '"' {
-                        self.i += 1;
+                        i += 1;
                         break;
                     } else {
-                        self.i += 1;
+                        i += 1;
                     }
                 }
-                let mut j = self.i;
-                while j < text_n && text_chars[j].is_ascii_whitespace() {
+                let mut j = i;
+                while j < self.n && self.chars[j].is_ascii_whitespace() {
                     j += 1;
                 }
-                if j < text_n && text_chars[j] == ':' && unbraced_start == -1 {
-                    unbraced_start = str_start as isize;
+                if j < self.n && self.chars[j] == ':' && unbraced_start.is_none() {
+                    unbraced_start = Some(str_start);
                 }
             } else {
-                self.i += 1;
+                i += 1;
             }
         }
-        if self.i >= text_n {
-            self.i = saved;
+        if i >= self.n {
+            self.i = 0;
         } else {
-            self.chars = text_chars;
-            self.n = self.chars.len();
+            self.i = i;
             debug_assert!(
                 self.i < self.n && (self.chars[self.i] == '{' || self.chars[self.i] == '['),
                 "skip_prefix_junk: position does not point at JSON container start"

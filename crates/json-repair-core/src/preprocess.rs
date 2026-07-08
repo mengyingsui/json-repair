@@ -1,5 +1,35 @@
 use std::borrow::Cow;
 
+/// Quick byte-level check: is there a quoted string containing `:` followed by `,` or `}`?
+fn needs_colon_fix(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let n = bytes.len();
+    let mut in_str = false;
+    let mut has_colon = false;
+    let mut i = 0;
+    while i < n {
+        match bytes[i] {
+            b'"' => {
+                if in_str && has_colon {
+                    let mut j = i + 1;
+                    while j < n && matches!(bytes[j], b' ' | b'\t' | b'\r' | b'\n') {
+                        j += 1;
+                    }
+                    if j < n && matches!(bytes[j], b',' | b'}') {
+                        return true;
+                    }
+                }
+                in_str = !in_str;
+                has_colon = false;
+            }
+            b':' if in_str => has_colon = true,
+            _ => {}
+        }
+        i += 1;
+    }
+    false
+}
+
 /// Fix the `','word":"` mixed-quote boundary pattern in `text`.
 ///
 /// When LLM output uses both `'` and `"` quote styles, a double-quoted string
@@ -7,6 +37,9 @@ use std::borrow::Cow;
 /// key.  This pre-processing step splits it into `","word":"` so the parser
 /// correctly treats `word` as the next key.
 pub fn fix_mixed_quotes(text: &str) -> Cow<'_, str> {
+    if !text.contains("','") {
+        return Cow::Borrowed(text);
+    }
     let chars: Vec<char> = text.chars().collect();
     let n = chars.len();
     let mut out = String::with_capacity(n);
@@ -52,6 +85,9 @@ pub fn fix_mixed_quotes(text: &str) -> Cow<'_, str> {
 /// colon is a valid bare key and the content after is a valid bare value,
 /// and the string is followed by structural punctuation.
 pub fn fix_colon_in_key(text: &str) -> Cow<'_, str> {
+    if !needs_colon_fix(text) {
+        return Cow::Borrowed(text);
+    }
     let chars: Vec<char> = text.chars().collect();
     let n = chars.len();
     let mut out = String::with_capacity(n);

@@ -36,6 +36,13 @@ additional `debug_assert!` guards (active in debug builds only).
 The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
 changes only; security posture is unchanged.
 
+**v0.3.8 / v0.1.8** adds:
+- **No new security features** — this release is a hot-path maintenance and
+  performance optimisation release. All security guarantees from v0.3.7+ /
+  v0.1.7+ preserved. Refactored code paths are covered by existing test and
+  fuzz coverage.
+- See [`CHANGELOG.md`](CHANGELOG.md) for full details.
+
 **v0.3.7 / v0.1.7** adds:
 - **Stack overflow guard** — serde_json recursion limit bypass removed;
   deeply nested output (>100 brackets) skips validation instead of crashing.

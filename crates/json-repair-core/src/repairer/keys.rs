@@ -20,20 +20,25 @@ impl Repairer {
         self.emit_char('"');
         while self.i < self.n {
             let ch = self.chars[self.i];
-            if " \t\r\n:{}[],\"'/\u{200b}".contains(ch) {
+            if matches!(
+                ch,
+                ' ' | '\t'
+                    | '\r'
+                    | '\n'
+                    | ':'
+                    | '{'
+                    | '}'
+                    | '['
+                    | ']'
+                    | ','
+                    | '"'
+                    | '\''
+                    | '/'
+                    | '\u{200b}'
+            ) {
                 break;
             }
-            if ch == '\\' {
-                self.emit_str("\\\\");
-            } else if ch == '"' {
-                self.emit_str("\\\"");
-            } else if (ch as u32) < 0x20 {
-                use std::fmt::Write;
-                let _ = write!(self.out, "\\u{:04x}", ch as u32);
-                self.out_chars += 6;
-            } else {
-                self.emit_char(ch);
-            }
+            self.emit_unquoted_char(ch);
             self.i += 1;
         }
         self.emit_char('"');
@@ -46,20 +51,10 @@ impl Repairer {
         self.emit_char('"');
         while self.i < self.n {
             let ch = self.chars[self.i];
-            if ",\u{7d}\u{5d}".contains(ch) {
+            if matches!(ch, ',' | '}' | ']') {
                 break;
             }
-            if ch == '\\' {
-                self.emit_str("\\\\");
-            } else if ch == '"' {
-                self.emit_str("\\\"");
-            } else if (ch as u32) < 0x20 {
-                use std::fmt::Write;
-                let _ = write!(self.out, "\\u{:04x}", ch as u32);
-                self.out_chars += 6;
-            } else {
-                self.emit_char(ch);
-            }
+            self.emit_unquoted_char(ch);
             self.i += 1;
         }
         self.emit_char('"');

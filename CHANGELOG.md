@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.3.8 🔒 (2026-07-08)
+
+### Changed
+- **Triplicated string-loop extraction** (`string.rs`) — `emit_string_body_char` +
+  `handle_escaped` + `BodyAction` enum extracted from the identical character
+  loop bodies in `parse_string`, `parse_triple_string`, and
+  `parse_single_quoted_string`. All three now share one implementation.
+- **Escape-logic deduplication** (`string.rs` + `keys.rs`) — `emit_unquoted_char`
+  extracted, unifying escape branches that were duplicated across key and value
+  unquoted-string parsing.
+- **`object_loop` splitting** (`structure.rs`) — `is_value_start`,
+  `is_key_start`, `looks_like_key` extracted from the 3-level-deep condition
+  block, reducing nesting from 20→5 lines per call site.
+- **`trim_trailing_comma` extracted** (`mod.rs`) — 6+ repetitions of
+  `if out.ends_with(',')` across `parse_object`/`parse_array`/`close_brackets`
+  replaced with a single helper.
+- **`emit_unicode_escape` extracted** (`mod.rs` + `string.rs`) — `write!` +
+  byte-counter pattern centralized.
+- **Magic-number naming** (`string.rs`) — `CONTROL_CHAR_MAX`, `SURROGATE_LO`,
+  `SURROGATE_HI` named constants replace inline hex values.
+- **`skip_prefix_junk` optimized** (`junk.rs`) — common path no longer clones
+  `self.chars` via `to_vec()`; `METATAG_MAX_LEN` constant extracted.
+- **`peek_is` optimized** (`mod.rs`) — uses `s.len()` + `debug_assert!(s.is_ascii())`
+  instead of `s.chars().count()`.
+- **Preprocess `Cow`-fast-path** (`preprocess.rs`) — `fix_mixed_quotes` and
+  `fix_colon_in_key` now return `Cow::Borrowed` when no matching pattern found,
+  skipping `Vec<char>` allocation.
+- Rust crate `json-repair-core` bumped to **v0.1.8**.
+
+### Performance
+- Hot-path allocations eliminated across the board:
+  - `parse_literal`: `collect::<String>().to_lowercase()` dual-heap replaced
+    with per-char case-insensitive matching via `match_lit()`.
+  - `emit_escape` hex parsing: `collect<String>() + from_str_radix` replaced
+    with `to_digit(16)`-based `fold`.
+  - `.contains()` replaced with `matches!()` on all hot paths — compiler
+    generates jump tables instead of loop-searches.
+- **39–82% speedup** on corrupted benchmarks (criterion, sample-size=100):
+  `small_corrupted/86` 1.97 µs (−40% vs pre-refactoring), `embedded_quotes/159`
+  1.71 µs (−52%), `realistic_llm/299` 2.68 µs (−50%), `unfixable_amps_medium/680`
+  4.47 µs (−82%).
+
 ## v0.3.7 🔒 (2026-07-05)
 
 ### Added
