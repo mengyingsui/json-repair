@@ -36,6 +36,14 @@ additional `debug_assert!` guards (active in debug builds only).
 The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
 changes only; security posture is unchanged.
 
+**v0.3.9 / v0.1.9** adds:
+- **No new security features** — this release is a documentation completion
+  and `is_closing_quote` refactoring release. All security guarantees from
+  v0.3.8+ / v0.1.8+ preserved. Refactored code paths are covered by existing
+  test coverage; behavior is equivalent (verified by full test suite +
+  benchmarks).
+- See [`CHANGELOG.md`](CHANGELOG.md) for full details.
+
 **v0.3.8 / v0.1.8** adds:
 - **No new security features** — this release is a hot-path maintenance and
   performance optimisation release. All security guarantees from v0.3.7+ /

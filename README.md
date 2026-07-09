@@ -2,7 +2,7 @@
 
 # json_repair
 
-[![Security: v0.3.8+](https://img.shields.io/badge/Security-v0.3.8%2B-2ea44f?labelColor=333)](SECURITY.md)
+[![Security: v0.3.9+](https://img.shields.io/badge/Security-v0.3.9%2B-2ea44f?labelColor=333)](SECURITY.md)
 
 Repair malformed JSON from LLM outputs in a **single pass** — now powered by Rust.
 
@@ -159,6 +159,7 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v0.3.9 🔒 | 2026-07-09 | **Documentation overhaul** — `repair_json()` full Google-style docstring; `__init__` module docstring expanded with all capabilities. Internal Rust crate documentation completed (`#![deny(missing_docs)]`, all modules/methods documented). |
 | v0.3.8 🔒 | 2026-07-08 | **Hot-path maintenance, 39–82% speedup** — triplicated string loops unified; escape logic deduplicated; zero-allocation literal matching; `is_value_start`/`is_key_start`/`looks_like_key` extracted from `object_loop`; `trim_trailing_comma`/`emit_unicode_escape` helpers; magic-number naming; `skip_prefix_junk` Vec clone eliminated; `peek_is` optimized; preprocess→`Cow::Borrowed` fast-path. See [`SECURITY.md`](SECURITY.md) |
 | v0.3.7 🔒 | 2026-07-05 | **Fuzzer crash fixes, CI bench summary** — 3 crash fixes (STATUS_STACK_BUFFER_OVERRUN, ASAN stack overflow); surrogate sanitization; runtime bracket balance check; serde_json depth guard; JSONL/Rust crash regression tests; CI bench summary via GITHUB_STEP_SUMMARY; clippy/deny fixes. See [`SECURITY.md`](SECURITY.md) |
 | v0.3.6 🔒 | 2026-07-04 | **PyO3 0.29, CI hardening** — Cargo.lock tracked; Actions bumped to checkout@v5, upload-artifact@v5; `allow_threads` → `detach` for pyo3 0.29 compat; wheel build via `uv build --wheel`; trailing-comma EOF fix from fuzzer. |

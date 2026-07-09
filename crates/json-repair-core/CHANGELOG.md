@@ -1,5 +1,43 @@
 # Changelog — json-repair-core
 
+## v0.1.9 (2026-07-09)
+
+### Changed
+- **`#![deny(missing_docs)]` enforced** (`lib.rs`) — any new public item
+  missing a doc comment is now a compile error.
+- **Module-level docs** — all 11 modules (`lib`, `error`, `preprocess`,
+  `repairer/mod`, `comment`, `junk`, `keys`, `literal`, `number`, `string`,
+  `structure`) now have `//!` doc comments describing their purpose.
+- **Internal method docs** — all `pub(crate)`/`pub(super)` methods
+  (`Repairer::new`/`peek`/`emit_char`/`skip_ws`/`close_brackets`/`emit_str`/
+  `repair`/`is_output_balanced`, `skip_comment`, `skip_suffix_junk`/
+  `is_implicit_object_sequence`, `parse_key`/`parse_unquoted_key`/
+  `parse_unquoted_value`, `parse_literal`, `parse_number`,
+  `emit_escape`/`is_closing_quote`/`parse_string`/`parse_triple_string`/
+  `parse_single_quoted_string`, `array_loop`/`resume_implicit_array`/
+  `implicit_array_loop`) now have `///` doc comments.
+- **`Repairer` struct + fields documented** — all 11 fields have `///` docs.
+- **`ParserState`/`ParseFrame` variants documented** — all 3+4 enum variants.
+- **`is_closing_quote` refactoring** (`string.rs`) — 200-line monolith split
+  into 6 focused functions:
+  - `lookahead_ws` (8 lines, `#[inline]`) — skip whitespace, return
+    `(pos, char)`.
+  - `comma_ok` (10 lines, `#[inline]`) — validate comma followed by value.
+  - `embedded_quote_guard` (17 lines, `#[inline]`) — `]`/`}` embedded-quote
+    detection (3 sub-cases).
+  - `looks_like_real_quote_terminator` (35 lines) — string-aware bracket
+    balance scan (cold path, not inlined).
+  - `bare_key_chain` (12 lines, `#[inline]`) — unquoted key `word"…":` chain.
+  - Main `is_closing_quote` (20 lines) — thin dispatcher.
+  Branch order restored: structural punctuation (`,}] \n`) checked first.
+- **Doc fixes** — `match_lit` doc corrected (returns `bool`, not "length");
+  `keys.rs` module doc fixed (removed incorrect "colon insertion");
+  `number.rs` module doc fixed (removed incorrect "hex");
+  `is_closing_quote` doc expanded to cover `\n`, `{`/`[` key context,
+  unquoted-key chain, and embedded-quote guard sub-cases.
+- **Bench file documented** (`bench_repair.rs`) — `BenchEntry`,
+  `load_entries`, `bench_repair` all have `///` docs.
+
 ## v0.1.8 (2026-07-08)
 
 ### Changed

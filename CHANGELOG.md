@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.3.9 (2026-07-09)
+
+### Changed
+- **Documentation completion** — `#![deny(missing_docs)]` enforced on
+  `json-repair-core`; all 11 Rust modules get `//!` module-level docs; all
+  `pub(crate)`/`pub(super)` methods get `///` docs; Python `repair_json()`
+  gets full Google-style docstring (`Args`/`Returns`/`Raises`/`Examples`);
+  bench file (`bench_repair.rs`) documented.
+- **`is_closing_quote` refactoring** (`string.rs`) — 200-line monolith split
+  into 6 focused functions: `lookahead_ws`, `comma_ok`,
+  `embedded_quote_guard`, `looks_like_real_quote_terminator`,
+  `bare_key_chain`, and a 20-line main dispatcher. `#[inline]` on hot-path
+  helpers; branch order restored to check structural punctuation first.
+- **Doc fixes** — `match_lit` return-type corrected (`bool`, not length);
+  `keys.rs`/`number.rs` module descriptions corrected; `is_closing_quote`
+  doc expanded to cover all branches (`\n`, `{`/`[` key context, unquoted-key
+  chain, embedded-quote guard sub-cases).
+- Rust crate `json-repair-core` bumped to **v0.1.9**.
+
 ## v0.3.8 🔒 (2026-07-08)
 
 ### Changed

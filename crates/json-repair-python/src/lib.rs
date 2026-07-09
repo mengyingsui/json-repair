@@ -17,7 +17,6 @@ fn _rust_parse(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// Releases the Python GIL during the Rust computation so other Python
 /// threads can run concurrently.
 #[pyfunction]
-#[pyo3(text = "Repair malformed JSON text and return a valid JSON string.\n\nReleases the GIL during computation.")]
 fn py_repair_json(py: Python<'_>, text: &str) -> PyResult<String> {
     py.detach(move || json_repair_core::repair_json(text))
         .map_err(|e| PyValueError::new_err(format!("{e}")))
