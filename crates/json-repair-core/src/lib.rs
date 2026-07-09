@@ -1,3 +1,18 @@
+//! Core library for repairing malformed JSON output from LLMs.
+//!
+//! This crate provides a single-pass streaming repairer that handles common
+//! JSON errors produced by large language models:
+//! - Missing quotes around keys/values
+//! - Mixed single/double quotes
+//! - Unescaped (embedded) quotes inside string values
+//! - Trailing commas
+//! - Truncated JSON
+//! - Unquoted literals (`true`, `false`, `null`)
+//! - Single-line and block comments (`//`, `/* ... */`, `#`, `--`)
+//! - Consecutive colons or space-separated keys
+#![deny(missing_docs)]
+
+/// Errors produced during JSON repair.
 pub mod error;
 
 mod preprocess;

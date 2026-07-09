@@ -1,6 +1,9 @@
+//! Unquoted key and value parsing (quote insertion around bare words).
+
 use super::Repairer;
 
 impl Repairer {
+    /// Parse an object key: quoted, single-quoted, or unquoted bare word.
     pub(super) fn parse_key(&mut self) {
         self.skip_ws();
         if self.i >= self.n {
@@ -16,6 +19,7 @@ impl Repairer {
         }
     }
 
+    /// Parse an unquoted bare-word key, wrapping it in double quotes.
     pub(super) fn parse_unquoted_key(&mut self) {
         self.emit_char('"');
         while self.i < self.n {
@@ -47,6 +51,7 @@ impl Repairer {
         }
     }
 
+    /// Parse an unquoted bare-word value, wrapping it in double quotes.
     pub(super) fn parse_unquoted_value(&mut self) {
         self.emit_char('"');
         while self.i < self.n {

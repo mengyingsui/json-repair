@@ -1,5 +1,8 @@
 """
 Rust-accelerated JSON repair — no Python fallback.
+
+This module wraps the ``_rust_parse`` native extension (PyO3) and provides
+the public :func:`repair_json` entry point.
 """
 
 from __future__ import annotations
@@ -19,6 +22,37 @@ def _strip_surrogates(text: str) -> str:
 
 
 def repair_json(text: str, *, return_object: bool = False) -> str | object:
+    """Repair malformed JSON text and return valid JSON or a Python object.
+
+    Delegates to the Rust core (via PyO3) which releases the GIL during
+    computation.  Handles common JSON errors produced by LLMs: missing
+    quotes, mixed quote styles, unescaped embedded quotes, trailing
+    commas, truncated input, unquoted literals, comments, and more.
+
+    Args:
+        text: Malformed JSON string to repair.
+        return_object: If ``True``, parse the repaired JSON and return the
+            resulting Python object (``dict`` / ``list`` / ``str`` /
+            ``int`` / ``float`` / ``bool`` / ``None``) instead of a JSON
+            string.
+
+    Returns:
+        A valid JSON string (default), or a parsed Python object when
+        ``return_object`` is ``True``.  Empty input returns ``""`` (or
+        raises if ``return_object`` is ``True``).
+
+    Raises:
+        ValueError: If *text* is empty or whitespace-only, or if the
+            repaired result is still invalid JSON and ``return_object``
+            is ``True``.
+
+    Examples:
+        >>> from json_repair import repair_json
+        >>> repair_json('{key: value}')
+        '{"key":"value"}'
+        >>> repair_json("{'k': 'v'}", return_object=True)
+        {'k': 'v'}
+    """
     if not text or not text.strip():
         if return_object:
             raise ValueError("empty input")

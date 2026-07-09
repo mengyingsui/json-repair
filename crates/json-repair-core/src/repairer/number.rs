@@ -1,6 +1,13 @@
+//! Number parsing and normalisation (leading zeros, leading dot, trailing dot).
+
 use super::Repairer;
 
 impl Repairer {
+    /// Parse a number from the current position and emit its normalised form.
+    ///
+    /// Handles leading `+`/`.`, trailing `.`, and strips leading zeros to
+    /// conform to JSON number syntax.  Sets `self.error` if non-numeric
+    /// characters are encountered.
     pub(super) fn parse_number(&mut self) {
         let start = self.i;
         while self.i < self.n

@@ -1,6 +1,10 @@
+//! Suffix junk, implicit object sequences, and trailing-comma trimming.
+
 use super::Repairer;
 
+/// Minimum input length to even consider the implicit-object-sequence fast path.
 const IMPLICIT_SEQUENCE_MIN_LENGTH: usize = 8192;
+/// Maximum length of a `[TEXT_*]`-style metatag to recognise and skip.
 const METATAG_MAX_LEN: usize = 64;
 
 impl Repairer {
@@ -135,6 +139,7 @@ impl Repairer {
         }
     }
 
+    /// Trim trailing whitespace/junk after the last depth-0 position in `out`.
     pub(super) fn skip_suffix_junk(&mut self) {
         debug_assert!(
             self.last_depth0_pos <= self.out.len(),
@@ -148,6 +153,11 @@ impl Repairer {
         }
     }
 
+    /// Detect a comma-separated sequence of top-level objects (implicit array).
+    ///
+    /// Returns `true` when the input starts with `{`, is long enough, and
+    /// contains at least 3 consecutive `{…}` objects separated by optional
+    /// commas — the repairer then wraps them in `[…]`.
     pub(super) fn is_implicit_object_sequence(&self) -> bool {
         if self.i >= self.n || self.chars[self.i] != '{' {
             return false;

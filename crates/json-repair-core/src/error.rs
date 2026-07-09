@@ -1,3 +1,5 @@
+//! Error type for the JSON repair process.
+
 use std::fmt;
 
 /// Error type for JSON repair failures.

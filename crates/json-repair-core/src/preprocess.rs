@@ -1,3 +1,12 @@
+//! Input pre-processing before the main repair pass.
+//!
+//! Transforms common LLM output patterns that the streaming repairer cannot
+//! handle efficiently in a single pass:
+//! - `fix_colon_in_key`: split `"key:value"` → `"key":"value"` enclosed in a
+//!   quoted string followed by `,`/`}`
+//! - `fix_mixed_quotes`: normalise `','word":"` boundary (single→double quote
+//!   mix) to `","word":"` so the parser sees a key after a comma
+
 use std::borrow::Cow;
 
 /// Quick byte-level check: is there a quoted string containing `:` followed by `,` or `}`?

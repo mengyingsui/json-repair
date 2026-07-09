@@ -1,3 +1,5 @@
+//! String parsing with embedded-quote detection and escape handling.
+
 use std::fmt::Write;
 
 use super::{ParserState, Repairer};
@@ -30,6 +32,11 @@ enum BodyAction {
 }
 
 impl Repairer {
+    /// Emit the escaped form of `ch` after a `\` was consumed.
+    ///
+    /// Valid JSON escapes are preserved; `\uXXXX` is validated (lone
+    /// surrogates become `\ufffd`); control chars become `\uXXXX`; anything
+    /// else is emitted as `\\` + the literal char.
     pub(super) fn emit_escape(&mut self, ch: char) {
         if is_valid_escape(ch) {
             self.emit_char('\\');
@@ -138,6 +145,24 @@ impl Repairer {
         }
     }
 
+    /// Decide whether the `"` at `self.i` is a real string terminator.
+    ///
+    /// Looks ahead past optional whitespace and returns `true` when the next
+    /// char is one of:
+    /// - `,` `}` `]` `\n` — structural punctuation (with sub-checks for `,`
+    ///   and the embedded-quote guard, see below)
+    /// - `"` — an immediately following quote (empty next value or `""…""")
+    /// - `:` `{` `[` — but only when `expect_key` is set (object key context)
+    /// - A bare word followed by `"` then `:` — unquoted key detection
+    ///
+    /// **Embedded-quote guard** (for `]`/`}` only): a `"` followed by brackets
+    /// that cannot be a real container-closer is treated as an unescaped quote
+    /// inside the string value, not a terminator.  Two sub-cases:
+    /// - Mismatched bracket (not the innermost open container) → embedded.
+    /// - Matching bracket: scan ahead for a later `"`+`,`/`}`/`]` terminator
+    ///   and verify the container genuinely closes after it, using a
+    ///   string-aware bracket balance (brackets inside quoted junk don't
+    ///   count) and a `:`-for-objects check.
     pub(super) fn is_closing_quote(&self) -> bool {
         let mut j = self.i + 1;
         while j < self.n && matches!(self.chars[j], ' ' | '\t' | '\r') {
@@ -279,6 +304,7 @@ impl Repairer {
         false
     }
 
+    /// Parse a double-quoted JSON string, handling embedded quotes and escapes.
     pub(super) fn parse_string(&mut self) {
         self.emit_char('"');
         self.state = ParserState::InString;
@@ -359,6 +385,7 @@ impl Repairer {
         self.emit_char('"');
     }
 
+    /// Parse a triple-quoted (`"""…"""`) string into a normal JSON string.
     pub(super) fn parse_triple_string(&mut self) {
         self.i += 3;
         self.emit_char('"');
@@ -393,6 +420,7 @@ impl Repairer {
         );
     }
 
+    /// Parse a single-quoted (`'…'`) string into a double-quoted JSON string.
     pub(super) fn parse_single_quoted_string(&mut self) {
         self.emit_char('"');
         self.state = ParserState::InString;

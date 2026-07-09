@@ -1,3 +1,18 @@
+//! Streaming JSON repairer state machine and core types.
+//!
+//! This module implements the single-pass repair algorithm. The top-level
+//! [`Repairer`](self::Repairer) struct holds the input/parse state and produces
+//! repaired JSON via [`Repairer::repair`](self::Repairer::repair). Sub-modules
+//! handle specific repair concerns:
+//!
+//! - `comment` — inline and block comment removal
+//! - `junk` — trailing/comma junk handling
+//! - `keys` — unquoted key parsing
+//! - `literal` — unquoted `true`/`false`/`null` / `Infinity` / `NaN`
+//! - `number` — number parsing and normalisation
+//! - `string` — string parsing with embedded-quote detection
+//! - `structure` — object/array frame management
+
 mod comment;
 mod junk;
 mod keys;
@@ -10,37 +25,70 @@ use std::fmt::Write;
 
 use crate::error::JsonRepairError;
 
+/// Maximum nesting depth for objects/arrays before the repairer gives up.
 const MAX_PARSE_DEPTH: usize = 512;
 
+/// Current parser state for the streaming string-state machine.
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum ParserState {
+    /// Outside any string; normal structural parsing.
     Normal,
+    /// Inside a string body (between opening and closing quotes).
     InString,
+    /// Just consumed a `\`; the next char is an escape payload.
     InStringEscaped,
 }
 
+/// Stack frame for the iterative (non-recursive) parse loop.
+///
+/// Each variant represents a "come back here after the current value is
+/// fully parsed" resumption point.  The main loop pops frames and dispatches
+/// to the corresponding `resume_*` method.
 pub(crate) enum ParseFrame {
+    /// Parse a fresh value (the entry point for any JSON value).
     Value,
+    /// Resume an object loop after a member value completes.
     ResumeObject { prev_expect: bool },
+    /// Resume an array loop after an element completes.
     ResumeArray,
+    /// Resume an implicit-array loop (comma-separated top-level objects).
     ResumeImplicitArray { first: bool },
 }
 
+/// Single-pass streaming JSON repairer.
+///
+/// Holds the input char slice, output buffer, bracket stack, and parse
+/// state.  The [`Repairer::repair`](self::Repairer::repair) method drives the
+/// full repair; all other methods are internal helpers called from it.
 pub(crate) struct Repairer {
+    /// Input text decomposed into a `Vec<char>` for O(1) indexing.
     chars: Vec<char>,
+    /// Length of `chars` (cached to avoid repeated `.len()` calls).
     n: usize,
+    /// Current read cursor into `chars`.
     i: usize,
+    /// Repaired JSON output buffer.
     out: String,
+    /// Stack of expected closing brackets (`}` or `]`) for open containers.
     brackets: Vec<char>,
+    /// Whether the parser expects a key (inside an object, before `:`).
     expect_key: bool,
+    /// Whether a value was just emitted (used for comma insertion logic).
     just_emitted_value: bool,
+    /// Byte length of `out` (cached; `String::len()` is O(1) but this avoids
+    /// re-fetching and serves as a sync invariant via `debug_assert_eq!`).
     out_chars: usize,
+    /// Byte offset in `out` of the last position at depth 0 (for suffix
+    /// junk trimming).
     last_depth0_pos: usize,
+    /// Deferred error (set by helpers, checked by the main loop).
     error: Option<JsonRepairError>,
+    /// Current string-state-machine state.
     state: ParserState,
 }
 
 impl Repairer {
+    /// Create a new repairer for `text`, pre-decomposing it into chars.
     pub(crate) fn new(text: &str) -> Self {
         let chars: Vec<char> = text.chars().collect();
         let n = chars.len();
@@ -59,6 +107,7 @@ impl Repairer {
         }
     }
 
+    /// Peek at the char `offset` positions ahead of the cursor (`\0` at EOF).
     fn peek(&self, offset: usize) -> char {
         let pos = self.i + offset;
         if pos < self.n { self.chars[pos] } else { '\0' }
@@ -86,6 +135,7 @@ impl Repairer {
         true
     }
 
+    /// Append a single char to `out` and update the byte counter.
     fn emit_char(&mut self, c: char) {
         self.out.push(c);
         self.out_chars += c.len_utf8();
@@ -96,6 +146,7 @@ impl Repairer {
         );
     }
 
+    /// Advance `self.i` past ASCII whitespace.
     fn skip_ws(&mut self) {
         while self.i < self.n && self.chars[self.i].is_ascii_whitespace() {
             self.i += 1;
@@ -125,6 +176,7 @@ impl Repairer {
         self.out_chars += 6;
     }
 
+    /// Pop and emit all remaining open brackets (close truncated containers).
     fn close_brackets(&mut self) {
         while let Some(b) = self.brackets.pop() {
             self.trim_trailing_comma();
@@ -141,6 +193,7 @@ impl Repairer {
         );
     }
 
+    /// Append a `&str` to `out` and update the byte counter.
     fn emit_str(&mut self, s: &str) {
         self.out.push_str(s);
         self.out_chars += s.len();
@@ -228,6 +281,11 @@ impl Repairer {
         }
     }
 
+    /// Run the full single-pass repair on the input text.
+    ///
+    /// Returns `Ok(valid_json)` on success, or `Err` if the input is
+    /// catastrophically malformed (e.g. parse depth exceeded).  In debug
+    /// builds, the result is additionally validated as parseable JSON.
     pub(crate) fn repair(&mut self) -> Result<String, JsonRepairError> {
         self.skip_prefix_junk();
         if self.i >= self.n {
@@ -304,6 +362,8 @@ impl Repairer {
 }
 
 impl Repairer {
+    /// Check that every `{`/`[` in `s` has a matching `}`/`]`, respecting
+    /// string boundaries and escape sequences.  Used only in debug builds.
     #[cfg_attr(not(debug_assertions), allow(dead_code))]
     fn is_output_balanced(s: &str) -> bool {
         let mut stack = vec![];

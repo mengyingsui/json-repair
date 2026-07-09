@@ -1,8 +1,10 @@
+//! Bareword literal parsing (`true`, `false`, `null`, `Infinity`, `NaN`).
+
 use super::Repairer;
 
 impl Repairer {
     /// Case-insensitive prefix match against a pattern, starting at `self.i`.
-    /// Returns the length of the match (pat len) or 0 if no match.
+    /// Returns `true` if the next characters (case-insensitively) equal `pat`.
     #[inline]
     fn match_lit(&self, pat: &str) -> bool {
         let plen = pat.len();
@@ -14,6 +16,9 @@ impl Repairer {
             .all(|(j, p)| self.chars[self.i + j].to_ascii_lowercase() == p as char)
     }
 
+    /// Parse a bareword literal (`true`/`false`/`null`/`none`/`undefined`/
+    /// `NaN`/`Infinity`), emitting the JSON equivalent.  Falls back to
+    /// `parse_unquoted_value` if no literal matches.
     pub(super) fn parse_literal(&mut self) {
         if self.match_lit("true") {
             self.emit_str("true");

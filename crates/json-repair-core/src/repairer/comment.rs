@@ -1,6 +1,9 @@
+//! Inline and block comment removal (`//`, `/* … */`, `#`, `--`).
+
 use super::Repairer;
 
 impl Repairer {
+    /// Skip a comment starting at `self.i` (`//`, `/* … */`, `#`, `--`).
     pub(super) fn skip_comment(&mut self) {
         if self.peek_is("//") {
             while self.i < self.n && self.chars[self.i] != '\n' {

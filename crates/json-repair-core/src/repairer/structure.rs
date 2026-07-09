@@ -1,3 +1,5 @@
+//! Object/array frame management and value resume logic.
+
 use super::{ParseFrame, Repairer};
 
 /// Whether `ch` can start a JSON value (string, number, literal, object, array).
@@ -206,6 +208,8 @@ impl Repairer {
         self.array_loop(stack, false);
     }
 
+    /// Array loop: processes one element at a time.
+    /// Returns when the array is complete or a nested-value parse is needed.
     pub(super) fn array_loop(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
         loop {
             self.skip_ws();
@@ -286,6 +290,7 @@ impl Repairer {
         }
     }
 
+    /// Resume an implicit-array loop after a top-level object completes.
     pub(super) fn resume_implicit_array(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
         self.just_emitted_value = true;
         self.skip_ws();
@@ -295,6 +300,8 @@ impl Repairer {
         self.implicit_array_loop(stack, first);
     }
 
+    /// Implicit-array loop: emit comma separators between top-level objects
+    /// and close the synthetic `]` when done.
     pub(super) fn implicit_array_loop(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
         self.skip_ws();
         if self.i < self.n && self.chars[self.i] == '{' {

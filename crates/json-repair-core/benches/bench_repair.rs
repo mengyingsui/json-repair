@@ -4,6 +4,8 @@ use std::path::Path;
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use serde::Deserialize;
 
+/// One entry from `bench_data.jsonl`: a labelled malformed-JSON input and
+/// whether it is expected to repair to valid JSON.
 #[derive(Deserialize)]
 #[allow(dead_code)]
 struct BenchEntry {
@@ -12,6 +14,7 @@ struct BenchEntry {
     expected_valid: bool,
 }
 
+/// Load all benchmark entries from `tests/cases/bench_data.jsonl`.
 fn load_entries() -> Vec<BenchEntry> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/cases/bench_data.jsonl");
     let content = fs::read_to_string(&path).unwrap();
@@ -22,6 +25,8 @@ fn load_entries() -> Vec<BenchEntry> {
         .collect()
 }
 
+/// Criterion benchmark: repair each `bench_data.jsonl` entry and validate
+/// the result parses as JSON.
 fn bench_repair(c: &mut Criterion) {
     let entries = load_entries();
     let mut group = c.benchmark_group("json_repair");
