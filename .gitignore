@@ -158,3 +158,6 @@ crates/json-repair-core/fuzz/corpus/
 
 # CodeGraph local index (machine-specific)
 .codegraph/
+
+# IDE
+.idea/

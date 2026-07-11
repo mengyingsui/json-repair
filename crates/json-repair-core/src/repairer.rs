@@ -58,8 +58,8 @@ pub(crate) enum ParseFrame {
 /// Single-pass streaming JSON repairer.
 ///
 /// Holds the input char slice, output buffer, bracket stack, and parse
-/// state.  The [`Repairer::repair`](self::Repairer::repair) method drives the
-/// full repair; all other methods are internal helpers called from it.
+/// state.  The [`Repairer::repair`] method drives the full repair; all
+/// other methods are internal helpers called from it.
 pub(crate) struct Repairer {
     /// Input text decomposed into a `Vec<char>` for O(1) indexing.
     chars: Vec<char>,

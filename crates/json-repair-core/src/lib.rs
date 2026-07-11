@@ -1,5 +1,7 @@
 //! Core library for repairing malformed JSON output from LLMs.
 //!
+//! The quickest way to repair JSON is [`repair_json`].
+//!
 //! This crate provides a single-pass streaming repairer that handles common
 //! JSON errors produced by large language models:
 //! - Missing quotes around keys/values
@@ -10,6 +12,13 @@
 //! - Unquoted literals (`true`, `false`, `null`)
 //! - Single-line and block comments (`//`, `/* ... */`, `#`, `--`)
 //! - Consecutive colons or space-separated keys
+//!
+//! # Features
+//!
+//! - **`serde-validate`** *(default)* — Uses `serde_json` to fast-path inputs
+//!   that are already valid JSON, skipping the repairer entirely.  Disable to
+//!   remove the `serde_json` dependency at the cost of always running the full
+//!   repair pass.
 #![deny(missing_docs)]
 
 /// Errors produced during JSON repair.
