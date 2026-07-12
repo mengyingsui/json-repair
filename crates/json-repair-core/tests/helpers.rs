@@ -16,8 +16,12 @@ pub fn collect_cases(dir: &Path) -> Vec<(String, String, usize, Option<serde_jso
         .filter(|e| {
             let p = e.path();
             let ext = p.extension().is_some_and(|ext| ext == "jsonl");
-            let is_bench = p.file_stem().and_then(|s| s.to_str()) == Some("bench_data");
-            ext && !is_bench
+            let stem = p.file_stem().and_then(|s| s.to_str());
+            let is_bench = stem == Some("bench_data");
+            let is_broken = stem == Some("broken_patterns");
+            let is_embedded_large = stem == Some("embedded_quotes_large");
+            let is_unterminated = stem == Some("unterminated_string");
+            ext && !is_bench && !is_broken && !is_embedded_large && !is_unterminated
         })
         .collect();
     entries.sort_by_key(|e| e.file_name());

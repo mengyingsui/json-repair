@@ -21,8 +21,6 @@ mod number;
 mod string;
 mod structure;
 
-use std::fmt::Write;
-
 use crate::error::JsonRepairError;
 
 /// Maximum nesting depth for objects/arrays before the repairer gives up.
@@ -34,6 +32,9 @@ const STACK_OVERHEAD: usize = 8;
 
 /// Capacity of the bracket and parse-frame stacks.
 const STACK_CAPACITY: usize = MAX_PARSE_DEPTH + STACK_OVERHEAD;
+
+/// Initial capacity for the output buffer (capped at 256 KiB).
+const INITIAL_OUTPUT_CAP: usize = 256 * 1024;
 
 /// Current parser state for the streaming string-state machine.
 #[derive(Clone, Copy, PartialEq)]
@@ -48,19 +49,21 @@ pub(crate) enum ParserState {
 
 /// Stack frame for the iterative (non-recursive) parse loop.
 ///
-/// Each variant represents a "come back here after the current value is
-/// fully parsed" resumption point.  The main loop pops frames and dispatches
-/// to the corresponding `resume_*` method.
+/// Each variant carries only the state needed to resume when the frame is
+/// popped — no global flags on `Repairer` are consulted or mutated.
 #[derive(Clone, Copy)]
 pub(crate) enum ParseFrame {
     /// Parse a fresh value (the entry point for any JSON value).
     Value,
-    /// Resume an object loop after a member value completes.
-    ResumeObject { prev_expect: bool },
-    /// Resume an array loop after an element completes.
-    ResumeArray,
-    /// Resume an implicit-array loop (comma-separated top-level objects).
-    ResumeImplicitArray { first: bool },
+    /// Process the next element of an object.  `usize` = number of elements
+    /// already processed (used for comma insertion: `count > 0` → not first).
+    ObjectLoop(usize),
+    /// Process the next element of an array.  `usize` = number of elements
+    /// already processed (comma logic: `count > 0`).
+    ArrayLoop(usize),
+    /// Process the next top-level object in an implicit-array sequence.
+    /// `usize` = number of objects already emitted.
+    ImplicitArrayLoop(usize),
 }
 
 /// Single-pass streaming JSON repairer.
@@ -81,10 +84,6 @@ pub(crate) struct Repairer {
     brackets: [char; STACK_CAPACITY],
     /// Number of valid entries in `brackets`.
     brackets_len: usize,
-    /// Whether the parser expects a key (inside an object, before `:`).
-    expect_key: bool,
-    /// Whether a value was just emitted (used for comma insertion logic).
-    just_emitted_value: bool,
 
     /// Byte offset in `out` of the last position at depth 0 (for suffix
     /// junk trimming).
@@ -93,9 +92,13 @@ pub(crate) struct Repairer {
     error: Option<JsonRepairError>,
     /// Current string-state-machine state.
     state: ParserState,
-    /// Cached position of the `"` after the bareword lookahead in
-    /// `is_closing_quote`, reused by `parse_string` to avoid a redundant scan.
-    lookahead_pos: Option<usize>,
+}
+
+/// Decode a hex nibble (0–15) into its ASCII hex character.
+#[inline]
+fn hex_nibble(v: u32) -> char {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    HEX[(v & 0xF) as usize] as char
 }
 
 impl Repairer {
@@ -107,22 +110,13 @@ impl Repairer {
             text,
             n,
             i: 0,
-            out: String::with_capacity(n.min(1 << 18)),
+            out: String::with_capacity(n.min(INITIAL_OUTPUT_CAP)),
             brackets: ['\0'; STACK_CAPACITY],
             brackets_len: 0,
-            expect_key: false,
-            just_emitted_value: false,
-
             last_depth0_pos: 0,
             error: None,
             state: ParserState::Normal,
-            lookahead_pos: None,
         }
-    }
-
-    /// Peek at the char `offset` positions ahead of the cursor (`\0` at EOF).
-    fn peek(&self, offset: usize) -> char {
-        self.text[self.i..].chars().nth(offset).unwrap_or('\0')
     }
 
     /// Char at the current cursor position (`\0` at EOF).
@@ -187,18 +181,13 @@ impl Repairer {
         }
     }
 
-    /// Whether a comma separator is needed before the next element.
+    /// Whether a comma separator is needed in the output before the next
+    /// element, based solely on the last byte of `out` — a pure byte check
+    /// with no implicit contracts.
     ///
-    /// Encapsulates the common conditions shared by `object_loop` and
-    /// `array_loop`: not the first element, a value was just emitted,
-    /// and the output does not already end with a separator or opening
-    /// bracket.  Callers add their own structural-char checks (e.g.
-    /// `ch != ']'` in arrays) on top of this.
+    /// The caller is responsible for checking element count (e.g. `count > 0`).
     #[inline]
-    fn needs_separator(&self, first: bool) -> bool {
-        if first || !self.just_emitted_value {
-            return false;
-        }
+    fn needs_comma_in_output(&self) -> bool {
         !matches!(self.out.as_bytes().last(), Some(b',' | b'{' | b'['))
     }
 
@@ -206,13 +195,17 @@ impl Repairer {
     /// `self.out`.
     #[inline]
     fn emit_unicode_escape(&mut self, code: u32) {
-        let _ = write!(self.out, "\\u{:04x}", code);
+        self.out.push_str("\\u");
+        self.out.push(hex_nibble(code >> 12));
+        self.out.push(hex_nibble(code >> 8));
+        self.out.push(hex_nibble(code >> 4));
+        self.out.push(hex_nibble(code));
     }
 
     /// Push a closing bracket onto the bracket stack.
     #[inline]
     fn brackets_push(&mut self, c: char) {
-        debug_assert!(self.brackets_len < STACK_CAPACITY, "bracket stack overflow");
+        assert!(self.brackets_len < STACK_CAPACITY, "bracket stack overflow");
         self.brackets[self.brackets_len] = c;
         self.brackets_len += 1;
     }
@@ -255,7 +248,7 @@ impl Repairer {
             self.trim_trailing_comma();
             self.emit_char(b);
         }
-        debug_assert!(
+        assert!(
             self.brackets_len == 0,
             "close_brackets: unclosed brackets remain"
         );
@@ -268,7 +261,11 @@ impl Repairer {
     }
 
     /// Parse one value (primitive, string, number, object, array).
-    /// For objects/arrays, pushes the iteration frames onto the stack.
+    ///
+    /// Containers (`{` / `[`) push an iteration frame (`ObjectLoop` /
+    /// `ArrayLoop`) and return — they are **not** processed recursively.
+    /// Structural closers/separators (`}`/`]`/`,`) at a value position are
+    /// orphans and produce `null`.
     fn run_value(&mut self, stack: &mut Stack) {
         self.skip_ws();
         if self.i >= self.n {
@@ -282,22 +279,20 @@ impl Repairer {
                 self.emit_char('{');
                 self.brackets_push('}');
                 self.i += 1;
-                let prev_expect = self.expect_key;
-                self.expect_key = true;
-                self.object_loop(stack, prev_expect, true);
+                stack.push(ParseFrame::ObjectLoop(0));
             }
             '[' => {
                 self.emit_char('[');
                 self.brackets_push(']');
                 self.i += 1;
-                self.array_loop(stack, true);
+                stack.push(ParseFrame::ArrayLoop(0));
             }
             '"' => {
                 if self.peek_is("\"\"\"") && self.text[self.i + 3..].contains("\"\"\"") {
                     self.parse_triple_string();
                     return;
                 }
-                self.parse_string();
+                self.parse_string(false);
             }
             '\'' => self.parse_single_quoted_string(),
             't' | 'f' | 'n' | 'T' | 'F' | 'N' | 'i' | 'I' | 'u' | 'U' => self.parse_literal(),
@@ -318,18 +313,7 @@ impl Repairer {
                 self.emit_str("null");
             }
             _ => {
-                if self.expect_key && (ch.is_ascii_alphabetic() || ch == '_') {
-                    self.parse_unquoted_key();
-                    self.skip_ws();
-                    if self.i < self.n && self.cur() == ':' {
-                        self.emit_char(':');
-                        self.i += 1;
-                    } else if self.i < self.n && self.cur() != ':' {
-                        self.emit_char(':');
-                    }
-                    self.expect_key = false;
-                    stack.push(ParseFrame::Value);
-                } else if ch.is_ascii_alphabetic() || ch == '_' {
+                if ch.is_ascii_alphabetic() || ch == '_' {
                     self.parse_unquoted_value();
                 } else {
                     self.i += ch.len_utf8();
@@ -345,7 +329,7 @@ impl Repairer {
     /// catastrophically malformed (e.g. parse depth exceeded).  In debug
     /// builds, the result is additionally validated as parseable JSON.
     pub(crate) fn repair(&mut self) -> Result<String, JsonRepairError> {
-        self.skip_prefix_junk();
+        self.normalize_preamble();
         if self.i >= self.n {
             return Ok(String::new());
         }
@@ -354,7 +338,7 @@ impl Repairer {
 
         if self.is_implicit_object_sequence() {
             self.emit_char('[');
-            stack.push(ParseFrame::ResumeImplicitArray { first: true });
+            stack.push(ParseFrame::ImplicitArrayLoop(0));
         } else {
             stack.push(ParseFrame::Value);
         }
@@ -377,15 +361,9 @@ impl Repairer {
 
             match frame {
                 ParseFrame::Value => self.run_value(&mut stack),
-                ParseFrame::ResumeObject { prev_expect } => {
-                    self.resume_object(&mut stack, prev_expect);
-                }
-                ParseFrame::ResumeArray => {
-                    self.resume_array(&mut stack);
-                }
-                ParseFrame::ResumeImplicitArray { first } => {
-                    self.resume_implicit_array(&mut stack, first);
-                }
+                ParseFrame::ObjectLoop(count) => self.object_loop(&mut stack, count),
+                ParseFrame::ArrayLoop(count) => self.array_loop(&mut stack, count),
+                ParseFrame::ImplicitArrayLoop(count) => self.implicit_array_loop(&mut stack, count),
             }
         }
 
@@ -396,36 +374,61 @@ impl Repairer {
         self.close_brackets();
         self.skip_suffix_junk();
         let out = std::mem::take(&mut self.out);
-        #[cfg(debug_assertions)]
-        {
-            if !Repairer::is_output_balanced(&out) {
-                return Err(JsonRepairError {
-                    message: "repaired output has unbalanced brackets".to_string(),
-                    position: None,
-                });
-            }
-            const MAX_VALIDATION_DEPTH: usize = 100;
-            let bracket_depth = out.chars().filter(|&c| c == '{' || c == '[').count();
-            if bracket_depth <= MAX_VALIDATION_DEPTH {
-                if let Err(e) = serde_json::from_str::<serde_json::Value>(&out) {
-                    debug_assert!(
-                        false,
-                        "repair result is not valid JSON (depth={}): {}\n---\n{}\n---",
-                        bracket_depth, e, out
-                    );
-                }
-            }
+        if !Self::is_output_balanced(&out) {
+            return Err(JsonRepairError {
+                message: "repaired output has unbalanced brackets".to_string(),
+                position: None,
+            });
         }
+        Self::debug_validate_output(&out)?;
         Ok(out)
     }
 }
 
 impl Repairer {
+    /// Debug-only validation: for shallow output, parse with serde_json.
+    /// Balance is already enforced by `repair()` — this only catches
+    /// cases where valid-JSON output still fails serde_json parsing.
+    #[cfg(debug_assertions)]
+    fn debug_validate_output(out: &str) -> Result<(), JsonRepairError> {
+        Self::validate_serde_json(out);
+        Ok(())
+    }
+
+    /// Non-debug stub (always succeeds — balance is already checked in
+    /// `repair()` before calling this).
+    #[cfg(not(debug_assertions))]
+    fn debug_validate_output(_out: &str) -> Result<(), JsonRepairError> {
+        Ok(())
+    }
+
+    /// When `serde-validate` is enabled, parse the output with serde_json
+    /// as a sanity check (triggers a panic in debug builds on failure).
+    /// Only compiled in debug builds — release mode uses the no-op stub.
+    #[cfg(all(feature = "serde-validate", debug_assertions))]
+    fn validate_serde_json(out: &str) {
+        const MAX_VALIDATION_DEPTH: usize = 100;
+        let bracket_depth = out.chars().filter(|&c| c == '{' || c == '[').count();
+        if bracket_depth <= MAX_VALIDATION_DEPTH {
+            if let Err(e) = serde_json::from_str::<serde_json::Value>(out) {
+                debug_assert!(
+                    false,
+                    "repair result is not valid JSON (depth={}): {}\n---\n{}\n---",
+                    bracket_depth, e, out
+                );
+            }
+        }
+    }
+
+    /// Stub when serde-validate is disabled.
+    #[cfg(not(feature = "serde-validate"))]
+    fn validate_serde_json(_out: &str) {}
+
     /// Check that every `{`/`[` in `s` has a matching `}`/`]`, respecting
-    /// string boundaries and escape sequences.  Used only in debug builds.
-    #[cfg_attr(not(debug_assertions), allow(dead_code))]
+    /// string boundaries and escape sequences.
     fn is_output_balanced(s: &str) -> bool {
-        let mut stack = vec![];
+        let mut stack: [char; STACK_CAPACITY] = ['\0'; STACK_CAPACITY];
+        let mut len = 0usize;
         let mut in_string = false;
         let mut esc = false;
         for c in s.chars() {
@@ -445,15 +448,24 @@ impl Repairer {
                 continue;
             }
             match c {
-                '{' => stack.push('}'),
-                '[' => stack.push(']'),
-                '}' | ']' if stack.pop() != Some(c) => {
+                '{' | '[' => {
+                    if len < STACK_CAPACITY {
+                        stack[len] = if c == '{' { '}' } else { ']' };
+                        len += 1;
+                    } else {
+                        return false;
+                    }
+                }
+                '}' | ']' if len == 0 || stack[len - 1] != c => {
                     return false;
+                }
+                '}' | ']' => {
+                    len -= 1;
                 }
                 _ => {}
             }
         }
-        stack.is_empty()
+        len == 0
     }
 }
 
@@ -473,7 +485,7 @@ impl Stack {
 
     #[inline]
     fn push(&mut self, frame: ParseFrame) {
-        debug_assert!(self.len < STACK_CAPACITY);
+        assert!(self.len < STACK_CAPACITY);
         self.frames[self.len] = Some(frame);
         self.len += 1;
     }

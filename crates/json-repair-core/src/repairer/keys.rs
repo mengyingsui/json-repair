@@ -11,7 +11,7 @@ impl Repairer {
         }
         let ch = self.cur();
         if ch == '"' {
-            self.parse_string();
+            self.parse_string(true);
         } else if ch == '\'' {
             self.parse_single_quoted_string();
         } else {
@@ -37,7 +37,7 @@ impl Repairer {
     pub(super) fn parse_unquoted_key(&mut self) {
         self.emit_char('"');
         self.emit_bare_word(|ch| {
-            (ch as u32) < 128
+            ch.is_ascii()
                 && matches!(
                     ch,
                     ' ' | '\t' | '\r' | '\n' | ':' | '{' | '}' | '[' | ']' | ',' | '"' | '\'' | '/'
@@ -55,6 +55,5 @@ impl Repairer {
         self.emit_char('"');
         self.emit_bare_word(|ch| matches!(ch, ',' | '}' | ']'));
         self.emit_char('"');
-        self.just_emitted_value = true;
     }
 }

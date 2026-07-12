@@ -1,7 +1,5 @@
 //! String parsing with embedded-quote detection and escape handling.
 
-use std::fmt::Write;
-
 use super::{ParserState, Repairer};
 
 /// Control characters (U+0000–U+001F) must be escaped in JSON strings.
@@ -27,22 +25,28 @@ impl Repairer {
         if is_valid_escape(ch) {
             self.emit_char('\\');
             self.emit_char(ch);
-        } else if ch == 'u'
-            && self.i + 5 <= self.n
-            && self.text.as_bytes()[self.i + 1..self.i + 5]
-                .iter()
-                .all(|b| b.is_ascii_hexdigit())
-        {
+        } else if ch == 'u' && self.i + 5 <= self.n {
             let mut hex_val: u32 = 0;
+            let mut all_hex = true;
             for k in 1..=4 {
-                hex_val = (hex_val << 4) | self.char_at(self.i + k).to_digit(16).unwrap_or(0);
+                if let Some(d) = self.char_at(self.i + k).to_digit(16) {
+                    hex_val = (hex_val << 4) | d;
+                } else {
+                    all_hex = false;
+                    break;
+                }
             }
-            if (SURROGATE_LO..=SURROGATE_HI).contains(&hex_val) {
-                let _ = write!(self.out, "\\ufffd");
-                self.i += 4;
+            if all_hex {
+                if (SURROGATE_LO..=SURROGATE_HI).contains(&hex_val) {
+                    self.emit_str("\\ufffd");
+                    self.i += 4;
+                } else {
+                    self.emit_char('\\');
+                    self.emit_char('u');
+                }
             } else {
-                self.emit_char('\\');
-                self.emit_char('u');
+                self.emit_str("\\\\");
+                self.emit_char(ch);
             }
         } else if (ch as u32) < CONTROL_CHAR_MAX {
             self.emit_unicode_escape(ch as u32);
@@ -127,31 +131,52 @@ impl Repairer {
 
     /// Check whether the `"` at `self.i` is a real string terminator.
     ///
-    /// May have side effects: caches the bareword lookahead position in
-    /// `self.lookahead_pos` so `parse_string` can reuse it.
+    /// Returns `(is_closing, bareword_quote_pos)`:
+    /// - `is_closing` — `true` when the `"` terminates the string
+    /// - `bareword_quote_pos` — the position of the `"` after a bareword
+    ///   lookahead (used by `try_split_bareword_after_value` to avoid a
+    ///   redundant scan)
     ///
-    /// Looks ahead past optional whitespace and returns `true` when the next
-    /// char is one of:
+    /// Looks ahead past optional whitespace.  The `is_closing` element is
+    /// `true` when the next char is one of:
     /// - `,` `}` `]` `\n` — structural punctuation (with sub-checks for `,`
     ///   and the embedded-quote guard, see below)
     /// - `"` — an immediately following quote (empty next value or `""…"""`)
-    /// - `:` `{` `[` — but only when `expect_key` is set (object key context)
+    /// - `:` `{` `[` — but only when `is_key` is set (object key context)
     /// - A bare word followed by `"` then `:` — unquoted key detection
     ///
     /// **Embedded-quote guard** (for `]`/`}` only): a `"` followed by brackets
     /// that cannot be a real container-closer is treated as an unescaped quote
     /// inside the string value, not a terminator.
-    pub(super) fn check_closing_quote(&mut self) -> bool {
+    pub(super) fn check_closing_quote(&self, is_key: bool) -> (bool, Option<usize>) {
+        // Backward scan: when parsing a value string (!is_key), if the
+        // preceding non-whitespace char is `{` or `[`, the `"` is not a
+        // real terminator.  The bracket was emitted as string body (not
+        // pushed to bracket stack), so `is_embedded_bracket_quote` can't
+        // catch this case.
+        if !is_key {
+            let mut p = self.i;
+            while p > 0 {
+                p -= 1;
+                let byte = self.text.as_bytes()[p];
+                if byte == b'{' || byte == b'[' {
+                    return (false, None);
+                }
+                if !matches!(byte, b' ' | b'\t' | b'\r' | b'\n') {
+                    break;
+                }
+            }
+        }
         let mut j = self.i + 1;
         while j < self.n && matches!(self.char_at(j), ' ' | '\t' | '\r') {
             j += 1;
         }
         if j >= self.n {
-            return true;
+            return (true, None);
         }
         let nc = self.char_at(j);
         if matches!(nc, ',' | '}' | ']' | '\n') {
-            if nc == ',' && !self.expect_key {
+            if nc == ',' && !is_key {
                 let k = self.skip_ws_at(j + 1);
                 if k < self.n {
                     let after = self.char_at(k);
@@ -160,20 +185,20 @@ impl Repairer {
                         '"' | '{' | '[' | 't' | 'f' | 'n' | '-' | '}' | ']' | ','
                     ) && !after.is_ascii_digit()
                     {
-                        return false;
+                        return (false, None);
                     }
                 }
             }
             if (nc == ']' || nc == '}') && self.is_embedded_bracket_quote(j, nc) {
-                return false;
+                return (false, None);
             }
-            return true;
+            return (true, None);
         }
         if nc == '"' {
-            return true;
+            return (true, None);
         }
-        if self.expect_key && matches!(nc, ':' | '{' | '[') {
-            return true;
+        if is_key && matches!(nc, ':' | '{' | '[') {
+            return (true, None);
         }
         if nc.is_ascii_alphabetic() || nc == '_' {
             let mut k = j;
@@ -186,15 +211,15 @@ impl Repairer {
             }
             k = self.skip_ws_at(k);
             if k < self.n && self.char_at(k) == '"' {
-                self.lookahead_pos = Some(k);
+                let bp = Some(k);
                 k += 1;
                 k = self.skip_ws_at(k);
                 if k < self.n && self.char_at(k) == ':' {
-                    return true;
+                    return (true, bp);
                 }
             }
         }
-        false
+        (false, None)
     }
 
     /// Check whether a `"` followed by bracket `nc` (`]` or `}`) at
@@ -270,71 +295,112 @@ impl Repairer {
         false
     }
 
+    /// Handle `""` inside a double-quoted string: if the `""` is followed
+    /// by a structural character it was the previous value's closing quote,
+    /// so we keep only `\"` (one escaped quote).  Otherwise, we treat it as
+    /// a `""` inside the string content and escape both quotes.
+    /// Returns `true` if the call consumed the double quote (caller should
+    /// `continue` the main loop).
+    fn handle_double_quote_escape(&mut self) -> bool {
+        if self.i + 1 >= self.n || self.text.as_bytes()[self.i + 1] != b'"' {
+            return false;
+        }
+        self.emit_str("\\\"");
+        self.i += 1;
+        let mut j = self.i + 1;
+        while j < self.n && matches!(self.char_at(j), ' ' | '\t' | '\r') {
+            j += 1;
+        }
+        if j < self.n && matches!(self.char_at(j), ',' | '}' | ']' | ':' | '\n') {
+            return true;
+        }
+        self.i += 1;
+        if self.i < self.n && self.cur() == '"' {
+            self.emit_str("\\\"");
+            self.i += 1;
+        }
+        true
+    }
+
+    /// After `check_closing_quote()` returns `is_closing = true`, and we
+    /// emit the closing `"`, the next character may be a bareword
+    /// (shorthand for a new key).  If the bareword is followed by `"`, the
+    /// `"` we just emitted was actually the closing boundary of a
+    /// mixed-quote pattern — pop it, trim trailing whitespace and any stray
+    /// comma from `self.out`, and re-emit `"`.  The object-loop comma logic
+    /// will insert `,` before the next key when it resumes.
+    /// Returns `true` when the mixed-quote conversion succeeded (caller
+    /// should `return`).
+    fn try_split_bareword_after_value(&mut self, bareword_quote_pos: Option<usize>) -> bool {
+        if self.i + 1 >= self.n {
+            return false;
+        }
+        let nc = self.text.as_bytes()[self.i + 1] as char;
+        if !(nc.is_ascii_alphabetic() || nc == '_') {
+            return false;
+        }
+        let k = bareword_quote_pos.unwrap_or_else(|| {
+            let mut k = self.i + 1;
+            loop {
+                let kc = self.char_at(k);
+                if !(kc.is_alphanumeric() || kc == '_') {
+                    break;
+                }
+                k += kc.len_utf8();
+            }
+            self.skip_ws_at(k)
+        });
+        if k >= self.n || self.char_at(k) != '"' {
+            return false;
+        }
+        let _ = self.out.pop();
+        let trimmed = self
+            .out
+            .trim_end_matches(|c: char| c.is_ascii_whitespace())
+            .len();
+        if trimmed < self.out.len() {
+            self.out.truncate(trimmed);
+        }
+        self.trim_trailing_comma();
+        self.emit_char('"');
+        self.state = ParserState::Normal;
+        true
+    }
+
+    /// Close a string at EOF: restore Normal state and emit closing `"`.
+    #[inline]
+    fn ensure_closing_quote(&mut self) {
+        self.state = ParserState::Normal;
+        self.emit_char('"');
+    }
+
     /// Parse a double-quoted JSON string, handling embedded quotes and escapes.
-    pub(super) fn parse_string(&mut self) {
+    ///
+    /// `is_key` controls which structural characters are treated as string
+    /// terminators — `:`/`{`/`[` are valid terminators for keys but not
+    /// for values.
+    pub(super) fn parse_string(&mut self, is_key: bool) {
         self.emit_char('"');
         self.state = ParserState::InString;
         self.i += 1;
         while self.i < self.n {
             let ch = self.cur();
             if ch == '"' {
-                if self.peek(1) == '"' {
-                    self.emit_str("\\\"");
-                    self.i += 1;
-                    let mut j = self.i + 1;
-                    while j < self.n && matches!(self.char_at(j), ' ' | '\t' | '\r') {
-                        j += 1;
-                    }
-                    if j < self.n && matches!(self.char_at(j), ',' | '}' | ']' | ':' | '\n') {
-                        continue;
-                    } else {
-                        self.i += 1;
-                        if self.i < self.n && self.cur() == '"' {
-                            self.emit_str("\\\"");
-                            self.i += 1;
-                        }
-                        continue;
-                    }
+                if self.handle_double_quote_escape() {
+                    continue;
                 }
-                if self.check_closing_quote() {
+                let (is_closing, bareword_pos) = self.check_closing_quote(is_key);
+                if is_closing {
                     self.emit_char('"');
                     self.state = ParserState::Normal;
-                    let nc = self.peek(1);
-                    if nc.is_ascii_alphabetic() || nc == '_' {
-                        let k = self.lookahead_pos.take().unwrap_or_else(|| {
-                            let mut k = self.i + 1;
-                            loop {
-                                let kc = self.char_at(k);
-                                if !(kc.is_alphanumeric() || kc == '_') {
-                                    break;
-                                }
-                                k += kc.len_utf8();
-                            }
-                            self.skip_ws_at(k)
-                        });
-                        if k < self.n && self.char_at(k) == '"' {
-                            let _ = self.out.pop();
-                            let trimmed = self
-                                .out
-                                .trim_end_matches(|c: char| c.is_ascii_whitespace())
-                                .len();
-                            if trimmed < self.out.len() {
-                                self.out.truncate(trimmed);
-                            }
-                            self.trim_trailing_comma();
-                            self.emit_char('"');
-                            self.state = ParserState::Normal;
-                            return;
-                        }
+                    if self.try_split_bareword_after_value(bareword_pos) {
+                        return;
                     }
                     self.i += 1;
-                    debug_assert!(
+                    assert!(
                         self.out.ends_with('"'),
                         "parse_string: output missing closing quote"
                     );
-                    if !self.out.ends_with('"') {
-                        self.emit_char('"');
-                    }
                     return;
                 } else {
                     self.emit_str("\\\"");
@@ -345,8 +411,7 @@ impl Repairer {
             self.emit_string_body_char(ch, false);
             continue;
         }
-        self.state = ParserState::Normal;
-        self.emit_char('"');
+        self.ensure_closing_quote();
     }
 
     /// Parse a triple-quoted (`"""…"""`) string into a normal JSON string.
@@ -361,7 +426,6 @@ impl Repairer {
                     self.i += 3;
                     self.emit_char('"');
                     self.state = ParserState::Normal;
-                    self.just_emitted_value = true;
                     return;
                 }
             }
@@ -374,11 +438,7 @@ impl Repairer {
             self.emit_string_body_char(ch, false);
             continue;
         }
-        self.state = ParserState::Normal;
-        self.emit_char('"');
-        if !self.out.ends_with('"') {
-            self.emit_char('"');
-        }
+        self.ensure_closing_quote();
     }
 
     /// Parse a single-quoted (`'…'`) string into a double-quoted JSON string.
@@ -397,7 +457,6 @@ impl Repairer {
                     self.emit_char('"');
                     self.state = ParserState::Normal;
                     self.i += 1;
-                    self.just_emitted_value = true;
                     return;
                 } else {
                     self.emit_char('\'');
@@ -413,10 +472,6 @@ impl Repairer {
             self.emit_string_body_char(ch, true);
             continue;
         }
-        self.state = ParserState::Normal;
-        self.emit_char('"');
-        if !self.out.ends_with('"') {
-            self.emit_char('"');
-        }
+        self.ensure_closing_quote();
     }
 }

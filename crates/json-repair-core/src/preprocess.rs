@@ -1,11 +1,12 @@
 //! Input pre-processing before the main repair pass.
 //!
-//! Transforms common LLM output patterns that the streaming repairer cannot
-//! handle efficiently in a single pass:
-//! - `fix_colon_in_key`: split `"key:value"` → `"key":"value"` enclosed in a
-//!   quoted string followed by `,`/`}`
-//! - `fix_mixed_quotes`: normalize `','word":"` boundary (single→double quote
-//!   mix) to `","word":"` so the parser sees a key after a comma
+//! [`preprocess_json`] transforms common LLM quote‑mixing patterns in a single
+//! forward scan — it is called once by [`repair_json`](crate::repair_json).
+//!
+//! The two internal transform steps (mixed‑quote boundary repair and
+//! colon‑in‑key splitting) were previously exposed as `fix_mixed_quotes` /
+//! `fix_colon_in_key`; they are now private implementation details of
+//! `preprocess_json`.
 
 use std::borrow::Cow;
 
@@ -22,166 +23,177 @@ pub(crate) fn char_at(text: &str, pos: usize) -> char {
     }
 }
 
-/// Find the first quoted string containing `:` followed by `,` or `}`.
-/// Returns `Some(open_pos)` where the problematic string starts, or `None`.
-fn needs_colon_fix(text: &str) -> Option<usize> {
-    let bytes = text.as_bytes();
-    let n = bytes.len();
-    let mut i = 0;
-    while i < n {
-        if bytes[i] == b'"' {
-            let open_pos = i;
-            let mut has_colon = false;
-            i += 1;
-            while i < n && bytes[i] != b'"' {
-                if bytes[i] == b':' {
-                    has_colon = true;
-                }
-                i += 1;
-            }
-            if i < n {
-                if has_colon {
-                    let mut j = i + 1;
-                    while j < n && matches!(bytes[j], b' ' | b'\t' | b'\r' | b'\n') {
-                        j += 1;
-                    }
-                    if j < n && matches!(bytes[j], b',' | b'}') {
-                        return Some(open_pos);
-                    }
-                }
-                i += 1;
-            }
-        } else {
-            i += 1;
+/// Detect a mixed-quote boundary `','[bareword]":"` at byte position `pos`.
+/// Returns `Some((bare_start, k))` on match, where `bare_start..k` is the
+/// bareword span.  `None` when no pattern is found.
+#[inline]
+fn try_mixed_quote_boundary(bytes: &[u8], n: usize, pos: usize) -> Option<(usize, usize)> {
+    if pos + 2 < n && bytes[pos] == b'\'' && bytes[pos + 1] == b',' && bytes[pos + 2] == b'\'' {
+        let bare_start = pos + 3;
+        let mut k = bare_start;
+        while k < n && (bytes[k].is_ascii_alphanumeric() || bytes[k] == b'_') {
+            k += 1;
+        }
+        if k > bare_start
+            && k + 2 < n
+            && bytes[k] == b'"'
+            && bytes[k + 1] == b':'
+            && bytes[k + 2] == b'"'
+        {
+            return Some((bare_start, k));
         }
     }
     None
 }
 
-/// Fix the `','word":"` mixed-quote boundary pattern in `text`.
-///
-/// When LLM output uses both `'` and `"` quote styles, a double-quoted string
-/// value may contain `','word":"` where `'word'` was originally a single-quoted
-/// key.  This pre-processing step splits it into `","word":"` so the parser
-/// correctly treats `word` as the next key.
-pub fn fix_mixed_quotes(text: &str) -> Cow<'_, str> {
-    if !text.contains("','") {
-        return Cow::Borrowed(text);
-    }
-    let n = text.len();
-    let mut out = String::with_capacity(n);
-    let mut i = 0;
-    while i < n {
-        let ch = char_at(text, i);
-        if ch == '\''
-            && i + 2 < n
-            && text.as_bytes()[i + 1] == b','
-            && text.as_bytes()[i + 2] == b'\''
-        {
-            let after_comma = i + 3;
-            let mut k = after_comma;
-            while k < n {
-                let kc = char_at(text, k);
-                if !(kc.is_alphanumeric() || kc == '_') {
-                    break;
-                }
-                k += kc.len_utf8();
-            }
-            if k > after_comma
-                && k + 2 < n
-                && text.as_bytes()[k] == b'"'
-                && text.as_bytes()[k + 1] == b':'
-                && text.as_bytes()[k + 2] == b'"'
-            {
-                out.push('"');
-                out.push(',');
-                out.push('"');
-                out.push_str(&text[after_comma..k]);
-                out.push('"');
-                out.push(':');
-                out.push('"');
-                i = k + 3;
-                continue;
-            }
-        }
-        out.push(ch);
-        i += ch.len_utf8();
-    }
-    if out == text {
-        Cow::Borrowed(text)
-    } else {
-        Cow::Owned(out)
-    }
+/// Emit the mixed-quote boundary `","<bareword>":"` into `out`.
+#[inline]
+fn emit_mixed_quote_boundary(out: &mut String, text: &str, bare_start: usize, k: usize) {
+    out.push('"');
+    out.push(',');
+    out.push('"');
+    out.push_str(&text[bare_start..k]);
+    out.push_str("\":\"");
 }
 
-/// Split `"key:value"` into `"key":"value"` when followed by `,` or `}`.
+/// Try to split a colon-in-key string `"key:value"` → `"key":"value"`.
+/// `content` is the string body (between `"` delimiters), `end` is the
+/// position in the input after the closing `"`, `text` / `bytes` / `n`
+/// give the full input.  Writes the fixed span into `out` and returns
+/// `Some(ws+1)` (new `i`) on success.
+#[inline]
+fn try_fix_colon_in_key(
+    content: &str,
+    end: usize,
+    text: &str,
+    bytes: &[u8],
+    n: usize,
+    out: &mut String,
+) -> Option<usize> {
+    let cpos = content.find(':')?;
+    let key = &content[..cpos];
+    let val = &content[cpos + 1..];
+    if key.is_empty()
+        || val.is_empty()
+        || !key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        || !val.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    {
+        return None;
+    }
+    let mut ws = end;
+    while ws < n && bytes[ws].is_ascii_whitespace() {
+        ws += 1;
+    }
+    if ws >= n || !matches!(bytes[ws], b',' | b'}') {
+        return None;
+    }
+    out.push('"');
+    out.push_str(key);
+    out.push_str("\":\"");
+    out.push_str(val);
+    out.push('"');
+    out.push_str(&text[end..ws]);
+    out.push(bytes[ws] as char);
+    Some(ws + 1)
+}
+
+/// Single-pass preprocessor: fixes mixed-quote boundaries AND colon-in-key
+/// patterns in one forward scan.
 ///
-/// Detects quoted strings that contain a colon where the content before the
-/// colon is a valid bare key and the content after is a valid bare value,
-/// and the string is followed by structural punctuation.
-pub fn fix_colon_in_key(text: &str) -> Cow<'_, str> {
-    let Some(open_pos) = needs_colon_fix(text) else {
-        return Cow::Borrowed(text);
-    };
-    let n = text.len();
-    let mut out = String::with_capacity(n);
-    out.push_str(&text[..open_pos]);
-    let mut i = open_pos;
+/// The key insight is that the colon-in-key scanner must not **skip** past
+/// `','` mixed-quote byte positions when it scans for the closing `"` of a
+/// string.  Instead, it examines every byte inside the string, so a
+/// mixed-quote trigger can be detected **before** the colon check
+/// mistakenly uses the bareword's `"` as the string terminator.
+///
+/// Returns `Cow::Borrowed` when neither pattern is found.
+pub(crate) fn preprocess_json(text: &str) -> Cow<'_, str> {
     let bytes = text.as_bytes();
+    let n = bytes.len();
+    let mut out = String::with_capacity(n);
+    let mut i = 0;
+    let mut modified = false;
+
     while i < n {
+        // ── Mixed-quote pattern: ','[bareword]":" ──
+        if let Some((bare_start, k)) = try_mixed_quote_boundary(bytes, n, i) {
+            modified = true;
+            emit_mixed_quote_boundary(&mut out, text, bare_start, k);
+            i = k + 3;
+            continue;
+        }
+
+        // ── Colon-in-key: "…key:value…" followed by , or } ──
+        // Also detects mixed-quote boundaries inside the string content
+        // so the colon check does not eat ',' bytes that belong to the
+        // mixed-quote pattern.
         if bytes[i] == b'"' {
-            let start = i;
-            i += 1;
-            let content_start = i;
+            let string_start = i;
+            let mut j = i + 1;
             let mut has_colon = false;
-            while i < n && bytes[i] != b'"' {
-                if bytes[i] == b':' {
+
+            let mut processed = false;
+            while j < n {
+                // Mixed-quote INSIDE string content: the string actually
+                // ends before the ',', and the bareword after is a new key.
+                if let Some((bare_start, k)) = try_mixed_quote_boundary(bytes, n, j) {
+                    modified = true;
+                    out.push_str(&text[string_start..j]);
+                    emit_mixed_quote_boundary(&mut out, text, bare_start, k);
+                    i = k + 3;
+                    processed = true;
+                    break;
+                }
+
+                if bytes[j] == b':' {
                     has_colon = true;
                 }
-                i += 1;
-            }
-            let content_end = i;
-            if i < n {
-                i += 1;
-            }
-            if has_colon {
-                let mut j = i;
-                while j < n && bytes[j].is_ascii_whitespace() {
-                    j += 1;
-                }
-                if j < n && matches!(bytes[j], b',' | b'}') {
-                    let content_str = &text[content_start..content_end];
-                    if let Some(colon_pos) = content_str.find(':') {
-                        let key = &content_str[..colon_pos];
-                        let val = &content_str[colon_pos + 1..];
-                        if !key.is_empty()
-                            && !val.is_empty()
-                            && key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
-                            && val.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                if bytes[j] == b'"' {
+                    let content_end = j;
+                    let end = j + 1;
+
+                    if has_colon {
+                        let content = &text[string_start + 1..content_end];
+                        if let Some(new_i) =
+                            try_fix_colon_in_key(content, end, text, bytes, n, &mut out)
                         {
-                            out.push('"');
-                            out.push_str(key);
-                            out.push_str("\":\"");
-                            out.push_str(val);
-                            out.push('"');
-                            out.push_str(&text[i..j]);
-                            out.push(bytes[j] as char);
-                            out.push_str(&text[j + 1..]);
-                            return Cow::Owned(out);
+                            modified = true;
+                            i = new_i;
+                            processed = true;
+                            break;
                         }
                     }
+
+                    out.push_str(&text[string_start..end]);
+                    i = end;
+                    processed = true;
+                    break;
                 }
+
+                j += 1;
             }
-            out.push_str(&text[start..i]);
+
+            if !processed {
+                out.push_str(&text[string_start..]);
+                break;
+            }
+            continue;
+        }
+
+        // ── Default: copy one character ──
+        if bytes[i].is_ascii() {
+            out.push(bytes[i] as char);
+            i += 1;
         } else {
             let ch = char_at(text, i);
             out.push(ch);
             i += ch.len_utf8();
         }
     }
-    if out == text {
-        Cow::Borrowed(text)
-    } else {
+
+    if modified {
         Cow::Owned(out)
+    } else {
+        Cow::Borrowed(text)
     }
 }

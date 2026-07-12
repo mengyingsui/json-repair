@@ -3,7 +3,7 @@
 use super::Repairer;
 
 impl Repairer {
-    /// Whether `ch` starts a recognised comment pattern (`//`, `/*`, `#`, `--`).
+    /// Whether `ch` starts a recognized comment pattern (`//`, `/*`, `#`, `--`).
     #[inline]
     pub(super) fn is_comment_start(&self, ch: char) -> bool {
         ch == '/' || ch == '#' || (ch == '-' && self.peek_is("--"))

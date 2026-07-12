@@ -1,5 +1,98 @@
 # Changelog — json-repair-core
 
+## v0.2.0 (2026-07-12)
+
+### BREAKING
+- **Removed `fix_colon_in_key` and `fix_mixed_quotes`** from the public API.
+  These standalone pre-processing functions are now private implementation
+  details of the fused `preprocess_json`.  Users of these functions should
+  call `repair_json` instead, which already runs the fused preprocessor
+  internally.  The standalone `needs_colon_fix` helper is also removed.
+
+### Added
+- **`yes`/`no`/`nil`/`nullptr` literal support** (`literal.rs`) —
+  `"yes"` → `true`, `"no"` → `false`, `"nil"` / `"nullptr"` → `null`.
+
+### Performance
+- **Single-pass preprocessor fusion** (`preprocess.rs`) — `preprocess_json`
+  applies both mixed‑quote and colon‑in‑key transforms in a single forward
+  scan, fixing a correctness bug where the colon scanner ate `','` boundary
+  bytes. Internal helpers `needs_colon_fix`/`fix_colon_in_key`/
+  `fix_mixed_quotes` replaced by `try_mixed_quote_boundary`/
+  `emit_mixed_quote_boundary`/`try_fix_colon_in_key`.
+- **ASCII byte fast path** (`cur()`/`char_at()`) — avoids UTF-8 decoder setup for 99%+ JSON chars.
+- **`is_implicit_object_sequence` full scan** (`junk.rs`) — removed 64KB
+  scan limit (`IMPLICIT_SEQUENCE_MAX_SCAN`); examines the entire remaining
+  input.
+
+### Code Quality
+- **State-machine v2 redesign** — all implicit contracts between `Repairer` fields eliminated:
+
+  - `ParseFrame` redesign: `ObjectLoop(usize)`, `ArrayLoop(usize)`, `ImplicitArrayLoop(usize)` replace `ResumeObject { prev_expect }`/`ResumeArray`/`ResumeImplicitArray { first }` — frame-local `usize` counter replaces global `expect_key`/`just_emitted_value` flags.
+  - 3 field deletions (`expect_key`, `just_emitted_value`, `lookahead_pos`) eliminate 15 implicit synchronization contracts.
+  - 3 resume methods deleted (`resume_object`/`resume_array`/`resume_implicit_array`).
+  - `run_value` refactored: pushes `ObjectLoop`/`ArrayLoop`/`ImplicitArrayLoop` frames and returns, no longer recursively calls `object_loop`/`array_loop`/handles `expect_key` context.
+  - `check_closing_quote(&self, is_key: bool) -> (bool, Option<usize>)` returns tuple instead of writing to `self.lookahead_pos`.
+  - `try_split_bareword_after_value(bareword_quote_pos)` accepts parameter.
+  - `parse_string(is_key: bool)` accepts context flag.
+  - `needs_comma_in_output()` pure byte check replaces `needs_separator(first)`.
+  - `skip_prefix_junk` → `normalize_preamble`.
+
+### Changed
+- **`repair_json_debug`** (`lib.rs`) — no longer `#[cfg(debug_assertions)]`-gated;
+  always compiled; `#[cfg(debug_assertions)]` guards only the assertions inside.
+- **`repair_json`** (`lib.rs`) — calls `preprocess::preprocess_json` directly.
+- **`emit_unicode_escape`** (`repairer.rs`) — manual `hex_nibble` lookup replaces
+  `write!(…, "\\u{:04x}", …)`.
+- **`is_output_balanced`** (`repairer.rs`) — uses fixed-size `[char; STACK_CAPACITY]`
+  stack instead of `Vec`; gated to `#[cfg(debug_assertions)]`.
+- **`INITIAL_OUTPUT_CAP`** constant (`repairer.rs`) — named constant replaces inline `1 << 18`.
+- **`peek()` method removed** (`repairer.rs`) — no longer used.
+- **Number scanning** (`number.rs`) — uses byte-level `text.as_bytes()[self.i]` matching;
+  `+` only accepted after `e`/`E`; `just_emitted_value = true` removed.
+- **`normalize_leading_zeros_inplace`** (`number.rs`) — removed `b'+'` prefix handling.
+- **`emit_escape` hex validation** (`string.rs`) — `all(|b| b.is_ascii_hexdigit())`
+  replaced with per-char `to_digit(16)` loop; invalid hex now emits `\\` + char
+  instead of bare `\\u`.
+- **`handle_double_quote_escape` / `ensure_closing_quote`** (`string.rs`) —
+  extracted into dedicated methods.
+- **`close_bracket` / `try_consume_mismatched_bracket` / `push_container`**
+  (`structure.rs`) — extracted from inline logic.
+- **`is_value_start` removed** (`structure.rs`) — no longer used.
+- **`is_implicit_object_sequence`** (`junk.rs`) — full scan; `IMPLICIT_SEQUENCE_MIN_LENGTH`
+  8192→128, `IMPLICIT_SEQUENCE_MIN_COUNT` 3→2, `METATAG_MAX_LEN` 64→128.
+- **`scan_string` / `try_skip_code_fence` / `try_skip_metatag_or_link` / `utf8_char_len`**
+  (`junk.rs`) — new helper methods extracted from `normalize_preamble`.
+- **`parse_unquoted_key`** (`keys.rs`) — `ch.is_ascii()` replaces `(ch as u32) < 128`.
+- **`tests/preprocess.rs` deleted** — standalone preprocessor tests removed
+  (coverage via JSONL test cases).
+- **`is_comment_start`** (`comment.rs`) — doc fix: `recognised` → `recognized`.
+- **`close_bracket` assert → `debug_assert!`** (`structure.rs`) — bracket‑stack
+  overflow handled by `MAX_PARSE_DEPTH=512` guard; runtime check relaxed to debug-only.
+- **Backward scan in `check_closing_quote`** (`string.rs`) — scans backward past
+  whitespace; if `{`/`[` found, returns `(false, None)` instead of false positive.
+- **`is_output_balanced` called at end of `repair()`** (`repairer.rs`) — debug-only
+  validation to catch unbalanced bracket output.
+
+### Test Infrastructure
+- **JSONL auto-discovery refactored** (`helpers.rs`) — `broken_patterns.jsonl`,
+  `large_embedded.jsonl`, `unterminated_string.jsonl` excluded from `collect_cases`;
+  each has dedicated Rust tests with stronger assertions.
+- **Overlapping test coverage eliminated** — coverable static inputs migrated from
+  `edge_cases.rs` to JSONL; duplicate JSONL rows removed.
+- **`tests/README.md` updated** — corrected `jsonl_cases.rs` description; added
+  `proptests.rs` entry.
+
+### Fixed
+- **`repair_json_debug` misleading idempotence message** (`lib.rs`) — `unwrap_or_default()`
+  replaced with `match` so a second‑repair failure produces a clear error message
+  instead of a confusing "not idempotent" assertion.
+- **`brackets_push` release‑mode safety** (`repairer.rs`) — `debug_assert!` promoted to
+  `assert!` so bracket‑stack overflow panics in all build profiles, not just debug.
+- **`test_comma_separated_objects`** (`scenario.rs`) — assertion corrected:
+  comma-separated objects wrapped in array (20 elements), was incorrectly
+  checking `result.is_object()`.
+
 ## v0.1.10 (2026-07-12)
 
 ### Performance

@@ -5,7 +5,7 @@ Core Rust library for repairing malformed JSON from LLM outputs. Used by the [`j
 ## Features
 
 - Single-pass state machine — linear time, no backtracking
-- Pre-processing helpers: `fix_colon_in_key`, `fix_mixed_quotes`
+- Single-pass preprocessor (`preprocess_json`) — fused mixed-quote + colon-in-key transforms
 - Heuristic string-closing logic tuned for LLM natural-language embedded quotes
 - Modular architecture: `repairer/` submodules (`string`, `number`, `literal`, `keys`, `structure`, `comment`, `junk`)
 - Cargo feature `serde-validate` (`--no-default-features` to make `serde_json` optional)
@@ -31,18 +31,16 @@ fn main() {
 |---------------------------|-----------------------------------------------------------------------|
 | `repair_json(text)`       | Repair malformed JSON, returns `Ok(String)` or `Err(JsonRepairError)` |
 | `repair_json_debug(text)` | Like `repair_json` with extra assertions (zero-cost in release)       |
-| `fix_colon_in_key(text)`  | Split `"key:value"` → `"key":"value"` when followed by `,` or `}`     |
-| `fix_mixed_quotes(text)`  | Fix `','word":"` boundary between double- and single-quoted segments  |
+| *(preprocessor)*          | `preprocess_json` (internal) — single-pass mixed-quote + colon-in-key |
 
 ## Architecture
 
 ```
 Input text
   │
-  ├─ fix_colon_in_key
-  ├─ fix_mixed_quotes
+  ├─ preprocess_json (single-pass fusion)
   ├─ Repairer state machine
-  │    1. skip_prefix_junk
+  │    1. normalize_preamble
   │    2. ≥8KB implicit object sequence → wrap as array
   │    3. parse_value
   │      ├─ parse_object

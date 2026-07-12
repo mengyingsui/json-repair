@@ -9,3 +9,4 @@
 {"input": "[\"He said \"]boom\" loudly\", \"d\"]", "expected": ["He said \"]boom\" loudly", "d"]}
 {"input": "{\"t\":\"He said \"}boom\" loudly\",\"n\":1}", "expected": {"t": "He said \"}boom\" loudly", "n": 1}}
 {"input": "{\"text\":\"a \"b}c\" d\",\"n\":1}", "expected": {"text": "a \"b}c\" d", "n": 1}}
+{"input": "{\"a\": \"{\"b\": \"c\"}", "expected": {"a": "{\"b\": \"c"}}

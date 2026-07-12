@@ -46,7 +46,8 @@ fn test_comma_separated_objects() {
     let text = (0..20).map(|_| obj).collect::<Vec<_>>().join(",\n");
     let repaired = json_repair_core::repair_json(&text).unwrap();
     let result: serde_json::Value = serde_json::from_str(&repaired).unwrap();
-    assert!(result.is_object(), "expected dict, got {result:?}");
+    assert!(result.is_array(), "expected array, got {result:?}");
+    assert_eq!(result.as_array().unwrap().len(), 20);
 }
 
 #[test]

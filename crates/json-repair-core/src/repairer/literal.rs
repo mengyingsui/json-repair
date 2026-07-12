@@ -12,6 +12,10 @@ const LIT_NAN: &str = "nan";
 const LIT_INFINITY: &str = "infinity";
 const LIT_POS_INF: &str = "+infinity";
 const LIT_NEG_INF: &str = "-infinity";
+const LIT_YES: &str = "yes";
+const LIT_NO: &str = "no";
+const LIT_NIL: &str = "nil";
+const LIT_NULLPTR: &str = "nullptr";
 
 impl Repairer {
     /// Case-insensitive prefix match against a pattern, starting at `self.i`.
@@ -35,11 +39,15 @@ impl Repairer {
         const ENTRIES: &[(&str, &str)] = &[
             (LIT_TRUE, LIT_TRUE),
             (LIT_FALSE, LIT_FALSE),
-            (LIT_NONE, LIT_NULL),
             (LIT_NULL, LIT_NULL),
+            (LIT_NONE, LIT_NULL),
             (LIT_UNDEFINED, LIT_NULL),
             (LIT_NAN, LIT_NULL),
             (LIT_INFINITY, LIT_NULL),
+            (LIT_YES, LIT_TRUE),
+            (LIT_NO, LIT_FALSE),
+            (LIT_NIL, LIT_NULL),
+            (LIT_NULLPTR, LIT_NULL),
             (LIT_POS_INF, LIT_NULL),
             (LIT_NEG_INF, LIT_NULL),
         ];
@@ -47,7 +55,6 @@ impl Repairer {
             if self.match_lit(pat) {
                 self.out.push_str(emit);
                 self.i += pat.len();
-                self.just_emitted_value = true;
                 return;
             }
         }

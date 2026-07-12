@@ -40,3 +40,9 @@ repos:
         language: system
         pass_filenames: false
         types: [rust]
+      - id: pytest
+        name: pytest
+        entry: uv run pytest tests/python/ --no-header -q
+        language: system
+        pass_filenames: false
+        types: [python]

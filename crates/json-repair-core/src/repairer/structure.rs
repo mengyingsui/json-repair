@@ -1,29 +1,6 @@
-//! Object/array frame management and value resume logic.
+//! Object/array loop methods and nested-container dispatch.
 
 use super::{ParseFrame, Repairer, Stack};
-
-/// Whether `ch` can start a JSON value (string, number, literal, object, array).
-#[inline]
-fn is_value_start(ch: char) -> bool {
-    matches!(
-        ch,
-        '"' | '{'
-            | '['
-            | '\''
-            | 't'
-            | 'f'
-            | 'n'
-            | 'T'
-            | 'F'
-            | 'N'
-            | 'i'
-            | 'I'
-            | 'u'
-            | 'U'
-            | '-'
-            | '.'
-    ) || ch.is_ascii_digit()
-}
 
 /// Whether `ch` can start an object key (quoted, single-quoted, or unquoted bare word).
 ///
@@ -54,16 +31,71 @@ impl Repairer {
         j < self.n && matches!(self.char_at(j), ',' | '"' | ':')
     }
 
-    /// Continue an object loop after a nested value has been completed.
-    pub(super) fn resume_object(&mut self, stack: &mut Stack, prev_expect: bool) {
-        self.expect_key = true;
-        self.just_emitted_value = true;
-        self.object_loop(stack, prev_expect, false);
+    /// Trim trailing comma, emit `bracket`, pop from bracket stack, and
+    /// update depth tracking.
+    /// Caller must advance `self.i` past the consumed bracket character.
+    fn close_bracket(&mut self, bracket: char) {
+        self.trim_trailing_comma();
+        self.emit_char(bracket);
+        let popped = self.brackets_pop();
+        debug_assert_eq!(
+            popped,
+            Some(bracket),
+            "close_bracket: closing {bracket:?} but top of stack is not {bracket:?}"
+        );
+        self.update_depth0();
+    }
+
+    /// Try to consume a mismatched closing bracket (e.g. `]` in an object,
+    /// `}` in an array) by popping the bracket stack and emitting whatever
+    /// is on top.  Returns `true` when the popped bracket was the *expected*
+    /// one (meaning the current frame is done).
+    fn try_consume_mismatched_bracket(&mut self) -> bool {
+        self.trim_trailing_comma();
+        let popped = self.brackets_pop();
+        match popped {
+            Some(b) => {
+                self.emit_char(b);
+                self.update_depth0();
+                self.i += 1;
+                true
+            }
+            _ => {
+                self.i += 1;
+                false
+            }
+        }
+    }
+
+    /// Push frames for a nested container value at the current position
+    /// onto `stack`.  The caller must `return` immediately after this call
+    /// so the main loop processes the inner container before resuming the
+    /// parent via `resume_frame`.
+    fn push_container(&mut self, stack: &mut Stack, ch: char, resume_frame: ParseFrame) {
+        match ch {
+            '{' => {
+                self.emit_char('{');
+                self.brackets_push('}');
+                self.i += 1;
+                stack.push(resume_frame);
+                stack.push(ParseFrame::ObjectLoop(0));
+            }
+            '[' => {
+                self.emit_char('[');
+                self.brackets_push(']');
+                self.i += 1;
+                stack.push(resume_frame);
+                stack.push(ParseFrame::ArrayLoop(0));
+            }
+            _ => unreachable!("push_container called with non-container char"),
+        }
     }
 
     /// Object loop: processes one element at a time.
-    /// Returns when the object is complete or a nested-value parse is needed.
-    pub(super) fn object_loop(&mut self, stack: &mut Stack, prev_expect: bool, first: bool) {
+    /// `count` = number of elements already processed (0 = first).
+    /// Always expects a key on entry.
+    pub(super) fn object_loop(&mut self, stack: &mut Stack, count: usize) {
+        let mut expect_key = true;
         loop {
             self.skip_ws();
             if self.i >= self.n {
@@ -71,38 +103,30 @@ impl Repairer {
                 break;
             }
             let ch = self.cur();
-            if self.expect_key && (ch == '{' || ch == ':') {
+            if expect_key && (ch == '{' || ch == ':') {
                 self.i += 1;
                 continue;
             }
             if ch == '}' {
-                self.trim_trailing_comma();
-                self.emit_char('}');
-                let popped = self.brackets_pop();
-                debug_assert_eq!(
-                    popped,
-                    Some('}'),
-                    "object_loop: closing }} but top of bracket stack is not }}"
-                );
-                self.update_depth0();
+                self.close_bracket('}');
                 self.i += 1;
-                self.expect_key = prev_expect;
-                self.just_emitted_value = true;
                 return;
             }
             if ch == ',' {
-                if !first && !self.out.ends_with(',') {
+                if count > 0 && !self.out.ends_with(',') {
                     self.emit_char(',');
                 }
                 self.i += 1;
-                self.expect_key = true;
+                expect_key = true;
                 continue;
             }
             if self.is_comment_start(ch) {
                 self.skip_comment();
                 continue;
             }
-            if ch == '"' && self.just_emitted_value {
+            // Orphan opening quote after a value: if " is followed by a
+            // structural char, skip it.
+            if ch == '"' && count > 0 {
                 let j = self.skip_ws_at(self.i + 1);
                 if j >= self.n || matches!(self.char_at(j), '}' | ',' | ']' | ':') {
                     self.i += 1;
@@ -110,87 +134,54 @@ impl Repairer {
                 }
             }
             if ch == ']' {
-                self.trim_trailing_comma();
-                let popped = self.brackets_pop();
-                match popped {
-                    Some('}') => {
-                        self.emit_char('}');
-                        self.update_depth0();
-                        self.i += 1;
-                        self.just_emitted_value = true;
-                        self.expect_key = prev_expect;
-                        return;
-                    }
-                    Some(']') => {
-                        // Defensive: unreachable in practice (object_loop runs
-                        // only when the innermost bracket is an object `}`),
-                        // but kept for consistency with `array_loop`.
-                        self.emit_char(']');
-                        self.update_depth0();
-                        self.i += 1;
-                        self.just_emitted_value = true;
-                        self.expect_key = prev_expect;
-                        return;
-                    }
-                    _ => {
-                        self.i += 1;
-                        self.just_emitted_value = true;
-                        return;
-                    }
-                }
+                self.try_consume_mismatched_bracket();
+                return;
             }
-            if self.expect_key {
-                if !first && !is_key_start(ch) {
+            if expect_key {
+                if count > 0 && !is_key_start(ch) {
                     break;
                 }
                 if ch.is_ascii_alphabetic() && !self.looks_like_key() {
                     break;
                 }
-                if self.needs_separator(first) {
+                if count > 0 && self.needs_comma_in_output() {
                     self.emit_char(',');
                 }
                 self.parse_key();
                 self.skip_ws();
+                self.emit_char(':');
                 if self.i < self.n && self.cur() == ':' {
-                    self.emit_char(':');
                     self.i += 1;
-                } else {
-                    self.emit_char(':');
                 }
-                self.expect_key = false;
-                stack.push(ParseFrame::ResumeObject { prev_expect });
-                stack.push(ParseFrame::Value);
-                return;
-            } else {
-                if !first && !is_value_start(ch) {
-                    break;
+                // Handle the value — check for nested containers
+                self.skip_ws();
+                if self.i >= self.n {
+                    stack.push(ParseFrame::ObjectLoop(count + 1));
+                    stack.push(ParseFrame::Value);
+                    return;
                 }
-                if self.needs_separator(first) && ch != '}' && ch != ']' && ch != ',' {
-                    self.emit_char(',');
+                let vch = self.cur();
+                match vch {
+                    '{' | '[' => {
+                        self.push_container(stack, vch, ParseFrame::ObjectLoop(count + 1));
+                        return;
+                    }
+                    _ => {
+                        stack.push(ParseFrame::ObjectLoop(count + 1));
+                        stack.push(ParseFrame::Value);
+                        return;
+                    }
                 }
-                stack.push(ParseFrame::ResumeObject { prev_expect });
-                stack.push(ParseFrame::Value);
-                return;
             }
         }
         if self.i < self.n && self.brackets_last() == Some('}') {
-            self.trim_trailing_comma();
-            self.emit_char('}');
-            self.brackets_pop();
-            self.just_emitted_value = true;
+            self.close_bracket('}');
         }
-        self.expect_key = prev_expect;
-    }
-
-    /// Continue an array loop after a nested value has been completed.
-    pub(super) fn resume_array(&mut self, stack: &mut Stack) {
-        self.just_emitted_value = true;
-        self.array_loop(stack, false);
     }
 
     /// Array loop: processes one element at a time.
-    /// Returns when the array is complete or a nested-value parse is needed.
-    pub(super) fn array_loop(&mut self, stack: &mut Stack, first: bool) {
+    /// `count` = number of elements already processed (0 = first).
+    pub(super) fn array_loop(&mut self, stack: &mut Stack, count: usize) {
         loop {
             self.skip_ws();
             if self.i >= self.n {
@@ -199,46 +190,18 @@ impl Repairer {
             }
             let ch = self.cur();
             if ch == ']' {
-                self.trim_trailing_comma();
-                self.emit_char(']');
-                let popped = self.brackets_pop();
-                debug_assert_eq!(
-                    popped,
-                    Some(']'),
-                    "array_loop: closing ] but top of bracket stack is not ]"
-                );
-                self.update_depth0();
+                self.close_bracket(']');
                 self.i += 1;
-                self.just_emitted_value = true;
                 return;
             }
             if ch == '}' {
-                self.trim_trailing_comma();
-                let popped = self.brackets_pop();
-                match popped {
-                    Some(']') => {
-                        self.emit_char(']');
-                        self.update_depth0();
-                        self.i += 1;
-                        self.just_emitted_value = true;
-                        return;
-                    }
-                    Some('}') => {
-                        self.emit_char('}');
-                        self.update_depth0();
-                        self.i += 1;
-                        self.just_emitted_value = true;
-                        continue;
-                    }
-                    _ => {
-                        self.i += 1;
-                        self.just_emitted_value = true;
-                        continue;
-                    }
+                if self.try_consume_mismatched_bracket() {
+                    return;
                 }
+                continue;
             }
             if ch == ',' {
-                if !first && !self.out.ends_with(',') {
+                if count > 0 && !self.out.ends_with(',') {
                     self.emit_char(',');
                 }
                 self.i += 1;
@@ -248,39 +211,43 @@ impl Repairer {
                 self.skip_comment();
                 continue;
             }
-            if self.needs_separator(first) && !self.out.ends_with(':') && ch != ']' {
+            if count > 0 && self.needs_comma_in_output() && !self.out.ends_with(':') && ch != ']' {
                 self.emit_char(',');
             }
-            // Parse value and come back
-            stack.push(ParseFrame::ResumeArray);
-            stack.push(ParseFrame::Value);
-            return;
-        }
-    }
 
-    /// Resume an implicit-array loop after a top-level object completes.
-    pub(super) fn resume_implicit_array(&mut self, stack: &mut Stack, first: bool) {
-        self.just_emitted_value = true;
-        self.skip_ws();
-        if self.i < self.n && self.cur() == ',' {
-            self.i += 1;
+            // Check for nested containers
+            match ch {
+                '{' | '[' => {
+                    self.push_container(stack, ch, ParseFrame::ArrayLoop(count + 1));
+                    return;
+                }
+                _ => {
+                    stack.push(ParseFrame::ArrayLoop(count + 1));
+                    stack.push(ParseFrame::Value);
+                    return;
+                }
+            }
         }
-        self.implicit_array_loop(stack, first);
     }
 
     /// Implicit-array loop: emit comma separators between top-level objects
     /// and close the synthetic `]` when done.
-    pub(super) fn implicit_array_loop(&mut self, stack: &mut Stack, first: bool) {
+    /// `count` = number of top-level objects already processed (0 = first).
+    pub(super) fn implicit_array_loop(&mut self, stack: &mut Stack, count: usize) {
         self.skip_ws();
+        if count > 0 && self.i < self.n && self.cur() == ',' {
+            self.i += 1;
+            self.skip_ws();
+        }
         if self.i < self.n && self.cur() == '{' {
-            if !first {
+            if count > 0 {
                 self.emit_char(',');
             }
-            stack.push(ParseFrame::ResumeImplicitArray { first: false });
+            stack.push(ParseFrame::ImplicitArrayLoop(count + 1));
             stack.push(ParseFrame::Value);
             return;
         }
-        if !first {
+        if count > 0 {
             self.trim_trailing_comma();
         }
         self.emit_char(']');

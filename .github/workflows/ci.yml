@@ -96,6 +96,9 @@ jobs:
       - name: uv sync
         run: uv sync
 
+      - name: Build Rust extension
+        run: uv run maturin develop --release
+
       - name: Run benchmarks
         run: uv run pytest tests/python/test_performance.py --benchmark-only -v --benchmark-json py_bench.json
 

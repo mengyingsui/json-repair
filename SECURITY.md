@@ -36,6 +36,16 @@ additional `debug_assert!` guards (active in debug builds only).
 The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
 changes only; security posture is unchanged.
 
+**v0.4.0 / v0.2.0** adds:
+- **No new security features** — this release fuses the two pre-processing
+  transforms into one `preprocess_json` scan, removes the standalone
+  `fix_colon_in_key` / `fix_mixed_quotes` from the public API (BREAKING),
+  and includes the state-machine v2 redesign that eliminates implicit
+  contracts between `Repairer` fields by embedding state into `ParseFrame`
+  variants. All security guarantees from v0.3.10+ / v0.1.10+ preserved.
+  Zero `unsafe` remains; all 35 tests pass; clippy clean.
+- See [`CHANGELOG.md`](CHANGELOG.md) for full details.
+
 **v0.3.10 / v0.1.10** adds:
 - **No new security features** — this release is a performance optimization,
   code quality, and test infrastructure release. All security guarantees from

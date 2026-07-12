@@ -27,8 +27,6 @@ pub mod error;
 mod preprocess;
 mod repairer;
 
-pub use preprocess::{fix_colon_in_key, fix_mixed_quotes};
-
 use error::JsonRepairError;
 use repairer::Repairer;
 
@@ -58,8 +56,7 @@ pub fn repair_json(text: &str) -> Result<String, JsonRepairError> {
     if is_valid_json(text) {
         return Ok(text.to_string());
     }
-    let text = fix_colon_in_key(text);
-    let text = fix_mixed_quotes(text.as_ref());
+    let text = preprocess::preprocess_json(text);
     let mut repairer = Repairer::new(text.as_ref());
     repairer.repair()
 }
@@ -81,14 +78,8 @@ fn is_valid_json(_text: &str) -> bool {
 
 /// Debug wrapper around `repair_json` with extra validation.
 ///
-/// In debug builds, performs the same repair but adds:
-/// - Valid JSON check on the result
-/// - Idempotence check (second repair pass must match the first)
-/// - All internal `debug_assert!` guards active
-///
+/// In debug builds, adds valid-JSON and idempotence checks.
 /// In release builds, identical to `repair_json`.
-///
-/// Use this during development and testing to catch regressions early.
 ///
 /// # Example
 ///
@@ -99,22 +90,24 @@ fn is_valid_json(_text: &str) -> bool {
 /// let repaired = repair_json_debug(broken).unwrap();
 /// assert_eq!(repaired, r#"{"key":"value"}"#);
 /// ```
-#[cfg(debug_assertions)]
 pub fn repair_json_debug(text: &str) -> Result<String, JsonRepairError> {
-    let result = repair_json(text)?;
-    if !result.is_empty() {
-        debug_assert!(
-            serde_json::from_str::<serde_json::Value>(&result).is_ok(),
-            "repair_json_debug: result is not valid JSON: {result}"
-        );
-        let second = repair_json(&result)?;
-        debug_assert_eq!(
-            second, result,
-            "repair_json_debug: repair is not idempotent"
-        );
+    let result = repair_json(text);
+    #[cfg(debug_assertions)]
+    if let Ok(ref r) = result {
+        if !r.is_empty() {
+            debug_assert!(
+                serde_json::from_str::<serde_json::Value>(r).is_ok(),
+                "repair_json_debug: result is not valid JSON: {r}"
+            );
+            match repair_json(r) {
+                Ok(second) => debug_assert_eq!(
+                    second.as_str(),
+                    r.as_str(),
+                    "repair_json_debug: repair is not idempotent"
+                ),
+                Err(e) => debug_assert!(false, "repair_json_debug: second repair pass failed: {e}"),
+            }
+        }
     }
-    Ok(result)
+    result
 }
-
-#[cfg(not(debug_assertions))]
-pub use repair_json as repair_json_debug;

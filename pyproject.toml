@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "json-repair"
-version = "0.3.10"
+version = "0.4.0"
 description = "Repair malformed JSON from LLM outputs - handles unescaped quotes, triple-quoted strings, and more in a single pass"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -33,12 +33,16 @@ Changelog = "https://github.com/mengyingsui/json-repair/blob/master/CHANGELOG.md
 manifest-path = "crates/json-repair-python/Cargo.toml"
 module-name = "json_repair._rust_parse"
 
+[tool.uv]
+package = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
 pythonpath = ["tests/python"]
 
 [dependency-groups]
 dev = [
+    "maturin>=1.14",
     "mypy>=2.1.0",
     "pip-audit>=2.8.0",
     "pre-commit>=4.6.0",
@@ -74,5 +78,5 @@ strict = true
 # Run Rust benches:              cargo bench -p json-repair-core
 # Run Python benches:            uv run pytest tests/python/test_performance.py --benchmark-only
 # Lint:                          uv run ruff check json_repair/ tests/python/
-# Rebuild Rust .pyd:             uv run maturin develop --release -m crates/json-repair-python/Cargo.toml
-#                               then copy .venv/Lib/site-packages/_rust_parse/*.pyd to json_repair/
+# Rebuild Rust .pyd (debug):     uv run maturin develop --uv
+# Rebuild Rust .pyd (release):   uv run maturin develop --release --uv

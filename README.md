@@ -1,8 +1,10 @@
 > **这是一个纯 AI 仓库** — 全部代码、文档、测试均由 AI 生成与维护，人工仅做最终审查。
+>
+> **为什么纯 AI 仓库容易变成屎山？** 用户盲目追求速度、可复用性、可维护性，而模型没有考虑这些变动带来的隐患而直接执行。用户对编程语言的认知也决定模型是否应该做下去，而不是盲目做。AI 缺乏对长期架构影响的判断力，每一次"优化"都在堆砌技术债，直到重构成本超过重写成本。
 
 # json_repair
 
-[![Security: v0.3.10+](https://img.shields.io/badge/Security-v0.3.10%2B-2ea44f?labelColor=333)](SECURITY.md)
+[![Security: v0.4.0+](https://img.shields.io/badge/Security-v0.4.0%2B-2ea44f?labelColor=333)](SECURITY.md)
 
 Repair malformed JSON from LLM outputs in a **single pass** — now powered by Rust.
 
@@ -136,11 +138,10 @@ else:
 Input text
   │
   ├─ Pre-processing (Rust)
-  │    fix_colon_in_key
-  │    fix_mixed_quotes
+  │    preprocess_json (single-pass fusion)
   │
   ├─ Repairer state machine (Rust)
-  │    1. skip_prefix_junk
+  │    1. normalize_preamble
   │    2. ≥8KB {..}{..} → wrap as array
   │    3. parse_value
   │      ├─ parse_object
@@ -159,7 +160,8 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Version    | Date       | Description                                                                                                                                                                                                                                                                                                                                                                                                                             |
 |------------|------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| v0.3.10 🔒 | 2026-07-12 | **Performance hot-path optimisation & test overhaul** — 15 optimizations (ASCII byte fast path, scan merging, stack early exits, byte-level comparisons); `out_chars` removed; magic number naming; bare-word helper extraction; inline test data migrated to JSONL files; fuzz corpus seeded from real cases; doc comment audit; Python `__version__` auto-loaded via `importlib.metadata`. See [`CHANGELOG.md`](CHANGELOG.md). |
+| v0.4.0 🔒  | 2026-07-12 | **State-machine v2 redesign & preprocessor fusion** — all implicit `Repairer` contracts eliminated (`ObjectLoop(usize)`/`ArrayLoop(usize)`/`ImplicitArrayLoop(usize)` frames replace 3 resume methods); `preprocess_json` fused single-pass; `fix_colon_in_key`/`fix_mixed_quotes` removed from public API; `yes`/`no`/`nil`/`nullptr` literals; output balanced checks use fixed stack; full implicit-sequence scan. See [`CHANGELOG.md`](CHANGELOG.md). |
+| v0.3.10 🔒 | 2026-07-12 | **Performance hot-path optimisation & test overhaul** — 15 optimizations (ASCII byte fast path, scan merging, stack early exits, byte-level comparisons); `out_chars` removed; magic number naming; bare-word helper extraction; inline test data migrated to JSONL files; fuzz corpus seeded from real cases; doc comment audit; Python `__version__` auto-loaded via `importlib.metadata`. See [`CHANGELOG.md`](CHANGELOG.md).        |
 | v0.3.9 🔒  | 2026-07-09 | **Documentation overhaul** — `repair_json()` full Google-style docstring; `__init__` module docstring expanded with all capabilities. Internal Rust crate documentation completed (`#![deny(missing_docs)]`, all modules/methods documented).                                                                                                                                                                                           |
 | v0.3.8 🔒  | 2026-07-08 | **Hot-path maintenance, 39–82% speedup** — triplicated string loops unified; escape logic deduplicated; zero-allocation literal matching; `is_value_start`/`is_key_start`/`looks_like_key` extracted from `object_loop`; `trim_trailing_comma`/`emit_unicode_escape` helpers; magic-number naming; `skip_prefix_junk` Vec clone eliminated; `peek_is` optimized; preprocess→`Cow::Borrowed` fast-path. See [`SECURITY.md`](SECURITY.md) |
 | v0.3.7 🔒  | 2026-07-05 | **Fuzzer crash fixes, CI bench summary** — 3 crash fixes (STATUS_STACK_BUFFER_OVERRUN, ASAN stack overflow); surrogate sanitization; runtime bracket balance check; serde_json depth guard; JSONL/Rust crash regression tests; CI bench summary via GITHUB_STEP_SUMMARY; clippy/deny fixes. See [`SECURITY.md`](SECURITY.md)                                                                                                            |
@@ -197,7 +199,7 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 git clone https://github.com/mengyingsui/json-repair.git
 cd json_repair
 
-# Install deps (Rust extension built automatically)
+# Install Python deps only (Rust extension built separately)
 uv sync
 
 # ── Python (performance benchmarks only) ──
@@ -215,8 +217,9 @@ cargo bench -p json-repair-core
 
 # Rebuild Rust .pyd (after Rust changes)
 uv build --wheel  # outputs to dist/
-# or for editable installs:
-uv run maturin develop --release -m crates/json-repair-python/Cargo.toml
+# or for editable installs (faster iteration):
+uv run maturin develop --uv              # debug build (fast for iteration)
+uv run maturin develop --release --uv    # release build (for benchmarks)
 
 # Lint / type check
 uv run ruff check json_repair/ tests/python/

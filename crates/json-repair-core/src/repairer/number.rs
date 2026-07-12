@@ -10,13 +10,23 @@ impl Repairer {
     /// characters are encountered.
     pub(super) fn parse_number(&mut self) {
         let start = self.i;
-        while self.i < self.n
-            && matches!(
-                self.char_at(self.i),
-                '-' | '0'..='9' | '.' | 'e' | 'E' | '+'
-            )
-        {
-            self.i += 1;
+        while self.i < self.n {
+            let b = self.text.as_bytes()[self.i];
+            match b {
+                b'0'..=b'9' | b'.' | b'e' | b'E' | b'-' => {
+                    self.i += 1;
+                }
+                b'+' => {
+                    if self.i == start
+                        || (self.i > 0 && matches!(self.text.as_bytes()[self.i - 1], b'e' | b'E'))
+                    {
+                        self.i += 1;
+                    } else {
+                        break;
+                    }
+                }
+                _ => break,
+            }
         }
         if self.i < self.n && self.char_at(self.i).is_ascii_alphabetic() {
             self.error = Some(crate::error::JsonRepairError {
@@ -51,8 +61,7 @@ impl Repairer {
         } else {
             self.emit_char('0');
         }
-        self.just_emitted_value = true;
-        debug_assert!(
+        assert!(
             self.error.is_none(),
             "parse_number: error set but parse continued"
         );
@@ -115,11 +124,7 @@ fn normalize_leading_zeros_inplace(s: &mut String) {
     if bytes.is_empty() {
         return;
     }
-    let start = if bytes[0] == b'-' || bytes[0] == b'+' {
-        1
-    } else {
-        0
-    };
+    let start = if bytes[0] == b'-' { 1 } else { 0 };
     let int_end = s[start..]
         .find(['.', 'e', 'E'])
         .map(|pos| start + pos)

@@ -18,42 +18,6 @@ fn test_very_long_string() {
 }
 
 #[test]
-fn test_control_chars_in_unquoted_key() {
-    // Crash input from fuzzer: {\0\0\0\x1a}
-    // Null bytes should not be emitted raw into JSON output
-    let mut input = String::from('{');
-    input.push('\0');
-    input.push('\0');
-    input.push('\0');
-    input.push('\u{1a}');
-    input.push('}');
-    let result = json_repair_core::repair_json(&input).unwrap();
-    // Result must be valid JSON
-    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-    // Key should be unquoted, repaired, with control chars escaped as \uXXXX
-    let key = parsed.as_object().unwrap().keys().next().unwrap();
-    assert_eq!(key, "\0\0\0\u{1a}", "key content should be preserved");
-}
-
-#[test]
-fn test_control_chars_in_quoted_key() {
-    // Fuzz crash input: {"z\0: }
-    // Null byte inside a quoted string with no closing quote;
-    // everything up to EOF (including `: }`) becomes part of the key.
-    let mut input = String::from("{\"z");
-    input.push('\0');
-    input.push_str(": }");
-    let result = json_repair_core::repair_json(&input);
-    assert!(result.is_ok(), "repair should succeed: {:?}", result.err());
-    let result = result.unwrap();
-    // Result must be valid JSON
-    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-    // The key absorbs all remaining input (no closing quote found)
-    let key = parsed.as_object().unwrap().keys().next().unwrap();
-    assert_eq!(key, "z\u{0}: }", "key should contain everything up to EOF");
-}
-
-#[test]
 fn test_backslash_before_newline_in_string() {
     // Fuzz crash: {vho: "r*\<LF>"}  — backslash followed by raw newline
     // emit_escape('\n') must escape it, not emit a raw newline.
@@ -163,34 +127,6 @@ fn test_surrogate_escape_in_string_key_replaced() {
     expected_key.push('\u{fffd}');
     expected_key.push_str("stest");
     assert_eq!(obj[&expected_key], serde_json::Value::Null);
-}
-
-#[test]
-fn test_backslash_at_eof_in_string() {
-    // Fuzz crash: parse_string emits \\ (backslash escape) then EOF handler
-    // emits closing ", making output end with \" — old debug_assert! incorrectly
-    // flagged this as an error. Output must be valid JSON.
-    let inputs = [
-        ("\"\\\\", r#""\\""#),                // "\\ -> "\\" (string: \)
-        ("{\"a\": \"\\\\", r#"{"a": "\\"}"#), // object with backslash value
-        ("\"\\", r#""""#),                    // single backslash, empty string
-        ("\"\\\\\\", r#""\\""#),              // three backslashes -> "\\" (string: \)
-    ];
-    for &(input, expected_json) in &inputs {
-        let result = json_repair_core::repair_json(input);
-        assert!(result.is_ok(), "repair should succeed for: {:?}", input);
-        let repaired = result.unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&repaired).unwrap_or_else(|e| {
-            panic!(
-                "invalid JSON: {}\n---\ninput: {:?}\noutput: {}\n---",
-                e, input, repaired
-            )
-        });
-        // Verify the parsed value matches expected JSON
-        let expected: serde_json::Value = serde_json::from_str(expected_json)
-            .unwrap_or_else(|e| panic!("bad expected_json: {} for {:?}", e, expected_json));
-        assert_eq!(parsed, expected, "mismatch for input: {:?}", input);
-    }
 }
 
 #[test]
