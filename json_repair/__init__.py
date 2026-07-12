@@ -23,7 +23,14 @@ Usage::
     {'key': 'value'}
 """
 
-from json_repair._repair import repair_json as repair_json
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _version
+
+from ._repair import repair_json
 
 __all__ = ["repair_json"]
-__version__ = "0.3.9"
+
+try:
+    __version__ = _version("json-repair")
+except PackageNotFoundError:
+    __version__ = "0.0.0"

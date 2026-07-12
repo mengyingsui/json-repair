@@ -4,36 +4,37 @@ use super::Repairer;
 
 /// Minimum input length to even consider the implicit-object-sequence fast path.
 const IMPLICIT_SEQUENCE_MIN_LENGTH: usize = 8192;
-/// Maximum length of a `[TEXT_*]`-style metatag to recognise and skip.
+/// Maximum length of a `[TEXT_*]`-style metatag to recognize and skip.
 const METATAG_MAX_LEN: usize = 64;
+/// Maximum number of bytes to scan for implicit object sequences before giving up.
+const IMPLICIT_SEQUENCE_MAX_SCAN: usize = 65536;
+/// Minimum number of consecutive `{…}` objects to treat as an implicit array.
+const IMPLICIT_SEQUENCE_MIN_COUNT: usize = 3;
 
 impl Repairer {
     /// Skip non-JSON text before the first `{` or `[`.
     ///
-    /// Handles markdown code fences, `[TEXT_*]`-style metatags, markdown
+    /// Handles Markdown code fences, `[TEXT_*]`-style metatags, Markdown
     /// link parens, and unbraced `"key": value` patterns.
     ///
     /// On return, `self.i` points at the first `{` or `[` of the JSON body
     /// (or at the original position if no JSON container was found).
-    /// For unbraced input, `self.chars` is rewritten to prepend `{` so the
+    /// For unbraced input, `self.text` is rewritten to prepend `{` so the
     /// parser treats the bare key as the first object member.
     pub(super) fn skip_prefix_junk(&mut self) {
-        let mut start = 0;
-        while start < self.n && self.chars[start].is_ascii_whitespace() {
-            start += 1;
-        }
+        let start = self.skip_ws_at(0);
         let mut i = start;
         let mut unbraced_start: Option<usize> = None;
 
         while i < self.n {
-            let ch = self.chars[i];
-            if ch == '`' && i + 2 < self.n && self.chars[i + 1] == '`' && self.chars[i + 2] == '`' {
+            let ch = self.char_at(i);
+            if i + 2 < self.n && self.text.as_bytes()[i..].starts_with(b"```") {
                 i += 3;
                 let lang_start = i;
-                while i < self.n && self.chars[i] != '\n' {
-                    i += 1;
+                while i < self.n && self.char_at(i) != '\n' {
+                    i += self.char_at(i).len_utf8();
                 }
-                let lang: String = self.chars[lang_start..i].iter().collect();
+                let lang = &self.text[lang_start..i];
                 let lang_trimmed = lang.trim();
                 let is_json_fence = lang_trimmed.is_empty() || lang_trimmed == "json";
                 if i < self.n {
@@ -41,15 +42,11 @@ impl Repairer {
                 }
                 if !is_json_fence {
                     while i < self.n {
-                        if i + 2 < self.n
-                            && self.chars[i] == '`'
-                            && self.chars[i + 1] == '`'
-                            && self.chars[i + 2] == '`'
-                        {
+                        if i + 2 < self.n && self.text.as_bytes()[i..].starts_with(b"```") {
                             i += 3;
                             break;
                         }
-                        i += 1;
+                        i += self.char_at(i).len_utf8();
                     }
                 }
                 continue;
@@ -60,45 +57,47 @@ impl Repairer {
                     let mut j = i + 1;
                     let mut is_metatag = j < self.n;
                     while j < self.n && depth > 0 {
-                        match self.chars[j] {
+                        let jc = self.char_at(j);
+                        match jc {
                             '[' => depth += 1,
                             ']' => depth -= 1,
                             '{' | '"' => is_metatag = false,
                             _ => {}
                         }
-                        j += 1;
+                        j += jc.len_utf8();
                     }
                     if depth == 0 && is_metatag && j - i <= METATAG_MAX_LEN {
-                        let inner: String = self.chars[i + 1..j - 1].iter().collect();
+                        let inner = &self.text[i + 1..j - 1];
                         if inner
-                            .chars()
-                            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
                         {
                             i = j;
                             continue;
                         }
                     }
-                    if j < self.n && self.chars[j] == '(' {
+                    if j < self.n && self.char_at(j) == '(' {
                         let mut k = j + 1;
                         let mut link_depth = 1i32;
                         while k < self.n && link_depth > 0 {
-                            if self.chars[k] == '(' {
+                            let kc = self.char_at(k);
+                            if kc == '(' {
                                 link_depth += 1;
                             }
-                            if self.chars[k] == ')' {
+                            if kc == ')' {
                                 link_depth -= 1;
                             }
-                            k += 1;
+                            k += kc.len_utf8();
                         }
                         i = k;
                         continue;
                     }
                 }
                 if let Some(start_pos) = unbraced_start {
-                    let wrapped: String = self.chars[start_pos..].iter().collect();
-                    self.chars = format!("{{{wrapped}").chars().collect();
-                    self.n = self.chars.len();
-                    self.i = 0;
+                    self.text.insert(start_pos, '{');
+                    self.text.push('}');
+                    self.n = self.text.len();
+                    self.i = start_pos;
                     return;
                 }
                 break;
@@ -107,25 +106,25 @@ impl Repairer {
                 let str_start = i;
                 i += 1;
                 while i < self.n {
-                    let c = self.chars[i];
+                    let c = self.char_at(i);
                     if c == '\\' {
-                        i += 2;
+                        i += 1;
+                        if i < self.n {
+                            i += self.char_at(i).len_utf8();
+                        }
                     } else if c == '"' {
                         i += 1;
                         break;
                     } else {
-                        i += 1;
+                        i += c.len_utf8();
                     }
                 }
-                let mut j = i;
-                while j < self.n && self.chars[j].is_ascii_whitespace() {
-                    j += 1;
-                }
-                if j < self.n && self.chars[j] == ':' && unbraced_start.is_none() {
+                let j = self.skip_ws_at(i);
+                if j < self.n && self.char_at(j) == ':' && unbraced_start.is_none() {
                     unbraced_start = Some(str_start);
                 }
             } else {
-                i += 1;
+                i += ch.len_utf8();
             }
         }
         if i >= self.n {
@@ -133,13 +132,17 @@ impl Repairer {
         } else {
             self.i = i;
             debug_assert!(
-                self.i < self.n && (self.chars[self.i] == '{' || self.chars[self.i] == '['),
+                self.i < self.n && (self.cur() == '{' || self.cur() == '['),
                 "skip_prefix_junk: position does not point at JSON container start"
             );
         }
     }
 
-    /// Trim trailing whitespace/junk after the last depth-0 position in `out`.
+    /// Trim trailing whitespace after the last depth-0 position in `out`.
+    ///
+    /// Only trims when the tail is *all* whitespace (detected via
+    /// `tail.trim().is_empty()`).  Non-whitespace trailing junk is left
+    /// in place.
     pub(super) fn skip_suffix_junk(&mut self) {
         debug_assert!(
             self.last_depth0_pos <= self.out.len(),
@@ -159,23 +162,24 @@ impl Repairer {
     /// contains at least 3 consecutive `{…}` objects separated by optional
     /// commas — the repairer then wraps them in `[…]`.
     pub(super) fn is_implicit_object_sequence(&self) -> bool {
-        if self.i >= self.n || self.chars[self.i] != '{' {
+        if self.i >= self.n || self.cur() != '{' {
             return false;
         }
         let remaining = self.n - self.i;
         if remaining < IMPLICIT_SEQUENCE_MIN_LENGTH {
             return false;
         }
+        let scan_end = self.n.min(self.i + IMPLICIT_SEQUENCE_MAX_SCAN);
         let mut j = self.i;
         let mut count = 0;
         let mut depth = 0usize;
         let mut in_string = false;
         let mut esc = false;
-        while j + 1 < self.n {
-            let ch = self.chars[j];
+        while j + 1 < scan_end {
+            let ch = self.char_at(j);
             if esc {
                 esc = false;
-                j += 1;
+                j += ch.len_utf8();
                 continue;
             }
             if ch == '\\' {
@@ -189,7 +193,7 @@ impl Repairer {
                 continue;
             }
             if in_string {
-                j += 1;
+                j += ch.len_utf8();
                 continue;
             }
             if ch == '{' || ch == '[' {
@@ -202,22 +206,20 @@ impl Repairer {
             }
             if ch == '}' && depth == 0 {
                 let mut k = j + 1;
-                if k < self.n && self.chars[k] == ',' {
+                if k < self.n && self.char_at(k) == ',' {
                     k += 1;
                 }
-                while k < self.n && self.chars[k].is_ascii_whitespace() {
-                    k += 1;
-                }
-                if k < self.n && self.chars[k] == '{' {
+                k = self.skip_ws_at(k);
+                if k < self.n && self.char_at(k) == '{' {
                     count += 1;
-                    if count >= 3 {
+                    if count >= IMPLICIT_SEQUENCE_MIN_COUNT {
                         return true;
                     }
                     j = k;
                     continue;
                 }
             }
-            j += 1;
+            j += ch.len_utf8();
         }
         false
     }

@@ -32,20 +32,17 @@ def _load_entries() -> list[dict[str, str]]:
 def _repair_and_validate(text: str) -> None:
     """Repair and validate; raises on invalid output."""
     repaired = repair_json(text)
-    json.loads(str(repaired))
+    json.loads(repaired)
 
 
 def _repair_and_validate_unfixable(text: str) -> None:
     """Repair and attempt to validate; expect parse failure."""
     repaired = repair_json(text)
     with contextlib.suppress(json.JSONDecodeError):
-        json.loads(str(repaired))
+        json.loads(repaired)
 
 
-ENTRIES = _load_entries()
-FIXABLE = [e for e in ENTRIES if e["expected_valid"]]
-UNFIXABLE = [e for e in ENTRIES if not e["expected_valid"]]
-ALL_ENTRIES = FIXABLE + UNFIXABLE
+ALL_ENTRIES = _load_entries()
 
 
 class TestAllCases:

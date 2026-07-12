@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.3.10 🔒 (2026-07-12)
+
+### Performance
+- **ASCII byte fast path** (`cur()`/`char_at()`) — avoids UTF-8 decoder setup for 99%+ JSON chars.
+- **`needs_colon_fix` fusion** (`preprocess.rs`) — returns `Option<usize>` so `fix_colon_in_key` skips the first scan.
+- **Redundant bareword scan eliminated** (`string.rs`) — `is_closing_quote` caches lookahead result; `parse_string` reuses it instead of re-scanning.
+- **`validate_number` single scan** (`number.rs`) — three `matches().count()` calls merged into one byte traversal via `has_excessive_separators`.
+- **`match_lit` byte comparison** (`literal.rs`) — `eq_ignore_ascii_case` on `u8` slices, zero UTF-8 decode per char.
+- **Output buffer** 4096 → 65536 — fewer reallocations on large inputs.
+- **`is_implicit_object_sequence` early exit** — stops scanning after 64KB without 3 consecutive objects.
+- **`*/` detection** (`comment.rs`) — `starts_with(b"*/")` replaces two char decodes.
+- **Triple backtick** (`junk.rs`) — `starts_with(b"```")` throughout.
+- **Metatag validation** (`junk.rs`) — `bytes().all(...)` replaces `chars().all(...)`.
+- **Preprocess ASCII fast path** (`preprocess.rs`) — `fix_colon_in_key` and `fix_mixed_quotes` use byte-indexed `cur()` throughout.
+- **`object_loop` edge check** (`structure.rs`) — `{`/`:` skip guarded behind `expect_key`.
+- **`\u{200b}` separated** (`keys.rs`) — removed from `matches!` so the ASCII bitmask can optimize.
+- **`emit_escape` hex validation** (`string.rs`) — byte slice `.all(|b| b.is_ascii_hexdigit())`.
+- **`needs_separator`** (`repairer.rs`) — three `ends_with` calls replaced with single `matches!` byte lookup.
+
+### Code Quality
+- **`debug_assert!` → runtime recovery** (`string.rs`) — state assertions upgraded to runtime correction (state reset + missing quote insertion).
+- **`Some(']')` arm fixed** (`structure.rs`) — `object_loop` dead arm now restores `self.expect_key` with defensive comment.
+- **`parse_number` error position** (`number.rs`) — points at contaminating char instead of number start.
+- **Output buffer capacity** (`repairer.rs`) — 65536 → 262144 for non-ASCII safety margin.
+- **`MaybeUninit`→`Option`** (`repairer.rs`) — zero `unsafe` in the crate (niche optimization keeps `Option<ParseFrame>` at 8 bytes).
+- **`out_chars` removed** — 21 occurrences deleted. This field duplicated `String::len()` (O(1)), adding sync bugs and boilerplate. All `debug_assert_eq!(out.len(), out_chars)` calls removed.
+- **Literal pattern constants** (`literal.rs`) — `LIT_TRUE`, `LIT_FALSE`, etc. replace hardcoded byte lengths.
+- **Magic number naming** — `STACK_OVERHEAD` (8), `MAX_VALIDATION_DEPTH` (100), `IMPLICIT_SEQUENCE_MIN_COUNT` (3).
+- **`emit_bare_word` helper** (`keys.rs`) — shared scan loop for `parse_unquoted_key` and `parse_unquoted_value`.
+- **Redundant doc link fixed** — `[Repairer](self::Repairer)` → `[Repairer]`.
+
+### Changed
+- Rust crate `json-repair-core` bumped to **v0.1.10**.
+
+### Test Infrastructure
+- **JSONL data migration** — inline test data from `prefix_junk.rs`, `control_chars.rs`, `scenario.rs`, `edge_cases.rs`, `number.rs` moved to `tests/cases/*.jsonl`. 3 test files deleted; redundant `#[cfg(test)]` blocks removed.
+- **UTF-8 BOM purge** — `complex_scenarios.jsonl` and `triple_quoted.jsonl` stripped of BOM that caused `serde_json::from_str` failures.
+- **Fuzz corpus seeded** — 222 inputs from `tests/cases/*.jsonl` added to `fuzz/corpus/repair/` (25K+ total seeds, all passing bracket-balance validation).
+- **Doc comment audit** — 4 inaccuracies corrected (`peek_is` panic assertion, `Repairer::new` pre-decompose claim, `skip_suffix_junk` trim scope, `is_key_start` comment claim).
+
+### Python
+- **`__version__` auto-loading** (`__init__.py`) — hardcoded string replaced with `importlib.metadata.version("json-repair")`, falling back to `"0.0.0"`.
+- **`except Exception` narrowed** (`__init__.py`) — `except Exception` → `except PackageNotFoundError`; imports reorganized (stdlib before first-party).
+- **`text.strip()`→`isspace()`** (`_repair.py`) — zero-allocation emptiness check; surrogate detection uses `re.search()` C-level short-circuit; `@overload` default value removed; all imports use relative paths.
+- **Benchmark lazy loading** (`test_performance.py`) — module-level `_load_entries()` call moved into class; redundant `str()` wrapping removed.
+
 ## v0.3.9 (2026-07-09)
 
 ### Changed
@@ -154,7 +200,7 @@
 ## v0.3.4 (2026-07-04)
 
 ### Security
-- **Leading-zero number normalisation** — numbers with leading zeros
+- **Leading-zero number normalization** — numbers with leading zeros
   (`"000"`, `"-001"`, `"00.5"`) are now stripped to RFC 8259-conformant
   forms before emission (`"0"`, `"-1"`, `"0.5"`).
 
@@ -168,7 +214,7 @@
 
 ### Fixed
 - Leading-zero numbers now emit valid JSON (previously `f64::parse()`
-  accepted them and they were emitted verbatim, violating RFC 8259).
+  accepted them, and they were emitted verbatim, violating RFC 8259).
 
 ### Added
 - Numeric-corruption property tests (4 proptest functions) covering
@@ -316,7 +362,7 @@
 
 ### Fixed
 - Comma instead of colon after key — `"PROPERTY", "value": "text"` no longer
-  treated as colon (which consumed `"value"` as PROPERTY's value). Instead the
+  treated as colon (which consumed `"value"` as PROPERTY's value). Instead, the
   comma remains a separator: `"PROPERTY": null, "value": "text"`. Fix:
   `_parse_value` emits `null` when value position starts with `,`.
 - Stray `:` when expecting key now silently consumed (avoids parser breakage
@@ -346,7 +392,7 @@
 - `#` line comment support — `_skip_comment` handles `#…` line-ending comments;
   `_parse_value`/`_parse_object`/`_parse_array` recognize `#` alongside `//` and `/*`.
 - `tests/cases/comments.jsonl` with 3 entries.
-- Cython `wraparound=False` undefined-behaviour fix (`_out[-1]` → `_out[len(_out)-1]`).
+- Cython `wraparound=False` undefined-behavior fix (`_out[-1]` → `_out[len(_out)-1]`).
 
 ### Changed
 - `tests/cases/INDEX.md` regenerated (30 `.jsonl` files).
@@ -427,7 +473,7 @@
 ## v0.1.9 (2026-06-26)
 
 ### Added
-- Brace-as-array-close: `}` used to close an array auto-corrects to `]`
+- Brace-as-array-close: `}` used to close an array autocorrects to `]`
   (e.g. `{"a":[1}}]}` → `{"a":[1]}`).
 - `_parse_unquoted_value()`: bare-word string values detected and wrapped in
   double quotes (e.g. `{"name": John}` → `{"name": "John"}`).

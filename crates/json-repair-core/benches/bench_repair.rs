@@ -4,7 +4,7 @@ use std::path::Path;
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use serde::Deserialize;
 
-/// One entry from `bench_data.jsonl`: a labelled malformed-JSON input and
+/// One entry from `bench_data.jsonl`: a labeled malformed-JSON input and
 /// whether it is expected to repair to valid JSON.
 #[derive(Deserialize)]
 #[allow(dead_code)]

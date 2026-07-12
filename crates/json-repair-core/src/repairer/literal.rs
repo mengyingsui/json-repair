@@ -2,6 +2,17 @@
 
 use super::Repairer;
 
+/// Literal string patterns recognised by `parse_literal`.
+const LIT_TRUE: &str = "true";
+const LIT_FALSE: &str = "false";
+const LIT_NULL: &str = "null";
+const LIT_NONE: &str = "none";
+const LIT_UNDEFINED: &str = "undefined";
+const LIT_NAN: &str = "nan";
+const LIT_INFINITY: &str = "infinity";
+const LIT_POS_INF: &str = "+infinity";
+const LIT_NEG_INF: &str = "-infinity";
+
 impl Repairer {
     /// Case-insensitive prefix match against a pattern, starting at `self.i`.
     /// Returns `true` if the next characters (case-insensitively) equal `pat`.
@@ -11,40 +22,35 @@ impl Repairer {
         if self.i + plen > self.n {
             return false;
         }
-        pat.bytes()
-            .enumerate()
-            .all(|(j, p)| self.chars[self.i + j].to_ascii_lowercase() == p as char)
+        self.text.as_bytes()[self.i..self.i + plen]
+            .iter()
+            .zip(pat.bytes())
+            .all(|(&a, b)| a.eq_ignore_ascii_case(&b))
     }
 
     /// Parse a bareword literal (`true`/`false`/`null`/`none`/`undefined`/
     /// `NaN`/`Infinity`), emitting the JSON equivalent.  Falls back to
     /// `parse_unquoted_value` if no literal matches.
     pub(super) fn parse_literal(&mut self) {
-        if self.match_lit("true") {
-            self.emit_str("true");
-            self.i += 4;
-        } else if self.match_lit("false") {
-            self.emit_str("false");
-            self.i += 5;
-        } else if self.match_lit("null") || self.match_lit("none") {
-            self.emit_str("null");
-            self.i += 4;
-        } else if self.match_lit("undefined") {
-            self.emit_str("null");
-            self.i += 9;
-        } else if self.match_lit("nan") {
-            self.emit_str("null");
-            self.i += 3;
-        } else if self.match_lit("infinity") {
-            self.emit_str("null");
-            self.i += 8;
-        } else if self.match_lit("+infinity") || self.match_lit("-infinity") {
-            self.emit_str("null");
-            self.i += 9;
-        } else {
-            self.parse_unquoted_value();
-            return;
+        const ENTRIES: &[(&str, &str)] = &[
+            (LIT_TRUE, LIT_TRUE),
+            (LIT_FALSE, LIT_FALSE),
+            (LIT_NONE, LIT_NULL),
+            (LIT_NULL, LIT_NULL),
+            (LIT_UNDEFINED, LIT_NULL),
+            (LIT_NAN, LIT_NULL),
+            (LIT_INFINITY, LIT_NULL),
+            (LIT_POS_INF, LIT_NULL),
+            (LIT_NEG_INF, LIT_NULL),
+        ];
+        for &(pat, emit) in ENTRIES {
+            if self.match_lit(pat) {
+                self.out.push_str(emit);
+                self.i += pat.len();
+                self.just_emitted_value = true;
+                return;
+            }
         }
-        self.just_emitted_value = true;
+        self.parse_unquoted_value();
     }
 }

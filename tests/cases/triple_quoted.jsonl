@@ -3,5 +3,4 @@
 {"input": "{\"key\": \"\"\"line1\nline2\nline3\"\"\"}", "expected": {"key": "line1\nline2\nline3"}}
 {"input": "{\"code\": \"\"\"def foo():\n    return \"bar\"\n\"\"\"}", "expected": {"code": "def foo():\n    return \"bar\"\n"}}
 {"input": "{\"key\": \"\"\"\"\"\"}", "expected": {"key": ""}}
-
 {"input": "{\"code\": \"\"\"def greet(name):\n    print(f\"Hello, {name}\")\n\"\"\"}", "expected": {"code": "def greet(name):\n    print(f\"Hello, {name}\")\n"}}

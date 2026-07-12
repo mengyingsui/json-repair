@@ -5,10 +5,10 @@ testing is handled by the Rust test suite (`cargo test -p json-repair-core`).
 
 ## File
 
-| File | Description |
-|------|-------------|
+| File                  | Description                                                                                               |
+|-----------------------|-----------------------------------------------------------------------------------------------------------|
 | `test_performance.py` | Micro-benchmarks via `pytest-benchmark` — runs every entry from `bench_data.jsonl` through `repair_json`. |
-| `__init__.py` | Package init. |
+| `__init__.py`         | Package init.                                                                                             |
 
 ## Run
 

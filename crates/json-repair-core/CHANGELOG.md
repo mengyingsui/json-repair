@@ -1,5 +1,44 @@
 # Changelog — json-repair-core
 
+## v0.1.10 (2026-07-12)
+
+### Performance
+- **ASCII byte fast path** (`cur()`/`char_at()`) — avoids full UTF-8 decoder for the 99%+ of JSON chars that are ASCII. Checks `text.as_bytes()[i].is_ascii()` first, falls back to `chars().next()` only for multibyte chars.
+- **`needs_colon_fix` fusion** (`preprocess.rs`) — returns `Option<usize>`, so `fix_colon_in_key` jumps directly to the first problematic `"` instead of rescanning from byte 0.
+- **Redundant bareword scan eliminated** (`string.rs`) — `is_closing_quote` now `&mut self` and caches the position of the `"` after a bareword lookahead in `self.lookahead_pos`. `parse_string` checks the cache before doing its own bareword scan, avoiding a second traversal.
+- **`validate_number` single scan** (`number.rs`) — the identical multi-period/multi-exponent pre-check was duplicated across both `cfg` variants. Extracted as `has_excessive_separators` — a single byte scan (`for &b in s.as_bytes()`).
+- **`match_lit` byte comparison** (`literal.rs`) — `eq_ignore_ascii_case` on `&[u8]` slices eliminates per-character UTF-8 decoding.
+- **Output buffer** 4096 → 65536 (`repairer.rs`).
+- **`is_implicit_object_sequence` early exit** (`junk.rs`) — stops scanning after 65536 bytes. New constant `IMPLICIT_SEQUENCE_MAX_SCAN`.
+- **`*/` detection** (`comment.rs`) — `starts_with(b"*/")` replaces `cur() == '*' && char_at(i+1) == '/'`.
+- **Triple backtick** (`junk.rs`) — `starts_with(b"```")` in both fence-open and fence-close checks.
+- **Metatag content validation** (`junk.rs`) — `bytes().all(|b| ...)` replaces `chars().all(|c| ...)` (all valid chars are ASCII).
+- **Preprocess ASCII fast path** (`preprocess.rs`) — `fix_colon_in_key` and `fix_mixed_quotes` now do a byte-indexed ASCII check before `text[i..].chars().next()`.
+- **`object_loop` edge check** (`structure.rs`) — `{`/`:` skip guarded behind `self.expect_key`.
+- **`\u{200b}` separated from `matches!`** (`keys.rs`) — the zero-width space was the only non-ASCII variant, preventing the compiler from using a bitmask optimization.
+- **`emit_escape` hex validation** (`string.rs`) — `all(|b| b.is_ascii_hexdigit())` on `self.text.as_bytes()[i+1..i+5]`.
+- **`needs_separator`** (`repairer.rs`) — three `ends_with` calls (`','`, `'{'`, `'['`) replaced with single `matches!` byte lookup.
+
+### Code Quality
+- **`debug_assert!` → runtime recovery** (`string.rs`) — state-postcondition checks upgraded from `debug_assert!` to actual runtime correction: `self.state = ParserState::Normal` reset and missing closing-quote auto-insertion.
+- **`Some(']')` arm fixed** (`structure.rs`) — `object_loop`'s dead `Some(']')` arm now restores `self.expect_key = prev_expect` (consistent with `Some('}')` arm) and carries a defensive comment.
+- **`parse_number` error position** (`number.rs`) — error position changed from `start` to `self.i` so it correctly points at the contaminating non-numeric character.
+- **Output buffer capacity** (`repairer.rs`) — raised from 65536 to 262144 (1&lt;&lt;18) to reduce reallocations on large non-ASCII inputs.
+- **`out_chars` field removed** — this redundant byte counter duplicated `String::len()` (O(1)). Removed 21 occurrences across `repairer.rs`, `string.rs`, `structure.rs`. All `debug_assert_eq!(out.len(), out_chars)` sync checks deleted.
+- **Literal pattern constants** (`literal.rs`) — `LIT_TRUE`, `LIT_FALSE`, `LIT_NULL`, `LIT_NONE`, `LIT_UNDEFINED`, `LIT_NAN`, `LIT_INFINITY`, `LIT_POS_INF`, `LIT_NEG_INF` — use `.len()` instead of hardcoded byte lengths (4, 5, 4, 9, 3, 8, 9).
+- **Magic number naming** — `STACK_OVERHEAD` (8, was inline in `STACK_CAPACITY`), `MAX_VALIDATION_DEPTH` (100), `IMPLICIT_SEQUENCE_MIN_COUNT` (3).
+- **`emit_bare_word` helper** (`keys.rs`) — extracted the shared char-loop from `parse_unquoted_key` and `parse_unquoted_value`.
+- **Redundant doc link fixed** — `[Repairer](self::Repairer)` → `[Repairer]`.
+- **Collapsed nested `if`** — clippy fix in `structure.rs`.
+- **`MaybeUninit`→`Option`** (`repairer.rs`) — `[MaybeUninit<ParseFrame>; 520]` replaced with `[Option<ParseFrame>; 520]`, eliminating the only `unsafe` in the crate. Zero overhead (niche optimization keeps `Option<ParseFrame>` at 8 bytes).
+- **`skip_ws`/`skip_ws_at` byte path** — `text.as_bytes()[i].is_ascii_whitespace()` replaces `char_at` call, eliminating UTF-8 decode overhead for whitespace scanning.
+
+### Tests
+- **JSONL data migration** — inline `#[cfg(test)]` data from `prefix_junk.rs`, `control_chars.rs`, `scenario.rs`, `edge_cases.rs`, `number.rs` moved to `tests/cases/*.jsonl`. Test files `prefix_junk.rs` and `control_chars.rs` deleted; `CORPUS_INPUTS` and 8 static-input tests and 6 leading-zero tests removed.
+- **UTF-8 BOM removed** — `complex_scenarios.jsonl` and `triple_quoted.jsonl` had BOM bytes that silently broke `serde_json::from_str`.
+- **Fuzz corpus extended** — 222 seed inputs drawn from JSONL test cases added to `fuzz/corpus/repair/`.
+- **Doc audit** — 4 doc fixes: `peek_is` panic note, `Repairer::new` pre-decompose removal, `skip_suffix_junk` trim scope, `is_key_start` comment exclusion.
+
 ## v0.1.9 (2026-07-09)
 
 ### Changed
@@ -144,7 +183,7 @@
 ## v0.1.4 (2026-07-04)
 
 ### Security
-- **Number normalisation** — leading zeros in numbers are stripped
+- **Number normalization** — leading zeros in numbers are stripped
   (`"000"` → `"0"`, `"-001"` → `"-1"`) so emitted JSON conforms to RFC 8259
   (which forbids leading zeros). Previously `f64::parse()` accepted
   non-conformant numbers which were emitted verbatim.

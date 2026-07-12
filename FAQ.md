@@ -83,10 +83,10 @@ starts with `{` or `[` (though that case is rare in LLM output).
 
 Two symmetric fixes handle swapped closing brackets:
 
-| Fix | Pattern | Behavior |
-|-----|---------|----------|
+| Fix                  | Pattern                                 | Behavior                                                                                  |
+|----------------------|-----------------------------------------|-------------------------------------------------------------------------------------------|
 | **Object `]` close** | `[{"key": value]}` → `[{"key": value}]` | When `]` appears where `}` is expected in an object, the object is closed with `}` first. |
-| **Array `}` close** | `{"a":[1}}]}` → `{"a":[1]}` | When `}` appears where `]` is expected in an array, the array is closed with `]` first. |
+| **Array `}` close**  | `{"a":[1}}]}` → `{"a":[1]}`             | When `}` appears where `]` is expected in an array, the array is closed with `]` first.   |
 
 Both only trigger when the wrong bracket is found at the *expected* closing
 position of a nested construct — they do not rearrange arbitrary bracket
@@ -131,11 +131,11 @@ trailing `\n```\s*` pattern.
 
 The string parser uses a multi-strategy heuristic:
 
-| Next non-whitespace char | Decision |
-|--------------------------|----------|
-| `,` `:` `\n` `"` | Closing quote |
-| `]` / `}` | Uses **bracket-stack + string-aware balance scan**:<br>1. If closing bracket doesn't match the current open bracket → **Embedded** (the bracket can't be a real closer).<br>2. If it matches, a forward scan checks whether treating this `"` as a terminator leads to a balanced close. The scan is string-aware (brackets inside unterminated j unk strings don't count) and requires an out-of-string `:` before `}` when structural `,` follows the terminator — preventing mimic junk like `"c", "d"}` from being falsely accepted. |
-| anything else | Embedded content → escape |
+| Next non-whitespace char | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+|--------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `,` `:` `\n` `"`         | Closing quote                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `]` / `}`                | Uses **bracket-stack + string-aware balance scan**:<br>1. If closing bracket doesn't match the current open bracket → **Embedded** (the bracket can't be a real closer).<br>2. If it matches, a forward scan checks whether treating this `"` as a terminator leads to a balanced close. The scan is string-aware (brackets inside unterminated j unk strings don't count) and requires an out-of-string `:` before `}` when structural `,` follows the terminator — preventing mimic junk like `"c", "d"}` from being falsely accepted. |
+| anything else            | Embedded content → escape                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 This handles natural-language `"He said "]boom" loudly"` and similar
 embedded quotes before `]`/`}` without false positives from structural

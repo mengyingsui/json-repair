@@ -18,3 +18,50 @@
 {"input": "{\"a\": \"\\\\", "expected": {"a": "\\"}}
 {"input": "\"\\\\", "expected": "\\"}
 {"input": "{\n  \"entities\": [\n    {\"name\": \"user\", \"type\": \"PERSON\"},  // inline comment\n    {\"name\": \"Canterbury\", \"type\": \"LOCATION\"},  // duplicate key comment\n    {\"name\": \"Canterbury\", \"type\": \"ORGANIZATION\"},  // repeated\n    {\"name\": \"Canterbury\", \"type\": \"PRODUCT\"}  // truncated", "expected": {"entities": [{"name": "user", "type": "PERSON"}, {"name": "Canterbury", "type": "LOCATION"}, {"name": "Canterbury", "type": "ORGANIZATION"}, {"name": "Canterbury", "type": "PRODUCT"}]}}
+{"input": "{\n: {\n::::::::::::::::::::::::::::::::::::::::evel }\n}"}
+{"input": "{\"outer\": {\"inn} Som}}}}}}}}}}}-}\"say \"yes\" please\"}}"}
+{"input": "{\"events\": [{\"step\"valxt\": \"plans.\", time\": n\"\"u\"}ll}]}]}"}
+{"input": "{\"a\":\"}\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\":\"}"}
+{"input": "{\"key\": \"}\" }"}
+{"input": "{\"key\": [\"{\"} ]"}
+{"input": "[\"}\", { \"key\": \"]\" }]"}
+{"input": "[1, 2, 3, ]"}
+{"input": "1, 2, 3"}
+{"input": "\"hello\", \"world\""}
+{"input": "{inside} \"key\": 1}"}
+{"input": "{a{inside}b \"key\": 1}"}
+{"input": "{\"a\": {\"b\": [1, 2, 3]}}"}
+{"input": "[[[1], [2]], [[3]]]"}
+{"input": "{\"a\": [1, 2"}
+{"input": "{\"a\": "}
+{"input": "{\"a\": 1}}"}
+{"input": "[1, 2]]"}
+{"input": "}}}["}
+{"input": "[[[[[[[[[[1]]]]]]]]]]"}
+{"input": "{{{{{{{{{{1}}}}}}}}}}"}
+{"input": "{\"a\": 1, \"b\": 2,}"}
+{"input": "[1, 2, 3,]"}
+{"input": "{\"a\": [{\"b\": 1}]}"}
+{"input": "[[{}], {}]"}
+{"input": "{key: va{lue}"}
+{"input": "{key: va[lu]e}"}
+{"input": "[]"}
+{"input": "{}"}
+{"input": "[{}]"}
+{"input": "}"}
+{"input": "]"}
+{"input": "}{"}
+{"input": "]["}
+{"input": "{\"entities\": [\n]||||||||||m\"} --e: typo\n]||||||||||||||}"}
+{"input": "{\"\": \"{\"\u0001\u0000\u0000e\\\\u555555555333333333h55555555555denestest\"e}}"}
+{"input": "Z{\"a\": 1, {{\" ZZZZZZZZZZZZZZZZZZZZZZZZZ~ner\" quotes\"\"\"}"}
+{"input": "{\"a\": True, \"b\": False,a\": True, \"b\": False, \"c \"c\": None}\r\n"}
+{"input": "{\"a\": {\"b\": [1, 2, 3]}}invalid trailing text"}
+{"input": "prefix junk {\"a\": 1}"}
+{"input": "{\"vho\": \"r*\\\n\"}", "expected": {"vho": "r*\n"}}
+{"input": "000", "expected": 0}
+{"input": "-001", "expected": -1}
+{"input": "00.5", "expected": 0.5}
+{"input": "0", "expected": 0}
+{"input": "0.5", "expected": 0.5}
+{"input": "123", "expected": 123}

@@ -137,7 +137,7 @@ proptest! {
     #[test]
     fn numeric_corruption_rejected_or_fixed(input in numeric_corruption_input()) {
         // Some number-corrupted inputs may be repairable, others must error.
-        // Neither path should panic or produce invalid JSON.
+        // Neither path should panic nor produce invalid JSON.
         if let Ok(repaired) = json_repair_core::repair_json(&input) {
             if !repaired.is_empty() {
                 let _: serde_json::Value = serde_json::from_str(&repaired)

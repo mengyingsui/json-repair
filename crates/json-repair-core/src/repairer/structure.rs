@@ -1,6 +1,6 @@
 //! Object/array frame management and value resume logic.
 
-use super::{ParseFrame, Repairer};
+use super::{ParseFrame, Repairer, Stack};
 
 /// Whether `ch` can start a JSON value (string, number, literal, object, array).
 #[inline]
@@ -25,7 +25,10 @@ fn is_value_start(ch: char) -> bool {
     ) || ch.is_ascii_digit()
 }
 
-/// Whether `ch` can start an object key (quoted, single-quoted, unquoted, or comment).
+/// Whether `ch` can start an object key (quoted, single-quoted, or unquoted bare word).
+///
+/// Note: comment-start characters (`/`, `#`, `-`) are handled upstream before
+/// this function is called and are not included here.
 #[inline]
 fn is_key_start(ch: char) -> bool {
     matches!(ch, '"' | '_' | '/' | '\'') || ch.is_ascii_alphabetic()
@@ -38,17 +41,21 @@ impl Repairer {
     /// Used to disambiguate `"word"` as a key vs. an unquoted string value.
     fn looks_like_key(&self) -> bool {
         let mut j = self.i + 1;
-        while j < self.n && (self.chars[j].is_alphanumeric() || self.chars[j] == '_') {
+        loop {
+            let ch = self.char_at(j);
+            if !(ch.is_alphanumeric() || ch == '_') {
+                break;
+            }
+            j += ch.len_utf8();
+        }
+        while j < self.n && matches!(self.char_at(j), ' ' | '\t' | '\r') {
             j += 1;
         }
-        while j < self.n && matches!(self.chars[j], ' ' | '\t' | '\r') {
-            j += 1;
-        }
-        j < self.n && matches!(self.chars[j], ',' | '"' | ':')
+        j < self.n && matches!(self.char_at(j), ',' | '"' | ':')
     }
 
     /// Continue an object loop after a nested value has been completed.
-    pub(super) fn resume_object(&mut self, stack: &mut Vec<ParseFrame>, prev_expect: bool) {
+    pub(super) fn resume_object(&mut self, stack: &mut Stack, prev_expect: bool) {
         self.expect_key = true;
         self.just_emitted_value = true;
         self.object_loop(stack, prev_expect, false);
@@ -56,39 +63,28 @@ impl Repairer {
 
     /// Object loop: processes one element at a time.
     /// Returns when the object is complete or a nested-value parse is needed.
-    pub(super) fn object_loop(
-        &mut self,
-        stack: &mut Vec<ParseFrame>,
-        prev_expect: bool,
-        first: bool,
-    ) {
+    pub(super) fn object_loop(&mut self, stack: &mut Stack, prev_expect: bool, first: bool) {
         loop {
             self.skip_ws();
             if self.i >= self.n {
                 self.trim_trailing_comma();
                 break;
             }
-            let ch = self.chars[self.i];
-            if ch == '{' && self.expect_key {
-                self.i += 1;
-                continue;
-            }
-            if ch == ':' && self.expect_key {
+            let ch = self.cur();
+            if self.expect_key && (ch == '{' || ch == ':') {
                 self.i += 1;
                 continue;
             }
             if ch == '}' {
                 self.trim_trailing_comma();
                 self.emit_char('}');
-                let popped = self.brackets.pop();
+                let popped = self.brackets_pop();
                 debug_assert_eq!(
                     popped,
                     Some('}'),
                     "object_loop: closing }} but top of bracket stack is not }}"
                 );
-                if self.brackets.is_empty() {
-                    self.last_depth0_pos = self.out_chars;
-                }
+                self.update_depth0();
                 self.i += 1;
                 self.expect_key = prev_expect;
                 self.just_emitted_value = true;
@@ -102,41 +98,38 @@ impl Repairer {
                 self.expect_key = true;
                 continue;
             }
-            if ch == '/' || ch == '#' || (ch == '-' && self.peek_is("--")) {
+            if self.is_comment_start(ch) {
                 self.skip_comment();
                 continue;
             }
             if ch == '"' && self.just_emitted_value {
-                let mut j = self.i + 1;
-                while j < self.n && self.chars[j].is_ascii_whitespace() {
-                    j += 1;
-                }
-                if j >= self.n || matches!(self.chars[j], '}' | ',' | ']' | ':') {
+                let j = self.skip_ws_at(self.i + 1);
+                if j >= self.n || matches!(self.char_at(j), '}' | ',' | ']' | ':') {
                     self.i += 1;
                     continue;
                 }
             }
             if ch == ']' {
                 self.trim_trailing_comma();
-                let popped = self.brackets.pop();
+                let popped = self.brackets_pop();
                 match popped {
                     Some('}') => {
                         self.emit_char('}');
-                        if self.brackets.is_empty() {
-                            self.last_depth0_pos = self.out_chars;
-                        }
+                        self.update_depth0();
                         self.i += 1;
                         self.just_emitted_value = true;
                         self.expect_key = prev_expect;
                         return;
                     }
                     Some(']') => {
+                        // Defensive: unreachable in practice (object_loop runs
+                        // only when the innermost bracket is an object `}`),
+                        // but kept for consistency with `array_loop`.
                         self.emit_char(']');
-                        if self.brackets.is_empty() {
-                            self.last_depth0_pos = self.out_chars;
-                        }
+                        self.update_depth0();
                         self.i += 1;
                         self.just_emitted_value = true;
+                        self.expect_key = prev_expect;
                         return;
                     }
                     _ => {
@@ -153,17 +146,12 @@ impl Repairer {
                 if ch.is_ascii_alphabetic() && !self.looks_like_key() {
                     break;
                 }
-                if !first
-                    && self.just_emitted_value
-                    && !self.out.ends_with(',')
-                    && !self.out.ends_with('{')
-                    && !self.out.ends_with('[')
-                {
+                if self.needs_separator(first) {
                     self.emit_char(',');
                 }
                 self.parse_key();
                 self.skip_ws();
-                if self.i < self.n && self.chars[self.i] == ':' {
+                if self.i < self.n && self.cur() == ':' {
                     self.emit_char(':');
                     self.i += 1;
                 } else {
@@ -177,15 +165,7 @@ impl Repairer {
                 if !first && !is_value_start(ch) {
                     break;
                 }
-                if !first
-                    && self.just_emitted_value
-                    && !self.out.ends_with(',')
-                    && !self.out.ends_with('{')
-                    && !self.out.ends_with('[')
-                    && ch != '}'
-                    && ch != ']'
-                    && ch != ','
-                {
+                if self.needs_separator(first) && ch != '}' && ch != ']' && ch != ',' {
                     self.emit_char(',');
                 }
                 stack.push(ParseFrame::ResumeObject { prev_expect });
@@ -193,65 +173,59 @@ impl Repairer {
                 return;
             }
         }
-        if self.i < self.n && self.brackets.last() == Some(&'}') {
+        if self.i < self.n && self.brackets_last() == Some('}') {
             self.trim_trailing_comma();
             self.emit_char('}');
-            self.brackets.pop();
+            self.brackets_pop();
             self.just_emitted_value = true;
         }
         self.expect_key = prev_expect;
     }
 
     /// Continue an array loop after a nested value has been completed.
-    pub(super) fn resume_array(&mut self, stack: &mut Vec<ParseFrame>) {
+    pub(super) fn resume_array(&mut self, stack: &mut Stack) {
         self.just_emitted_value = true;
         self.array_loop(stack, false);
     }
 
     /// Array loop: processes one element at a time.
     /// Returns when the array is complete or a nested-value parse is needed.
-    pub(super) fn array_loop(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
+    pub(super) fn array_loop(&mut self, stack: &mut Stack, first: bool) {
         loop {
             self.skip_ws();
             if self.i >= self.n {
                 self.trim_trailing_comma();
                 break;
             }
-            let ch = self.chars[self.i];
+            let ch = self.cur();
             if ch == ']' {
                 self.trim_trailing_comma();
                 self.emit_char(']');
-                let popped = self.brackets.pop();
+                let popped = self.brackets_pop();
                 debug_assert_eq!(
                     popped,
                     Some(']'),
                     "array_loop: closing ] but top of bracket stack is not ]"
                 );
-                if self.brackets.is_empty() {
-                    self.last_depth0_pos = self.out_chars;
-                }
+                self.update_depth0();
                 self.i += 1;
                 self.just_emitted_value = true;
                 return;
             }
             if ch == '}' {
                 self.trim_trailing_comma();
-                let popped = self.brackets.pop();
+                let popped = self.brackets_pop();
                 match popped {
                     Some(']') => {
                         self.emit_char(']');
-                        if self.brackets.is_empty() {
-                            self.last_depth0_pos = self.out_chars;
-                        }
+                        self.update_depth0();
                         self.i += 1;
                         self.just_emitted_value = true;
                         return;
                     }
                     Some('}') => {
                         self.emit_char('}');
-                        if self.brackets.is_empty() {
-                            self.last_depth0_pos = self.out_chars;
-                        }
+                        self.update_depth0();
                         self.i += 1;
                         self.just_emitted_value = true;
                         continue;
@@ -270,17 +244,11 @@ impl Repairer {
                 self.i += 1;
                 continue;
             }
-            if ch == '/' || ch == '#' || (ch == '-' && self.peek_is("--")) {
+            if self.is_comment_start(ch) {
                 self.skip_comment();
                 continue;
             }
-            if !first
-                && self.just_emitted_value
-                && !self.out.ends_with(',')
-                && !self.out.ends_with('[')
-                && !self.out.ends_with(':')
-                && ch != ']'
-            {
+            if self.needs_separator(first) && !self.out.ends_with(':') && ch != ']' {
                 self.emit_char(',');
             }
             // Parse value and come back
@@ -291,10 +259,10 @@ impl Repairer {
     }
 
     /// Resume an implicit-array loop after a top-level object completes.
-    pub(super) fn resume_implicit_array(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
+    pub(super) fn resume_implicit_array(&mut self, stack: &mut Stack, first: bool) {
         self.just_emitted_value = true;
         self.skip_ws();
-        if self.i < self.n && self.chars[self.i] == ',' {
+        if self.i < self.n && self.cur() == ',' {
             self.i += 1;
         }
         self.implicit_array_loop(stack, first);
@@ -302,9 +270,9 @@ impl Repairer {
 
     /// Implicit-array loop: emit comma separators between top-level objects
     /// and close the synthetic `]` when done.
-    pub(super) fn implicit_array_loop(&mut self, stack: &mut Vec<ParseFrame>, first: bool) {
+    pub(super) fn implicit_array_loop(&mut self, stack: &mut Stack, first: bool) {
         self.skip_ws();
-        if self.i < self.n && self.chars[self.i] == '{' {
+        if self.i < self.n && self.cur() == '{' {
             if !first {
                 self.emit_char(',');
             }

@@ -27,12 +27,12 @@ fn main() {
 
 ## API
 
-| Function | Description |
-|----------|-------------|
-| `repair_json(text)` | Repair malformed JSON, returns `Ok(String)` or `Err(JsonRepairError)` |
-| `repair_json_debug(text)` | Like `repair_json` with extra assertions (zero-cost in release) |
-| `fix_colon_in_key(text)` | Split `"key:value"` → `"key":"value"` when followed by `,` or `}` |
-| `fix_mixed_quotes(text)` | Fix `','word":"` boundary between double- and single-quoted segments |
+| Function                  | Description                                                           |
+|---------------------------|-----------------------------------------------------------------------|
+| `repair_json(text)`       | Repair malformed JSON, returns `Ok(String)` or `Err(JsonRepairError)` |
+| `repair_json_debug(text)` | Like `repair_json` with extra assertions (zero-cost in release)       |
+| `fix_colon_in_key(text)`  | Split `"key:value"` → `"key":"value"` when followed by `,` or `}`     |
+| `fix_mixed_quotes(text)`  | Fix `','word":"` boundary between double- and single-quoted segments  |
 
 ## Architecture
 
