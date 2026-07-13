@@ -1,5 +1,0 @@
-{"events": [{"steps": [{
-  {
-    "text": "hello"
-  }
-}]}]}

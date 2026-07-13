@@ -1,6 +1,0 @@
-{"items":[
-{"text":"想到这里，周明瑞跟在脸涂红黄油彩的女子身后，弯腰进了那低矮的帐篷","entity":"周明瑞","type":4,"stable":false,"topic":"entering tent"},
-{"text":"帐篷内非常黑暗，只有少许光线透入，隐约照出一嚄桌子","entity":"帐篷","type":9,"stable":false,"topic":"darkness and table"},
-{"text":"头戴尖帽的女子一点不受影响，黑色长裙仿佛漂荡在水上，她绕过桌子坐到对面，点燃了蜡烛","entity":null,"type":9,"stable":false,"topic":"woman's actions"},
-{"text":"昏黄摇曳，帐篷内似明似暗，瞬间多了几分神秘的意味","entity":null,"type":9,"stable":false,"topic":"atmosphere"}
-]}

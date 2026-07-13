@@ -1,3 +1,0 @@
-{"items":[
-{"text":"周明瑞放下心来，将左轮手枪往口袋里塞了一点，接着坦然伸出双手，熟练地洗牌、切牌。","entity":"周明瑞","type":4,"stable":false,"topic":"action"}}
-]}

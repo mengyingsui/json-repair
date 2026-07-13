@@ -1,7 +1,0 @@
-{
-            "facts": [{
-                "what": "The team needs to find the first branch.",
-                "who": "\*keeper, dwarf, bear, user",
-                "entities": ["\*keeper", "dwarf", "Tree of Life"]
-            }]
-        }

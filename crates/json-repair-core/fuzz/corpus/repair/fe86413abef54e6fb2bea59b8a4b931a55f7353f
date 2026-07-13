@@ -1,6 +1,0 @@
-{"items":[
-{"text":"枪是从哪里来的？","entity":"枪","type":9,"stable":false,"topic":"origin of the gun"},
-{"text":"自杀，还是伪装成自杀？","entity":"自杀","type":6,"stable":false,"topic":"suicide or fake suicide"},
-{"text":"这种自杀方式怎么才留下这点血痕？","entity":"自杀","type":8,"stable":false,"topic":"blood traces of suicide"},
-{"text":"是因为我穿越及时，自带治愈福利？","entity":null,"type":6{"a": 1,},"stable":false,"topic":"time travel and healing ability"}
-]}

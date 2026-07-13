@@ -1,1 +1,0 @@
-{"actions": [{"text": "hello", "subject": "world", "verb": "test", "object": "foo"]}]}

@@ -1,7 +1,0 @@
-[{ name: 'Test',
-            // a comment
-        "    message": "He said "try it" to me",
-            "items": [1, 2, 3,],
-            "nested": {'key': "value",}
-            extra_key:"val"
-: Infnii[2]

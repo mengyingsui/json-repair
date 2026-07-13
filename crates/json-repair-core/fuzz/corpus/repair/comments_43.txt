@@ -1,2 +1,0 @@
-{"a": 1,  # hash inline
-  "b": 2}

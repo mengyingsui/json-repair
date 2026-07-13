@@ -1,3 +1,0 @@
-Sure! Here is the JSON you requested:
-
-{"name": "test"}

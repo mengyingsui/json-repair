@@ -1,1 +1,0 @@
-{"event_type":"X","role_argument_pairs":[{"role":"r","argument":"text."}]}junk

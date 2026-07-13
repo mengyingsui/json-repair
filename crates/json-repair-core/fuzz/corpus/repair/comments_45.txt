@@ -1,2 +1,0 @@
-{"entities": [{"name": "x"} -- Note: typo
-]}
