@@ -88,6 +88,10 @@ pub(crate) struct Repairer {
     /// Byte offset in `out` of the last position at depth 0 (for suffix
     /// junk trimming).
     last_depth0_pos: usize,
+    /// Net bracket depth of emitted output: +1 per `brackets_push`, -1 per
+    /// `brackets_pop`.  Must be zero after `close_brackets()` — replaces the
+    /// `is_output_balanced` scan.
+    bracket_depth: i32,
     /// Deferred error (set by helpers, checked by the main loop).
     error: Option<JsonRepairError>,
     /// Current string-state-machine state.
@@ -114,6 +118,7 @@ impl Repairer {
             brackets: ['\0'; STACK_CAPACITY],
             brackets_len: 0,
             last_depth0_pos: 0,
+            bracket_depth: 0,
             error: None,
             state: ParserState::Normal,
         }
@@ -208,6 +213,7 @@ impl Repairer {
         assert!(self.brackets_len < STACK_CAPACITY, "bracket stack overflow");
         self.brackets[self.brackets_len] = c;
         self.brackets_len += 1;
+        self.bracket_depth += 1;
     }
 
     /// Pop the top closing bracket from the bracket stack.
@@ -217,6 +223,7 @@ impl Repairer {
             None
         } else {
             self.brackets_len -= 1;
+            self.bracket_depth -= 1;
             Some(self.brackets[self.brackets_len])
         }
     }
@@ -338,6 +345,7 @@ impl Repairer {
 
         if self.is_implicit_object_sequence() {
             self.emit_char('[');
+            self.brackets_push(']');
             stack.push(ParseFrame::ImplicitArrayLoop(0));
         } else {
             stack.push(ParseFrame::Value);
@@ -374,7 +382,7 @@ impl Repairer {
         self.close_brackets();
         self.skip_suffix_junk();
         let out = std::mem::take(&mut self.out);
-        if !Self::is_output_balanced(&out) {
+        if self.bracket_depth != 0 {
             return Err(JsonRepairError {
                 message: "repaired output has unbalanced brackets".to_string(),
                 position: None,
@@ -387,16 +395,14 @@ impl Repairer {
 
 impl Repairer {
     /// Debug-only validation: for shallow output, parse with serde_json.
-    /// Balance is already enforced by `repair()` — this only catches
-    /// cases where valid-JSON output still fails serde_json parsing.
+    /// Bracket balance is tracked by `bracket_depth` in all build profiles.
     #[cfg(debug_assertions)]
     fn debug_validate_output(out: &str) -> Result<(), JsonRepairError> {
         Self::validate_serde_json(out);
         Ok(())
     }
 
-    /// Non-debug stub (always succeeds — balance is already checked in
-    /// `repair()` before calling this).
+    /// Non-debug stub (always succeeds).
     #[cfg(not(debug_assertions))]
     fn debug_validate_output(_out: &str) -> Result<(), JsonRepairError> {
         Ok(())
@@ -423,50 +429,6 @@ impl Repairer {
     /// Stub when serde-validate is disabled.
     #[cfg(not(feature = "serde-validate"))]
     fn validate_serde_json(_out: &str) {}
-
-    /// Check that every `{`/`[` in `s` has a matching `}`/`]`, respecting
-    /// string boundaries and escape sequences.
-    fn is_output_balanced(s: &str) -> bool {
-        let mut stack: [char; STACK_CAPACITY] = ['\0'; STACK_CAPACITY];
-        let mut len = 0usize;
-        let mut in_string = false;
-        let mut esc = false;
-        for c in s.chars() {
-            if esc {
-                esc = false;
-                continue;
-            }
-            if c == '\\' {
-                esc = true;
-                continue;
-            }
-            if c == '"' {
-                in_string = !in_string;
-                continue;
-            }
-            if in_string {
-                continue;
-            }
-            match c {
-                '{' | '[' => {
-                    if len < STACK_CAPACITY {
-                        stack[len] = if c == '{' { '}' } else { ']' };
-                        len += 1;
-                    } else {
-                        return false;
-                    }
-                }
-                '}' | ']' if len == 0 || stack[len - 1] != c => {
-                    return false;
-                }
-                '}' | ']' => {
-                    len -= 1;
-                }
-                _ => {}
-            }
-        }
-        len == 0
-    }
 }
 
 /// Fixed-capacity stack of parse frames, avoiding heap allocation.

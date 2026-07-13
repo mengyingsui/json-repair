@@ -250,6 +250,5 @@ impl Repairer {
         if count > 0 {
             self.trim_trailing_comma();
         }
-        self.emit_char(']');
     }
 }

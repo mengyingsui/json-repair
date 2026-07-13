@@ -4,9 +4,9 @@
 
 # json_repair
 
-[![Security: v0.4.0+](https://img.shields.io/badge/Security-v0.4.0%2B-2ea44f?labelColor=333)](SECURITY.md)
+[![Security: v0.4.1+](https://img.shields.io/badge/Security-v0.4.1%2B-2ea44f?labelColor=333)](SECURITY.md)
 
-Repair malformed JSON from LLM outputs in a **single pass** — now powered by Rust.
+Repair malformed JSON from LLM outputs — now powered by Rust.
 
 ## Problems Solved
 
@@ -137,21 +137,16 @@ else:
 ```
 Input text
   │
-  ├─ Pre-processing (Rust)
-  │    preprocess_json (single-pass fusion)
+  ├─ 6 input traversals:
+  │   1. trim + serde_json fast-path (skips repair if valid JSON)
+  │   2. preprocess_json (mixed-quote + colon-in-key fusion — single pass)
+  │   3. normalize_preamble (strip comments, prefix junk, code fences)
+  │   4. is_implicit_object_sequence (≥2 objects → wrap as array)
+  │   5. Repairer main loop (parse_value → object/array/string/literal)
+  │   6. close_brackets (LIFO bracket emission using bracket stack)
   │
-  ├─ Repairer state machine (Rust)
-  │    1. normalize_preamble
-  │    2. ≥8KB {..}{..} → wrap as array
-  │    3. parse_value
-  │      ├─ parse_object
-  │      ├─ parse_array
-  │      ├─ parse_string
-  │      └─ parse_literal
-  │    4. close_brackets
-  │    5. skip_suffix_junk (O(1) depth-tracker lookup)
-  │
-  └─ Repaired JSON
+  └─ 0 output traversals — bracket_depth == 0 check is O(1)
+     No post‑repair output scan needed.
 ```
 
 All hot-path logic runs in native Rust, exposed to Python via PyO3.
@@ -160,6 +155,7 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Version    | Date       | Description                                                                                                                                                                                                                                                                                                                                                                                                                             |
 |------------|------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| v0.4.1 🔒  | 2026-07-13 | **Eliminated `is_output_balanced` output scan** — `bracket_depth: i32` counter tracks bracket balance live; removed the only output‑pass from `repair()`. Implicit array `[` now goes through `brackets_push`/`brackets_pop` stack (LIFO order maintained). 6 input passes, 0 output passes. See [`CHANGELOG.md`](CHANGELOG.md). |
 | v0.4.0 🔒  | 2026-07-12 | **State-machine v2 redesign & preprocessor fusion** — all implicit `Repairer` contracts eliminated (`ObjectLoop(usize)`/`ArrayLoop(usize)`/`ImplicitArrayLoop(usize)` frames replace 3 resume methods); `preprocess_json` fused single-pass; `fix_colon_in_key`/`fix_mixed_quotes` removed from public API; `yes`/`no`/`nil`/`nullptr` literals; output balanced checks use fixed stack; full implicit-sequence scan. See [`CHANGELOG.md`](CHANGELOG.md). |
 | v0.3.10 🔒 | 2026-07-12 | **Performance hot-path optimisation & test overhaul** — 15 optimizations (ASCII byte fast path, scan merging, stack early exits, byte-level comparisons); `out_chars` removed; magic number naming; bare-word helper extraction; inline test data migrated to JSONL files; fuzz corpus seeded from real cases; doc comment audit; Python `__version__` auto-loaded via `importlib.metadata`. See [`CHANGELOG.md`](CHANGELOG.md).        |
 | v0.3.9 🔒  | 2026-07-09 | **Documentation overhaul** — `repair_json()` full Google-style docstring; `__init__` module docstring expanded with all capabilities. Internal Rust crate documentation completed (`#![deny(missing_docs)]`, all modules/methods documented).                                                                                                                                                                                           |

@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.4.1 🔒 (2026-07-13)
+
+### Performance
+- **Eliminated `is_output_balanced` output scan** (`repairer.rs`) — replaced
+  the O(n) post-repair bracket balance scan with an O(1) `bracket_depth != 0`
+  check. `Repairer` now tracks bracket depth live via `brackets_push`/`brackets_pop`,
+  eliminating the only output traversal in `repair()`.
+- **Implicit array `[` lives on bracket stack** (`structure.rs`) — implicit
+  array opening bracket is now pushed via `brackets_push(']')` and closed by
+  `close_brackets()` in LIFO order, instead of emitting `]` directly in
+  `implicit_array_loop()`. This ensures correct `}`-before-`]` ordering without
+  a separate output scan.
+- **`memchr2`-accelerated string scanning** (`junk.rs`) — `scan_string` and
+  the string-body loop in `is_implicit_object_sequence` now use `memchr2`
+  to skip past long runs without `"`/`\` via SIMD, reducing character-level
+  dispatch overhead.
+
+### Removed
+- **`is_output_balanced` function** (`repairer.rs`) — the `is_output_balanced`
+  function and its helper `closing_for` were removed. Bracket balance is now
+  guaranteed by the live `bracket_depth` counter.
+
+### Changed
+- **`Repairer`** (`repairer.rs`) — new `bracket_depth: i32` field initialized to 0.
+- **`brackets_push`** — increments `bracket_depth`.
+- **`brackets_pop`** — decrements `bracket_depth`.
+- **`repair()`** (`repairer.rs`) — implicit array opens now call `brackets_push(']')`;
+  final `bracket_depth != 0` replaces `is_output_balanced(&out)`.
+- **`implicit_array_loop()`** (`structure.rs`) — no longer emits `]`;
+  closing bracket is emitted by `close_brackets()` via the bracket stack.
+- `repair_json()` now makes **6 input passes** (trim, serde_json fast-path,
+  preprocess_json, normalize_preamble, is_implicit_object_sequence, main loop)
+  and **0 output passes** (bracket_depth check is O(1)).
+
+### Python
+- `json-repair` bumped to **v0.4.1**.
+
+### Rust
+- Workspace `json-repair-core` bumped to **v0.2.1**.
+
 ## v0.4.0 🔒 (2026-07-12)
 
 ### BREAKING
@@ -83,7 +123,7 @@
 - **`close_bracket` assert → `debug_assert!`** (`structure.rs`) — bracket‑stack
   overflow handled by `MAX_PARSE_DEPTH=512` guard; runtime check relaxed to debug-only.
 - **`is_output_balanced` validation** (`repairer.rs`) — called at end of `repair()`
-  in debug builds.
+  in all build profiles; `repair_json` returns `Err` on imbalance (API guarantee).
 - **Backward scan in `check_closing_quote`** (`string.rs`) — scans backward past
   whitespace; if `{`/`[` found, returns `(false, None)` instead of false positive.
 

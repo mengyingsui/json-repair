@@ -53,7 +53,8 @@ pub fn repair_json(text: &str) -> Result<String, JsonRepairError> {
     if text.trim().is_empty() {
         return Ok(String::new());
     }
-    if is_valid_json(text) {
+    let trimmed = text.trim_start();
+    if (trimmed.starts_with('{') || trimmed.starts_with('[')) && is_valid_json(text) {
         return Ok(text.to_string());
     }
     let text = preprocess::preprocess_json(text);

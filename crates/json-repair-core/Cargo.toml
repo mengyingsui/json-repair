@@ -17,6 +17,7 @@ serde-validate = ["dep:serde", "dep:serde_json"]
 [dependencies]
 serde = { version = "1", optional = true }
 serde_json = { workspace = true, features = ["unbounded_depth"], optional = true }
+memchr = "2"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }

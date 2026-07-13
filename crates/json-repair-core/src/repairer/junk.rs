@@ -1,6 +1,7 @@
 //! Suffix junk, implicit object sequences, and trailing-comma trimming.
 
 use super::Repairer;
+use memchr::memchr2;
 
 /// Minimum input length (bytes) to consider the implicit-object-sequence path.
 const IMPLICIT_SEQUENCE_MIN_LENGTH: usize = 128;
@@ -101,22 +102,25 @@ impl Repairer {
     fn scan_string(&self, pos: usize) -> usize {
         debug_assert_eq!(self.char_at(pos), '"');
         let bytes = self.text.as_bytes();
+        let n = self.n;
         let mut i = pos + 1;
-        while i < self.n {
-            let b = bytes[i];
-            if b == b'\\' {
-                i += 1;
-                if i < self.n {
-                    let nb = bytes[i];
-                    i += if nb.is_ascii() { 1 } else { utf8_char_len(nb) };
+        loop {
+            match memchr2(b'"', b'\\', &bytes[i..]) {
+                Some(off) => {
+                    i += off;
+                    if bytes[i] == b'\\' {
+                        i += 1;
+                        if i < n {
+                            let nb = bytes[i];
+                            i += if nb.is_ascii() { 1 } else { utf8_char_len(nb) };
+                        }
+                    } else {
+                        return i + 1;
+                    }
                 }
-            } else if b == b'"' {
-                return i + 1;
-            } else {
-                i += if b.is_ascii() { 1 } else { utf8_char_len(b) };
+                None => return n,
             }
         }
-        i
     }
 
     /// Skip non-JSON text before the first `{` or `[` and handle
@@ -214,25 +218,37 @@ impl Repairer {
         let mut count = 0;
         let mut depth = 0usize;
         let mut in_string = false;
-        let mut esc = false;
+        let bytes = self.text.as_bytes();
         while j + 1 < self.n {
-            let ch = self.char_at(j);
-            if esc {
-                esc = false;
-                j += ch.len_utf8();
+            if in_string {
+                match memchr2(b'"', b'\\', &bytes[j..]) {
+                    Some(off) => {
+                        j += off;
+                        if bytes[j] == b'\\' {
+                            j += 1;
+                            if j < self.n {
+                                let nb = bytes[j];
+                                j += if nb.is_ascii() { 1 } else { utf8_char_len(nb) };
+                            }
+                        } else {
+                            in_string = false;
+                            j += 1;
+                        }
+                    }
+                    None => break,
+                }
                 continue;
             }
+            let ch = self.char_at(j);
             if ch == '\\' {
-                esc = true;
-                j += ch.len_utf8();
+                j += 1;
+                if j < self.n {
+                    j += self.char_at(j).len_utf8();
+                }
                 continue;
             }
             if ch == '"' {
-                in_string = !in_string;
-                j += ch.len_utf8();
-                continue;
-            }
-            if in_string {
+                in_string = true;
                 j += ch.len_utf8();
                 continue;
             }

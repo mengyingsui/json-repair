@@ -318,9 +318,10 @@ dependencies = [
 
 [[package]]
 name = "json-repair-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "criterion",
+ "memchr",
  "proptest",
  "serde",
  "serde_json",

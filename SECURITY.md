@@ -22,9 +22,11 @@ Starting with **v0.3.4** (Python) / **v0.1.4** (Rust),
 
 | Package                     | Version | Supported          |
 |-----------------------------|---------|--------------------|
-| **json-repair** (Python)    | 0.3.x   | :white_check_mark: |
+| **json-repair** (Python)    | 0.4.x   | :white_check_mark: |
+|                             | 0.3.x   | :white_check_mark: |
 |                             | < 0.3   | :x:                |
-| **json-repair-core** (Rust) | 0.1.x   | :white_check_mark: |
+| **json-repair-core** (Rust) | 0.2.x   | :white_check_mark: |
+|                             | 0.1.x   | :white_check_mark: |
 |                             | < 0.1   | :x:                |
 
 Security guarantees in the declaration above apply to **Python v0.3.4+** / **Rust v0.1.4+**.
@@ -35,6 +37,14 @@ additional `debug_assert!` guards (active in debug builds only).
 
 The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
 changes only; security posture is unchanged.
+
+**v0.4.1 / v0.2.1** adds:
+- **No new security features** — this release eliminates the O(n)
+  `is_output_balanced` output scan in favor of a live `bracket_depth: i32`
+  counter, removing the only output pass from `repair()`. All security
+  guarantees from v0.4.0+ / v0.2.0+ preserved. Zero `unsafe` remains;
+  all tests pass; clippy clean.
+- See [`CHANGELOG.md`](CHANGELOG.md) for full details.
 
 **v0.4.0 / v0.2.0** adds:
 - **No new security features** — this release fuses the two pre-processing
