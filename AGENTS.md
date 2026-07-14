@@ -138,7 +138,7 @@ Every version bump (especially breaking) touches these files — check each:
 |------------------------|-------------------------------------------------------------|
 | Rust workspace version | `Cargo.toml` (`workspace.package.version`)                  |
 | Python package version | `pyproject.toml`                                            |
-| Lock files             | `uv.lock` (search for `json-repair` version)                |
+| Lock files             | `uv.lock` (search for `json-repair-core` version)             |
 | Root changelog         | `CHANGELOG.md`                                              |
 | Core changelog         | `crates/json-repair-core/CHANGELOG.md`                      |
 | Version table          | `README.md` (add row + update security badge if applicable) |

@@ -31,6 +31,6 @@ from ._repair import repair_json
 __all__ = ["repair_json"]
 
 try:
-    __version__ = _version("json-repair")
+    __version__ = _version("json-repair-core")
 except PackageNotFoundError:
     __version__ = "0.0.0"

@@ -22,7 +22,7 @@ Starting with **v0.3.4** (Python) / **v0.1.4** (Rust),
 
 | Package                     | Version | Supported          |
 |-----------------------------|---------|--------------------|
-| **json-repair** (Python)    | 0.4.x   | :white_check_mark: |
+| **json-repair-core** (Python) | 0.4.x   | :white_check_mark: |
 |                             | 0.3.x   | :white_check_mark: |
 |                             | < 0.3   | :x:                |
 | **json-repair-core** (Rust) | 0.2.x   | :white_check_mark: |
