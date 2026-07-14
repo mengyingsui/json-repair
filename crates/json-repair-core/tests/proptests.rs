@@ -167,3 +167,47 @@ proptest! {
         let _ = json_repair_core::repair_json(&input);
     }
 }
+
+/// ── Depth, Unicode whitespace, and colon-in-value edge cases ────────────
+fn unicode_ws_strategy() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("\u{00A0}".to_string()),
+        Just("\u{2000}".to_string()),
+        Just("\u{2003}".to_string()),
+        Just("\u{3000}".to_string()),
+        Just("\u{FEFF}".to_string()),
+    ]
+}
+
+proptest! {
+    #[test]
+    fn deep_nesting_no_panic(depth in 100usize..520) {
+        let input = format!(
+            "{open}1{close}",
+            open = "[".repeat(depth),
+            close = "]".repeat(depth)
+        );
+        let _ = json_repair_core::repair_json(&input);
+    }
+
+    #[test]
+    fn unicode_whitespace_prefix(ws in unicode_ws_strategy(), value in json_value()) {
+        let json = serde_json::to_string(&value).unwrap();
+        let input = format!("{}{}", ws, json);
+        if let Ok(repaired) = json_repair_core::repair_json(&input) {
+            if !repaired.is_empty() {
+                let _: serde_json::Value = serde_json::from_str(&repaired)
+                    .expect("repaired output with unicode whitespace prefix must be valid JSON");
+            }
+        }
+    }
+
+    #[test]
+    fn value_with_colon_no_panic(
+        before in "[a-zA-Z]{1,6}",
+        after in "[a-zA-Z]{1,6}",
+    ) {
+        let input = format!(r#"{{"k": {}:{}}}"#, before, after);
+        let _ = json_repair_core::repair_json(&input);
+    }
+}

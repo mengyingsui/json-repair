@@ -1,59 +1,75 @@
-//! Unquoted key and value parsing (quote insertion around bare words).
+use super::{BracketStack, InputCursor, OutputBuffer, string};
 
-use super::Repairer;
-
-impl Repairer {
-    /// Parse an object key: quoted, single-quoted, or unquoted bare word.
-    pub(super) fn parse_key(&mut self) {
-        self.skip_ws();
-        if self.i >= self.n {
-            return;
-        }
-        let ch = self.cur();
-        if ch == '"' {
-            self.parse_string(true);
-        } else if ch == '\'' {
-            self.parse_single_quoted_string();
-        } else {
-            self.parse_unquoted_key();
-        }
+// Parse a JSON object key: quoted (double/single) or bareword.
+pub(super) fn parse_key(
+    input: &mut InputCursor,
+    output: &mut OutputBuffer,
+    brackets: &BracketStack,
+) {
+    input.skip_ws();
+    if input.i >= input.text.len() {
+        return;
     }
+    let ch = input.cur();
+    if ch == '"' {
+        string::parse_string(input, output, brackets, true);
+    } else if ch == '\'' {
+        string::parse_single_quoted_string(input, output, brackets);
+    } else {
+        parse_unquoted_key(input, output);
+    }
+}
 
-    /// Emit chars as a bare word (wrapping in `"`) until a stop predicate
-    /// returns `true`.  Shared by `parse_unquoted_key` and `parse_unquoted_value`.
-    #[inline]
-    fn emit_bare_word(&mut self, is_stop: impl Fn(char) -> bool) {
-        while self.i < self.n {
-            let ch = self.cur();
-            if is_stop(ch) {
-                break;
-            }
-            self.emit_unquoted_char(ch);
-            self.i += ch.len_utf8();
+// Consume characters while `is_stop` returns false.
+// Each consumed character is escaped and emitted via [`emit_unquoted_char`].
+// Silently skips control characters that cannot appear in JSON at all
+// (U+0000-U+0008, U+000B-U+000C, U+000E-U+001F) but preserves `\n`,
+// `\r`, and `\t` which are valid JSON string content.
+#[inline]
+fn emit_bare_word(
+    input: &mut InputCursor,
+    output: &mut OutputBuffer,
+    is_stop: impl Fn(char) -> bool,
+) {
+    while input.i < input.text.len() {
+        let ch = input.cur();
+        if is_stop(ch) {
+            break;
         }
-    }
-
-    /// Parse an unquoted bare-word key, wrapping it in double quotes.
-    pub(super) fn parse_unquoted_key(&mut self) {
-        self.emit_char('"');
-        self.emit_bare_word(|ch| {
-            ch.is_ascii()
-                && matches!(
-                    ch,
-                    ' ' | '\t' | '\r' | '\n' | ':' | '{' | '}' | '[' | ']' | ',' | '"' | '\'' | '/'
-                )
-                || ch == '\u{200b}'
-        });
-        self.emit_char('"');
-        if self.i < self.n && self.cur() == '"' {
-            self.i += 1;
+        let cv = u32::from(ch);
+        if cv < 0x20 && !matches!(cv, 0x09 | 0x0A | 0x0D) {
+            input.i += ch.len_utf8();
+            continue;
         }
+        string::emit_unquoted_char(input, output, ch);
+        input.i += ch.len_utf8();
     }
+}
 
-    /// Parse an unquoted bare-word value, wrapping it in double quotes.
-    pub(super) fn parse_unquoted_value(&mut self) {
-        self.emit_char('"');
-        self.emit_bare_word(|ch| matches!(ch, ',' | '}' | ']'));
-        self.emit_char('"');
+// Parse an unquoted (bare) key: wrap in `"..."`, stop at structural
+// characters.  Includes ZWSP (U+200B) as a stop so copy-pasted
+// invisible characters don't leak into the key.
+pub(super) fn parse_unquoted_key(input: &mut InputCursor, output: &mut OutputBuffer) {
+    output.emit_char('"');
+    emit_bare_word(input, output, |ch| {
+        ch.is_ascii()
+            && matches!(
+                ch,
+                ' ' | '\t' | '\r' | '\n' | ':' | '{' | '}' | '[' | ']' | ',' | '"' | '\'' | '/'
+            )
+            || ch == '\u{200b}'
+    });
+    output.emit_char('"');
+    // Consume a trailing `"` if present (from the original input)
+    if input.i < input.text.len() && input.cur() == '"' {
+        input.i += 1;
     }
+}
+
+// Parse an unquoted value (e.g. bareword after `:` that is not a
+// literal or number).  Only stops at structural separators.
+pub(super) fn parse_unquoted_value(input: &mut InputCursor, output: &mut OutputBuffer) {
+    output.emit_char('"');
+    emit_bare_word(input, output, |ch| matches!(ch, ',' | '}' | ']'));
+    output.emit_char('"');
 }

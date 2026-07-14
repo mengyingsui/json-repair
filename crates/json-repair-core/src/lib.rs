@@ -58,7 +58,10 @@ pub fn repair_json(text: &str) -> Result<String, JsonRepairError> {
         return Ok(text.to_string());
     }
     let text = preprocess::preprocess_json(text);
-    let mut repairer = Repairer::new(text.as_ref());
+    let (text, start_i) = preprocess::normalize_preamble(text.as_ref());
+    let text = text.into_owned();
+    let mut repairer = Repairer::new(&text);
+    repairer.input.i = start_i;
     repairer.repair()
 }
 

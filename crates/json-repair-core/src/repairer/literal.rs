@@ -1,8 +1,10 @@
-//! Bareword literal parsing (`true`, `false`, `null`, `Infinity`, `NaN`).
+use super::{InputCursor, OutputBuffer, keys};
 
-use super::Repairer;
-
-/// Literal string patterns recognised by `parse_literal`.
+// Canonical JSON tokens (left column) and their aliases (right column):
+//   "none", "undefined", "nan", "infinity", … → null
+//   "yes" → true,  "no" → false
+//   "nil", "nullptr" → null
+//   "+infinity", "-infinity" → null
 const LIT_TRUE: &str = "true";
 const LIT_FALSE: &str = "false";
 const LIT_NULL: &str = "null";
@@ -17,47 +19,44 @@ const LIT_NO: &str = "no";
 const LIT_NIL: &str = "nil";
 const LIT_NULLPTR: &str = "nullptr";
 
-impl Repairer {
-    /// Case-insensitive prefix match against a pattern, starting at `self.i`.
-    /// Returns `true` if the next characters (case-insensitively) equal `pat`.
-    #[inline]
-    fn match_lit(&self, pat: &str) -> bool {
-        let plen = pat.len();
-        if self.i + plen > self.n {
-            return false;
-        }
-        self.text.as_bytes()[self.i..self.i + plen]
-            .iter()
-            .zip(pat.bytes())
-            .all(|(&a, b)| a.eq_ignore_ascii_case(&b))
+// ASCII case-insensitive match at cursor position.
+// Used against LLM output which may capitalize or mix case.
+#[inline]
+fn match_lit(input: &InputCursor, pat: &str) -> bool {
+    let plen = pat.len();
+    if input.i + plen > input.text.len() {
+        return false;
     }
+    input.text.as_bytes()[input.i..input.i + plen]
+        .iter()
+        .zip(pat.bytes())
+        .all(|(&a, b)| a.eq_ignore_ascii_case(&b))
+}
 
-    /// Parse a bareword literal (`true`/`false`/`null`/`none`/`undefined`/
-    /// `NaN`/`Infinity`), emitting the JSON equivalent.  Falls back to
-    /// `parse_unquoted_value` if no literal matches.
-    pub(super) fn parse_literal(&mut self) {
-        const ENTRIES: &[(&str, &str)] = &[
-            (LIT_TRUE, LIT_TRUE),
-            (LIT_FALSE, LIT_FALSE),
-            (LIT_NULL, LIT_NULL),
-            (LIT_NONE, LIT_NULL),
-            (LIT_UNDEFINED, LIT_NULL),
-            (LIT_NAN, LIT_NULL),
-            (LIT_INFINITY, LIT_NULL),
-            (LIT_YES, LIT_TRUE),
-            (LIT_NO, LIT_FALSE),
-            (LIT_NIL, LIT_NULL),
-            (LIT_NULLPTR, LIT_NULL),
-            (LIT_POS_INF, LIT_NULL),
-            (LIT_NEG_INF, LIT_NULL),
-        ];
-        for &(pat, emit) in ENTRIES {
-            if self.match_lit(pat) {
-                self.out.push_str(emit);
-                self.i += pat.len();
-                return;
-            }
+// Try every known literal pattern; fall back to generic unquoted value.
+pub(super) fn parse_literal(input: &mut InputCursor, output: &mut OutputBuffer) {
+    const ENTRIES: &[(&str, &str)] = &[
+        (LIT_TRUE, LIT_TRUE),
+        (LIT_FALSE, LIT_FALSE),
+        (LIT_NULL, LIT_NULL),
+        (LIT_NONE, LIT_NULL),
+        (LIT_UNDEFINED, LIT_NULL),
+        (LIT_NAN, LIT_NULL),
+        (LIT_INFINITY, LIT_NULL),
+        (LIT_YES, LIT_TRUE),
+        (LIT_NO, LIT_FALSE),
+        (LIT_NIL, LIT_NULL),
+        (LIT_NULLPTR, LIT_NULL),
+        (LIT_POS_INF, LIT_NULL),
+        (LIT_NEG_INF, LIT_NULL),
+    ];
+    for &(pat, emit) in ENTRIES {
+        if match_lit(input, pat) {
+            output.emit_str(emit);
+            input.i += pat.len();
+            return;
         }
-        self.parse_unquoted_value();
     }
+    // Not a recognizable literal — treat as an unquoted string value.
+    keys::parse_unquoted_value(input, output);
 }

@@ -4,7 +4,7 @@
 
 # json_repair
 
-[![Security: v0.4.1+](https://img.shields.io/badge/Security-v0.4.1%2B-2ea44f?labelColor=333)](SECURITY.md)
+[![Security: v0.4.2+](https://img.shields.io/badge/Security-v0.4.2%2B-2ea44f?labelColor=333)](SECURITY.md)
 
 Repair malformed JSON from LLM outputs — now powered by Rust.
 
@@ -155,6 +155,7 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Version    | Date       | Description                                                                                                                                                                                                                                                                                                                                                                                                                             |
 |------------|------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| v0.4.2 🔒  | 2026-07-14 | **Focused sub‑struct composition (P2)** — all sub‑modules converted to free functions; `state: ParserState` removed from `Repairer` (now only `input`, `output`, `brackets`); `BooleanStack` 520→`Vec::new()`; `emit_unicode_escape` hex table; NUL bareword split. See [`CHANGELOG.md`](CHANGELOG.md). |
 | v0.4.1 🔒  | 2026-07-13 | **Eliminated `is_output_balanced` output scan** — `bracket_depth: i32` counter tracks bracket balance live; removed the only output‑pass from `repair()`. Implicit array `[` now goes through `brackets_push`/`brackets_pop` stack (LIFO order maintained). 6 input passes, 0 output passes. See [`CHANGELOG.md`](CHANGELOG.md). |
 | v0.4.0 🔒  | 2026-07-12 | **State-machine v2 redesign & preprocessor fusion** — all implicit `Repairer` contracts eliminated (`ObjectLoop(usize)`/`ArrayLoop(usize)`/`ImplicitArrayLoop(usize)` frames replace 3 resume methods); `preprocess_json` fused single-pass; `fix_colon_in_key`/`fix_mixed_quotes` removed from public API; `yes`/`no`/`nil`/`nullptr` literals; output balanced checks use fixed stack; full implicit-sequence scan. See [`CHANGELOG.md`](CHANGELOG.md). |
 | v0.3.10 🔒 | 2026-07-12 | **Performance hot-path optimisation & test overhaul** — 15 optimizations (ASCII byte fast path, scan merging, stack early exits, byte-level comparisons); `out_chars` removed; magic number naming; bare-word helper extraction; inline test data migrated to JSONL files; fuzz corpus seeded from real cases; doc comment audit; Python `__version__` auto-loaded via `importlib.metadata`. See [`CHANGELOG.md`](CHANGELOG.md).        |

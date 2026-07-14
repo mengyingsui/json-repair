@@ -1,477 +1,554 @@
-//! String parsing with embedded-quote detection and escape handling.
+use crate::repairer::{BracketStack, InputCursor, OutputBuffer};
 
-use super::{ParserState, Repairer};
+/// Current parser state for the streaming string-state machine.
+#[derive(Clone, Copy, PartialEq)]
+enum ParserState {
+    /// Outside any string; normal structural parsing.
+    Normal,
+    /// Inside a string body (between opening and closing quotes).
+    InString,
+    /// Just consumed a `\`; the next char is an escape payload.
+    InStringEscaped,
+}
 
-/// Control characters (U+0000–U+001F) must be escaped in JSON strings.
+// Control character threshold: U+0000…U+001F must be emitted as \uXXXX.
 const CONTROL_CHAR_MAX: u32 = 0x20;
-/// Start of the UTF-16 surrogate range; lone surrogates are invalid in JSON.
+// Unicode surrogates (U+D800–U+DFFF) replaced with \ufffd.
 const SURROGATE_LO: u32 = 0xD800;
-/// End of the UTF-16 surrogate range.
 const SURROGATE_HI: u32 = 0xDFFF;
 
-/// Whether `ch` is one of the valid JSON escape characters after `\`.
+// Characters that JSON allows as short escapes (\n, \t, \\, etc.).
 #[inline]
 fn is_valid_escape(ch: char) -> bool {
     matches!(ch, '"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't')
 }
 
-impl Repairer {
-    /// Emit the escaped form of `ch` after a `\` was consumed.
-    ///
-    /// Valid JSON escapes are preserved; `\uXXXX` is validated (lone
-    /// surrogates become `\ufffd`); control chars become `\uXXXX`; anything
-    /// else is emitted as `\\` + the literal char.
-    pub(super) fn emit_escape(&mut self, ch: char) {
-        if is_valid_escape(ch) {
-            self.emit_char('\\');
-            self.emit_char(ch);
-        } else if ch == 'u' && self.i + 5 <= self.n {
-            let mut hex_val: u32 = 0;
-            let mut all_hex = true;
-            for k in 1..=4 {
-                if let Some(d) = self.char_at(self.i + k).to_digit(16) {
-                    hex_val = (hex_val << 4) | d;
-                } else {
-                    all_hex = false;
-                    break;
-                }
-            }
-            if all_hex {
-                if (SURROGATE_LO..=SURROGATE_HI).contains(&hex_val) {
-                    self.emit_str("\\ufffd");
-                    self.i += 4;
-                } else {
-                    self.emit_char('\\');
-                    self.emit_char('u');
-                }
+// Emit an escaped character.  If `\u` is followed by 4 hex digits
+// the hex value is validated; surrogates are replaced with \ufffd.
+pub(super) fn emit_escape(input: &mut InputCursor, output: &mut OutputBuffer, ch: char) {
+    if is_valid_escape(ch) {
+        output.emit_char('\\');
+        output.emit_char(ch);
+    } else if ch == 'u' && input.i + 5 <= input.text.len() {
+        let mut hex_val: u32 = 0;
+        let mut all_hex = true;
+        for k in 1..=4 {
+            if let Some(d) = input.char_at(input.i + k).to_digit(16) {
+                hex_val = (hex_val << 4) | d;
             } else {
-                self.emit_str("\\\\");
-                self.emit_char(ch);
+                all_hex = false;
+                break;
             }
-        } else if (ch as u32) < CONTROL_CHAR_MAX {
-            self.emit_unicode_escape(ch as u32);
+        }
+        if all_hex {
+            if (SURROGATE_LO..=SURROGATE_HI).contains(&hex_val) {
+                output.emit_str("\\ufffd");
+                input.i += 4;
+            } else {
+                output.emit_char('\\');
+                output.emit_char('u');
+            }
         } else {
-            self.emit_str("\\\\");
-            self.emit_char(ch);
+            output.emit_str("\\\\");
+            output.emit_char(ch);
+        }
+    } else if u32::from(ch) < CONTROL_CHAR_MAX {
+        output.emit_unicode_escape(u32::from(ch));
+    } else {
+        output.emit_str("\\\\");
+        output.emit_char(ch);
+    }
+}
+
+// Handle `\`-escape inside a string.  External callers also use
+// this for single-quoted strings via `single_quote_escape`.
+fn handle_escaped(
+    input: &mut InputCursor,
+    output: &mut OutputBuffer,
+    state: &mut ParserState,
+    ch: char,
+    single_quote_escape: bool,
+) {
+    if single_quote_escape && ch == '\'' {
+        output.emit_char('\'');
+    } else {
+        emit_escape(input, output, ch);
+    }
+    *state = ParserState::InString;
+    input.i += ch.len_utf8();
+}
+
+// Emit a character for an unquoted (bare) key/value body.
+// Escapes `\`, `"`, newlines, tabs, and other control characters.
+#[inline]
+pub(super) fn emit_unquoted_char(_input: &mut InputCursor, output: &mut OutputBuffer, ch: char) {
+    match ch {
+        '\\' => output.emit_str("\\\\"),
+        '"' => output.emit_str("\\\""),
+        '\n' => output.out.push_str("\\n"),
+        '\r' => output.out.push_str("\\r"),
+        '\t' => output.out.push_str("\\t"),
+        c if u32::from(c) < CONTROL_CHAR_MAX => {
+            output.emit_unicode_escape(u32::from(c));
+        }
+        _ => output.emit_char(ch),
+    }
+}
+
+// Emit one character of a string body, tracking `\`-escape state.
+// Control chars and newlines are replaced with standard JSON escapes.
+#[inline]
+fn emit_string_body_char(
+    input: &mut InputCursor,
+    output: &mut OutputBuffer,
+    state: &mut ParserState,
+    ch: char,
+    single_quote_escape: bool,
+) {
+    if *state == ParserState::InString && ch == '\\' {
+        *state = ParserState::InStringEscaped;
+        input.i += 1;
+        return;
+    }
+    if *state == ParserState::InStringEscaped {
+        handle_escaped(input, output, state, ch, single_quote_escape);
+        return;
+    }
+    match ch {
+        '\n' => {
+            output.out.push_str("\\n");
+            input.i += 1;
+        }
+        '\r' => {
+            output.out.push_str("\\r");
+            input.i += 1;
+        }
+        '\t' => {
+            output.out.push_str("\\t");
+            input.i += 1;
+        }
+        c if u32::from(c) < CONTROL_CHAR_MAX => {
+            output.emit_unicode_escape(u32::from(c));
+            input.i += 1;
+        }
+        _ => {
+            output.emit_char(ch);
+            input.i += ch.len_utf8();
         }
     }
+}
 
-    /// Handle the `InStringEscaped` state for a single char.
-    ///
-    /// `single_quote_escape` controls whether `\'` is emitted literally (for
-    /// single-quoted strings) or as a normal escape (for double/triple-quoted).
-    #[inline]
-    fn handle_escaped(&mut self, ch: char, single_quote_escape: bool) {
-        if single_quote_escape && ch == '\'' {
-            self.emit_char('\'');
-        } else {
-            self.emit_escape(ch);
-        }
-        self.state = ParserState::InString;
-        self.i += ch.len_utf8();
-    }
-
-    /// Emit a single char from an unquoted string (key or value).
-    ///
-    /// Escapes `\` and `"` as JSON string escapes, control chars as
-    /// `\uXXXX`, and passes everything else through.  This is the unquoted
-    /// counterpart of `emit_string_body_char` — the difference is that in an
-    /// unquoted context `\` is a literal backslash (not an escape introducer),
-    /// so there is no `InStringEscaped` state.
-    #[inline]
-    pub(super) fn emit_unquoted_char(&mut self, ch: char) {
-        match ch {
-            '\\' => self.emit_str("\\\\"),
-            '"' => self.emit_str("\\\""),
-            c if (c as u32) < CONTROL_CHAR_MAX => {
-                self.emit_unicode_escape(c as u32);
+// Heuristic: does `"` at `input.i` close the string or is it an
+// embedded (unescaped) quote?  Returns `(is_closing, bareword_pos)`.
+//
+// `bareword_pos` is set when a `bareword":` pattern is found after
+// the quote — used by `try_split_bareword_after_value`.
+pub(super) fn check_closing_quote(
+    input: &InputCursor,
+    is_key: bool,
+    brackets: &BracketStack,
+) -> (bool, Option<usize>) {
+    // For values, scan backward: if a `{` or `[` appears before any
+    // other visible char, the quote is the start of a string, not a
+    // closer — defer to the caller.
+    if !is_key {
+        let mut p = input.i;
+        while p > 0 {
+            p -= 1;
+            let byte = input.text.as_bytes()[p];
+            if byte == b'{' || byte == b'[' {
+                return (false, None);
             }
-            _ => self.emit_char(ch),
-        }
-    }
-
-    /// Handle a body char that is NOT a string delimiter (`"` / `'`).
-    ///
-    /// Covers: backslash state transitions, `\n\r\t` escapes, `<0x20` control
-    /// escapes, and plain passthrough.
-    #[inline]
-    fn emit_string_body_char(&mut self, ch: char, single_quote_escape: bool) {
-        if self.state == ParserState::InString && ch == '\\' {
-            self.state = ParserState::InStringEscaped;
-            self.i += 1;
-            return;
-        }
-        if self.state == ParserState::InStringEscaped {
-            self.handle_escaped(ch, single_quote_escape);
-            return;
-        }
-        match ch {
-            '\n' => {
-                self.out.push_str("\\n");
-                self.i += 1;
-            }
-            '\r' => {
-                self.out.push_str("\\r");
-                self.i += 1;
-            }
-            '\t' => {
-                self.out.push_str("\\t");
-                self.i += 1;
-            }
-            c if (c as u32) < CONTROL_CHAR_MAX => {
-                self.emit_unicode_escape(c as u32);
-                self.i += 1;
-            }
-            _ => {
-                self.emit_char(ch);
-                self.i += ch.len_utf8();
+            if !matches!(byte, b' ' | b'\t' | b'\r' | b'\n') {
+                break;
             }
         }
     }
-
-    /// Check whether the `"` at `self.i` is a real string terminator.
-    ///
-    /// Returns `(is_closing, bareword_quote_pos)`:
-    /// - `is_closing` — `true` when the `"` terminates the string
-    /// - `bareword_quote_pos` — the position of the `"` after a bareword
-    ///   lookahead (used by `try_split_bareword_after_value` to avoid a
-    ///   redundant scan)
-    ///
-    /// Looks ahead past optional whitespace.  The `is_closing` element is
-    /// `true` when the next char is one of:
-    /// - `,` `}` `]` `\n` — structural punctuation (with sub-checks for `,`
-    ///   and the embedded-quote guard, see below)
-    /// - `"` — an immediately following quote (empty next value or `""…"""`)
-    /// - `:` `{` `[` — but only when `is_key` is set (object key context)
-    /// - A bare word followed by `"` then `:` — unquoted key detection
-    ///
-    /// **Embedded-quote guard** (for `]`/`}` only): a `"` followed by brackets
-    /// that cannot be a real container-closer is treated as an unescaped quote
-    /// inside the string value, not a terminator.
-    pub(super) fn check_closing_quote(&self, is_key: bool) -> (bool, Option<usize>) {
-        // Backward scan: when parsing a value string (!is_key), if the
-        // preceding non-whitespace char is `{` or `[`, the `"` is not a
-        // real terminator.  The bracket was emitted as string body (not
-        // pushed to bracket stack), so `is_embedded_bracket_quote` can't
-        // catch this case.
-        if !is_key {
-            let mut p = self.i;
-            while p > 0 {
-                p -= 1;
-                let byte = self.text.as_bytes()[p];
-                if byte == b'{' || byte == b'[' {
+    // Look ahead past horizontal whitespace
+    let mut j = input.i + 1;
+    while j < input.text.len() && matches!(input.char_at(j), ' ' | '\t' | '\r') {
+        j += 1;
+    }
+    // EOF → closing (truncated string completion)
+    if j >= input.text.len() {
+        return (true, None);
+    }
+    let nc = input.char_at(j);
+    // Succeeded by structural char → likely a closing quote
+    if matches!(nc, ',' | '}' | ']' | '\n') {
+        // Comma is ambiguous: check that the char after the comma
+        // is a valid value-starter — otherwise the quote was embedded.
+        if nc == ',' && !is_key {
+            let k = input.skip_ws_at(j + 1);
+            if k < input.text.len() {
+                let after = input.char_at(k);
+                if !matches!(
+                    after,
+                    '"' | '{' | '[' | 't' | 'f' | 'n' | '-' | '}' | ']' | ','
+                ) && !after.is_ascii_digit()
+                {
                     return (false, None);
                 }
-                if !matches!(byte, b' ' | b'\t' | b'\r' | b'\n') {
-                    break;
-                }
             }
         }
-        let mut j = self.i + 1;
-        while j < self.n && matches!(self.char_at(j), ' ' | '\t' | '\r') {
-            j += 1;
+        // `]`/`}` after a quote: check whether it is an embedded
+        // quote inside an array/object element.
+        if (nc == ']' || nc == '}') && is_embedded_bracket_quote(input, j, nc, brackets) {
+            return (false, None);
         }
-        if j >= self.n {
-            return (true, None);
+        return (true, None);
+    }
+    // Another `"` immediately → closing (doubled `""` is a quote).
+    if nc == '"' {
+        return (true, None);
+    }
+    // Key-specific: `:`, `{`, `[` after quote → closing
+    if is_key && matches!(nc, ':' | '{' | '[') {
+        return (true, None);
+    }
+    // Value context with `:` after quote: the string may actually
+    // be a key.  Only close when the char before `"` is a typical
+    // key-end character (printable non-whitespace); control chars
+    // like `\r` in a corrupt value body keep the string open.
+    // Additionally scan backward: if `{` or `[` appears before any
+    // structural separator (`,`, `}`, `]`, `:`), the quote opens a
+    // nested key inside an embedded JSON structure — treat as embedded.
+    if !is_key && nc == ':' {
+        let mut p = input.i;
+        while p > 0 {
+            p -= 1;
+            match input.text.as_bytes()[p] {
+                b'{' | b'[' => return (false, None),
+                b',' | b'}' | b']' | b':' => break,
+                _ => {}
+            }
         }
-        let nc = self.char_at(j);
-        if matches!(nc, ',' | '}' | ']' | '\n') {
-            if nc == ',' && !is_key {
-                let k = self.skip_ws_at(j + 1);
-                if k < self.n {
-                    let after = self.char_at(k);
-                    if !matches!(
-                        after,
-                        '"' | '{' | '[' | 't' | 'f' | 'n' | '-' | '}' | ']' | ','
-                    ) && !after.is_ascii_digit()
-                    {
+        if input.i > 0 {
+            let prev = input.text.as_bytes()[input.i - 1];
+            if prev.is_ascii_graphic() || prev == b' ' || prev == b'_' || prev == b'"' {
+                return (true, None);
+            }
+        }
+        return (false, None);
+    }
+    // Bareword after quote: could be `key":value` (split point) or
+    // a continuation of an unquoted string.
+    if nc.is_ascii_alphabetic() || nc == '_' {
+        let mut k = j;
+        loop {
+            let ch = input.char_at(k);
+            if !(ch.is_alphanumeric() || ch == '_') {
+                break;
+            }
+            k += ch.len_utf8();
+        }
+        k = input.skip_ws_at(k);
+        if k < input.text.len() && input.char_at(k) == '"' {
+            let bp = Some(k);
+            k += 1;
+            k = input.skip_ws_at(k);
+            if k < input.text.len() && input.char_at(k) == ':' {
+                // In key context, scan between this quote and the
+                // bareword's ending `"`.  If no structural separator
+                // (`,`, `}`, `]`, `:`, `\n`) exists in that span, the
+                // entire span is one key with embedded quotes — don't
+                // close here.  E.g. `"step"valxt":` → key is `step"valxt`.
+                if is_key {
+                    let mut p = input.i + 1;
+                    let mut has_sep = false;
+                    while p < k {
+                        let c = input.char_at(p);
+                        if matches!(c, ',' | '}' | ']' | ':' | '\n') {
+                            has_sep = true;
+                            break;
+                        }
+                        p += c.len_utf8();
+                    }
+                    if !has_sep {
                         return (false, None);
                     }
                 }
-            }
-            if (nc == ']' || nc == '}') && self.is_embedded_bracket_quote(j, nc) {
-                return (false, None);
-            }
-            return (true, None);
-        }
-        if nc == '"' {
-            return (true, None);
-        }
-        if is_key && matches!(nc, ':' | '{' | '[') {
-            return (true, None);
-        }
-        if nc.is_ascii_alphabetic() || nc == '_' {
-            let mut k = j;
-            loop {
-                let ch = self.char_at(k);
-                if !(ch.is_alphanumeric() || ch == '_') {
-                    break;
-                }
-                k += ch.len_utf8();
-            }
-            k = self.skip_ws_at(k);
-            if k < self.n && self.char_at(k) == '"' {
-                let bp = Some(k);
-                k += 1;
-                k = self.skip_ws_at(k);
-                if k < self.n && self.char_at(k) == ':' {
-                    return (true, bp);
-                }
+                return (true, bp);
             }
         }
-        (false, None)
     }
+    (false, None)
+}
 
-    /// Check whether a `"` followed by bracket `nc` (`]` or `}`) at
-    /// position `j` is an embedded quote inside the string value rather
-    /// than a real string terminator.
-    ///
-    /// After the bracket run, a "structural" continuation is `,`, `}`,
-    /// `]`, or EOF — anything else means bare content follows, so the
-    /// bracket is a literal character.  Two sub-cases:
-    ///
-    /// * **Mismatched bracket** (not the innermost open container): it can
-    ///   never be a real closer, so the quote is embedded.
-    /// * **Matching bracket**: ambiguous — could be a real close + trailing
-    ///   junk, or an embedded bracket.  Treated as embedded only when a
-    ///   later real terminator (a `"` followed by `,`/`}`/`]`) exists AND
-    ///   the current container's closer `nc` reappears after it.
-    fn is_embedded_bracket_quote(&self, j: usize, nc: char) -> bool {
-        let mut k = j;
-        while k < self.n && matches!(self.char_at(k), ']' | '}') {
-            k += 1;
-        }
-        k = self.skip_ws_at(k);
-        let structural = k >= self.n || matches!(self.char_at(k), ',' | '}' | ']');
-        if structural {
-            return false;
-        }
-        let matches_top = self.brackets_last() == Some(nc);
-        if !matches_top {
-            return true;
-        }
-        let open_bracket = if nc == ']' { '[' } else { '{' };
-        let mut p = k;
-        while p < self.n {
-            if self.char_at(p) == '"' {
-                let q = self.skip_ws_at(p + 1);
-                if q < self.n && matches!(self.char_at(q), ',' | '}' | ']') {
-                    let need_colon = nc == '}' && self.char_at(q) == ',';
-                    let mut r = q;
-                    let mut in_str = false;
-                    let mut depth: i32 = 1;
-                    let mut saw_colon = false;
-                    while r < self.n {
-                        let rc = self.char_at(r);
-                        if in_str {
-                            if rc == '"' {
-                                in_str = false;
-                            }
-                            r += rc.len_utf8();
-                        } else if rc == '"' {
-                            in_str = true;
-                            r += 1;
-                        } else if rc == nc {
-                            depth -= 1;
-                            if depth == 0 {
-                                return !need_colon || saw_colon;
-                            }
-                            r += 1;
-                        } else if rc == open_bracket {
-                            depth += 1;
-                            r += 1;
-                        } else if rc == ':' {
-                            saw_colon = true;
-                            r += 1;
-                        } else {
-                            r += rc.len_utf8();
+// Check whether `]`/`}` after a quote is actually the *start* of an
+// embedded bracket-inside-string, not the container closer.
+// E.g. `["]}]` — the `]` and `}` are inside the string value.
+//
+// Returns `true` when the bracket is "embedded" (i.e. not structural).
+fn is_embedded_bracket_quote(
+    input: &InputCursor,
+    j: usize,
+    nc: char,
+    brackets: &BracketStack,
+) -> bool {
+    // Skip past any consecutive brackets
+    let mut k = j;
+    while k < input.text.len() && matches!(input.char_at(k), ']' | '}') {
+        k += 1;
+    }
+    k = input.skip_ws_at(k);
+    // If the run ends at EOF or another structural char, not embedded
+    let structural = k >= input.text.len() || matches!(input.char_at(k), ',' | '}' | ']');
+    if structural {
+        return false;
+    }
+    // If the bracket doesn't match the stack top, it's embedded
+    let matches_top = brackets.last() == Some(nc);
+    if !matches_top {
+        return true;
+    }
+    // Matches top: scan ahead for the mirror opener, treating
+    // `"short_string",` as the interior of an embedded container.
+    let open_bracket = if nc == ']' { '[' } else { '{' };
+    let mut p = k;
+    while p < input.text.len() {
+        if input.char_at(p) == '"' {
+            let q = input.skip_ws_at(p + 1);
+            if q < input.text.len() && matches!(input.char_at(q), ',' | '}' | ']') {
+                let need_colon = nc == '}' && input.char_at(q) == ',';
+                let mut r = q;
+                let mut in_str = false;
+                let mut depth: i32 = 1;
+                let mut saw_colon = false;
+                while r < input.text.len() {
+                    let rc = input.char_at(r);
+                    if in_str {
+                        if rc == '"' {
+                            in_str = false;
                         }
+                        r += rc.len_utf8();
+                    } else if rc == '"' {
+                        in_str = true;
+                        r += 1;
+                    } else if rc == nc {
+                        depth -= 1;
+                        if depth == 0 {
+                            return !need_colon || saw_colon;
+                        }
+                        r += 1;
+                    } else if rc == open_bracket {
+                        depth += 1;
+                        r += 1;
+                    } else if rc == ':' {
+                        saw_colon = true;
+                        r += 1;
+                    } else {
+                        r += rc.len_utf8();
                     }
-                    break;
                 }
+                break;
             }
-            p += self.char_at(p).len_utf8();
         }
-        false
+        p += input.char_at(p).len_utf8();
     }
+    false
+}
 
-    /// Handle `""` inside a double-quoted string: if the `""` is followed
-    /// by a structural character it was the previous value's closing quote,
-    /// so we keep only `\"` (one escaped quote).  Otherwise, we treat it as
-    /// a `""` inside the string content and escape both quotes.
-    /// Returns `true` if the call consumed the double quote (caller should
-    /// `continue` the main loop).
-    fn handle_double_quote_escape(&mut self) -> bool {
-        if self.i + 1 >= self.n || self.text.as_bytes()[self.i + 1] != b'"' {
-            return false;
-        }
-        self.emit_str("\\\"");
-        self.i += 1;
-        let mut j = self.i + 1;
-        while j < self.n && matches!(self.char_at(j), ' ' | '\t' | '\r') {
-            j += 1;
-        }
-        if j < self.n && matches!(self.char_at(j), ',' | '}' | ']' | ':' | '\n') {
-            return true;
-        }
-        self.i += 1;
-        if self.i < self.n && self.cur() == '"' {
-            self.emit_str("\\\"");
-            self.i += 1;
-        }
-        true
+// Handle `""` (doubled double-quote) — a common LLM pattern for
+// escaping.  Emit `\"` and check whether the next non-whitespace
+// is structural to decide if we consumed the closing quote.
+fn handle_double_quote_escape(input: &mut InputCursor, output: &mut OutputBuffer) -> bool {
+    if input.i + 1 >= input.text.len() || input.text.as_bytes()[input.i + 1] != b'"' {
+        return false;
     }
+    output.emit_str("\\\"");
+    input.i += 1;
+    let mut j = input.i + 1;
+    while j < input.text.len() && matches!(input.char_at(j), ' ' | '\t' | '\r') {
+        j += 1;
+    }
+    if j < input.text.len() && matches!(input.char_at(j), ',' | '}' | ']' | ':' | '\n') {
+        return true;
+    }
+    input.i += 1;
+    // Another `"` follows → treat third quote as closer
+    if input.i < input.text.len() && input.cur() == '"' {
+        output.emit_str("\\\"");
+        input.i += 1;
+    }
+    true
+}
 
-    /// After `check_closing_quote()` returns `is_closing = true`, and we
-    /// emit the closing `"`, the next character may be a bareword
-    /// (shorthand for a new key).  If the bareword is followed by `"`, the
-    /// `"` we just emitted was actually the closing boundary of a
-    /// mixed-quote pattern — pop it, trim trailing whitespace and any stray
-    /// comma from `self.out`, and re-emit `"`.  The object-loop comma logic
-    /// will insert `,` before the next key when it resumes.
-    /// Returns `true` when the mixed-quote conversion succeeded (caller
-    /// should `return`).
-    fn try_split_bareword_after_value(&mut self, bareword_quote_pos: Option<usize>) -> bool {
-        if self.i + 1 >= self.n {
-            return false;
-        }
-        let nc = self.text.as_bytes()[self.i + 1] as char;
-        if !(nc.is_ascii_alphabetic() || nc == '_') {
-            return false;
-        }
-        let k = bareword_quote_pos.unwrap_or_else(|| {
-            let mut k = self.i + 1;
-            loop {
-                let kc = self.char_at(k);
-                if !(kc.is_alphanumeric() || kc == '_') {
-                    break;
-                }
-                k += kc.len_utf8();
+// When a `"` is followed by a bareword and then another `":`,
+// split the value: emit `"` to end the current value, leaving
+// the bareword as part of the following key.
+// E.g. `"value_key":...` → first emit `"value"`, then treat
+// `_key` as an unparsed key prefix.
+fn try_split_bareword_after_value(
+    input: &mut InputCursor,
+    output: &mut OutputBuffer,
+    state: &mut ParserState,
+    bareword_quote_pos: Option<usize>,
+) -> bool {
+    if input.i + 1 >= input.text.len() {
+        return false;
+    }
+    let nc = char::from_u32(u32::from(input.text.as_bytes()[input.i + 1])).unwrap();
+    if !(nc.is_ascii_alphabetic() || nc == '_') {
+        return false;
+    }
+    let k = bareword_quote_pos.unwrap_or_else(|| {
+        let mut k = input.i + 1;
+        loop {
+            let kc = input.char_at(k);
+            if !(kc.is_alphanumeric() || kc == '_') {
+                break;
             }
-            self.skip_ws_at(k)
-        });
-        if k >= self.n || self.char_at(k) != '"' {
-            return false;
+            k += kc.len_utf8();
         }
-        let _ = self.out.pop();
-        let trimmed = self
-            .out
-            .trim_end_matches(|c: char| c.is_ascii_whitespace())
-            .len();
-        if trimmed < self.out.len() {
-            self.out.truncate(trimmed);
-        }
-        self.trim_trailing_comma();
-        self.emit_char('"');
-        self.state = ParserState::Normal;
-        true
+        input.skip_ws_at(k)
+    });
+    if k >= input.text.len() || input.char_at(k) != '"' {
+        return false;
     }
-
-    /// Close a string at EOF: restore Normal state and emit closing `"`.
-    #[inline]
-    fn ensure_closing_quote(&mut self) {
-        self.state = ParserState::Normal;
-        self.emit_char('"');
+    // Undo the closing quote we just emitted, plus trailing whitespace/comma
+    let _ = output.out.pop();
+    let trimmed = output
+        .out
+        .trim_end_matches(|c: char| c.is_ascii_whitespace())
+        .len();
+    if trimmed < output.out.len() {
+        output.out.truncate(trimmed);
     }
+    output.trim_trailing_comma();
+    output.emit_char('"');
+    *state = ParserState::Normal;
+    true
+}
 
-    /// Parse a double-quoted JSON string, handling embedded quotes and escapes.
-    ///
-    /// `is_key` controls which structural characters are treated as string
-    /// terminators — `:`/`{`/`[` are valid terminators for keys but not
-    /// for values.
-    pub(super) fn parse_string(&mut self, is_key: bool) {
-        self.emit_char('"');
-        self.state = ParserState::InString;
-        self.i += 1;
-        while self.i < self.n {
-            let ch = self.cur();
-            if ch == '"' {
-                if self.handle_double_quote_escape() {
-                    continue;
-                }
-                let (is_closing, bareword_pos) = self.check_closing_quote(is_key);
-                if is_closing {
-                    self.emit_char('"');
-                    self.state = ParserState::Normal;
-                    if self.try_split_bareword_after_value(bareword_pos) {
-                        return;
-                    }
-                    self.i += 1;
-                    assert!(
-                        self.out.ends_with('"'),
-                        "parse_string: output missing closing quote"
-                    );
-                    return;
-                } else {
-                    self.emit_str("\\\"");
-                    self.i += 1;
-                    continue;
-                }
-            }
-            self.emit_string_body_char(ch, false);
-            continue;
-        }
-        self.ensure_closing_quote();
-    }
+// EOF while parsing string body — close the string.
+#[inline]
+fn ensure_closing_quote(output: &mut OutputBuffer, state: &mut ParserState) {
+    *state = ParserState::Normal;
+    output.emit_char('"');
+}
 
-    /// Parse a triple-quoted (`"""…"""`) string into a normal JSON string.
-    pub(super) fn parse_triple_string(&mut self) {
-        self.i += 3;
-        self.emit_char('"');
-        self.state = ParserState::InString;
-        while self.i < self.n {
-            if self.peek_is("\"\"\"") {
-                let after = self.i + 3;
-                if !(after < self.n && self.char_at(after) == '"') {
-                    self.i += 3;
-                    self.emit_char('"');
-                    self.state = ParserState::Normal;
-                    return;
-                }
-            }
-            let ch = self.cur();
-            if ch == '"' {
-                self.emit_str("\\\"");
-                self.i += 1;
+// Parse a double-quoted string, detecting embedded (unescaped)
+// quotes via `check_closing_quote`.
+pub(super) fn parse_string(
+    input: &mut InputCursor,
+    output: &mut OutputBuffer,
+    brackets: &BracketStack,
+    is_key: bool,
+) {
+    let mut state = ParserState::InString;
+    output.emit_char('"');
+    input.i += 1;
+    while input.i < input.text.len() {
+        let ch = input.cur();
+        if ch == '"' {
+            if handle_double_quote_escape(input, output) {
                 continue;
             }
-            self.emit_string_body_char(ch, false);
-            continue;
-        }
-        self.ensure_closing_quote();
-    }
-
-    /// Parse a single-quoted (`'…'`) string into a double-quoted JSON string.
-    pub(super) fn parse_single_quoted_string(&mut self) {
-        self.emit_char('"');
-        self.state = ParserState::InString;
-        self.i += 1;
-        while self.i < self.n {
-            let ch = self.cur();
-            if ch == '\'' {
-                let mut j = self.i + 1;
-                while j < self.n && matches!(self.char_at(j), ' ' | '\t' | '\r') {
-                    j += 1;
-                }
-                if j >= self.n || matches!(self.char_at(j), ',' | '}' | ']' | ':' | '\n') {
-                    self.emit_char('"');
-                    self.state = ParserState::Normal;
-                    self.i += 1;
+            let (is_closing, bareword_pos) = check_closing_quote(input, is_key, brackets);
+            if is_closing {
+                output.emit_char('"');
+                state = ParserState::Normal;
+                if try_split_bareword_after_value(input, output, &mut state, bareword_pos) {
                     return;
-                } else {
-                    self.emit_char('\'');
-                    self.i += 1;
-                    continue;
                 }
-            }
-            if ch == '"' {
-                self.emit_str("\\\"");
-                self.i += 1;
+                input.i += 1;
+                debug_assert!(
+                    output.ends_with('"'),
+                    "parse_string: output missing closing quote"
+                );
+                return;
+            } else {
+                // Embedded quote — escape it
+                output.emit_str("\\\"");
+                input.i += 1;
                 continue;
             }
-            self.emit_string_body_char(ch, true);
+        }
+        // NUL byte in key context: emit `\u0000`, close the string,
+        // and return so `:` is treated as a key-value separator.
+        // Raw NUL is never intentional JSON content.
+        if is_key && ch == '\0' {
+            output.emit_unicode_escape(0);
+            input.i += 1;
+            output.emit_char('"');
+            if try_split_bareword_after_value(input, output, &mut state, None) {
+                return;
+            }
+            return;
+        }
+        emit_string_body_char(input, output, &mut state, ch, false);
+        continue;
+    }
+    ensure_closing_quote(output, &mut state);
+}
+
+// Parse Python-style `"""..."""` as a double-quoted string.
+pub(super) fn parse_triple_string(
+    input: &mut InputCursor,
+    output: &mut OutputBuffer,
+    _brackets: &BracketStack,
+) {
+    let mut state = ParserState::InString;
+    input.i += 3;
+    output.emit_char('"');
+    while input.i < input.text.len() {
+        if input.peek_is("\"\"\"") {
+            let after = input.i + 3;
+            // Avoid false match on `""""` (four quotes)
+            if !(after < input.text.len() && input.char_at(after) == '"') {
+                input.i += 3;
+                output.emit_char('"');
+                return;
+            }
+        }
+        let ch = input.cur();
+        if ch == '"' {
+            output.emit_str("\\\"");
+            input.i += 1;
             continue;
         }
-        self.ensure_closing_quote();
+        emit_string_body_char(input, output, &mut state, ch, false);
+        continue;
     }
+    ensure_closing_quote(output, &mut state);
+}
+
+// Parse a single-quoted string (`'...'`) as a double-quoted string.
+// Emit `'` literally if the next non-ws char isn't structural.
+pub(super) fn parse_single_quoted_string(
+    input: &mut InputCursor,
+    output: &mut OutputBuffer,
+    _brackets: &BracketStack,
+) {
+    let mut state = ParserState::InString;
+    output.emit_char('"');
+    input.i += 1;
+    while input.i < input.text.len() {
+        let ch = input.cur();
+        if ch == '\'' {
+            let mut j = input.i + 1;
+            while j < input.text.len() && matches!(input.char_at(j), ' ' | '\t' | '\r') {
+                j += 1;
+            }
+            if j >= input.text.len() || matches!(input.char_at(j), ',' | '}' | ']' | ':' | '\n') {
+                output.emit_char('"');
+                input.i += 1;
+                return;
+            } else {
+                // Not a structural closer — keep single quote as literal
+                output.emit_char('\'');
+                input.i += 1;
+                continue;
+            }
+        }
+        if ch == '"' {
+            output.emit_str("\\\"");
+            input.i += 1;
+            continue;
+        }
+        emit_string_body_char(input, output, &mut state, ch, true);
+        continue;
+    }
+    ensure_closing_quote(output, &mut state);
 }

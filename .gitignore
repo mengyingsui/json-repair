@@ -159,3 +159,6 @@ crates/json-repair-core/fuzz/corpus
 
 # IDE
 .idea/
+
+# OpenCode
+.opencode/

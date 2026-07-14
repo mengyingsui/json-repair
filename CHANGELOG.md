@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.4.2 🔒 (2026-07-14)
+
+### Changed
+- **Focused sub-struct composition** (P2) — sub-modules `comment.rs`, `junk.rs`,
+  `number.rs`, `string.rs`, `keys.rs`, `literal.rs` converted from `impl Repairer`
+  to free functions with explicit parameters, eliminating ambient access to
+  `Repairer` fields. `ParserState` moved into `string.rs` as a private enum.
+- **`Repairer`** (`repairer.rs`) — `state: ParserState` field removed. Struct
+  now holds only `input`, `output`, `brackets`.
+- **`emit_unicode_escape`** (`output_buffer.rs`) — replaced 4×
+  `char::from_digit().unwrap()` with zero-cost hex lookup table.
+- **`BracketStack`** (`bracket_stack.rs`) — removed hard-coded `520` initial
+  capacity; uses `Vec::new()`.
+- **`parse_string`** (`string.rs`) — NUL key-split path now also calls
+  `try_split_bareword_after_value` for bareword recovery.
+
+### Fixed
+- **`unescaped_quotes[11]`** — `check_closing_quote` `nc == ':'` branch
+  extended backward scan for `{`/`[` to handle nested embedded JSON keys.
+- **`edge_cases[64]`** — `_fix_expected.py` corrected to emit `\u0000` as
+  6-char literal, not raw NUL byte.
+
 ## v0.4.1 🔒 (2026-07-13)
 
 ### Performance

@@ -15,6 +15,54 @@
 cargo test -p json-repair-core ; cargo clippy -p json-repair-core --all-targets -- -D warnings
 ```
 
+## Design rules
+
+- **Signature must reflect side effects** — A `&mut self` method that modifies internal
+  state beyond what its return type suggests (e.g. a bool-returning method that also adjusts
+  position cursors, output buffers, or state flags) introduces implicit contracts.  These
+  must be encoded in the return type (e.g. an enum with position/action variants) rather
+  than left to comments or call ordering.
+
+- **No deferred errors** — Do NOT place an `Option<Error>` / `Option<JsonRepairError>` field
+  on the parser struct to be checked later by the main loop.  Errors must propagate
+  immediately via `Result` return values.  Deferred errors create an implicit contract:
+  "after setting error, no further work matters, and the next frame dispatch must check it."
+  Callers inevitably forget, or the check is not obviously required.
+
+- **No cached redundant state** — Do NOT cache `text.len()` in a separate `n: usize` field.
+  `str::len()` is an O(1) field read in the standard library.  A cached copy creates a
+  maintenance burden (must keep in sync with every mutation of `text`) for zero measurable
+  gain.
+
+- **No manual stack arrays** — Do NOT use `[T; N] + len` counters to implement a stack.
+  Use `Vec<T>` instead.  Manual stacks require explicit overflow checks (`assert!` panics),
+  waste capacity when `N` is overestimated, and leak an extra field (`len`) into the struct
+  that must be manually maintained alongside every push/pop.
+
+- **No `as` type conversions** — Prefer `From`/`Into` over the `as` operator for type
+  conversions.  `as` silently truncates, sign-extends, or widens without semantic
+  annotation.  Use `char::from(byte)` over `byte as char` (it documents that the byte is
+  valid ASCII), and `char::from_digit(n, 16)` over `HEX[n as usize] as char`.
+
+- **Read-only input during parsing** — The parser/repaier must never mutate the input text.
+  All preprocessing (text wrapping, code-fence removal, metatag stripping) must happen
+  *before* the parser is constructed, not inside it.  This is what allows the parser to
+  borrow (`&str`) instead of own (`String`), eliminating an eager heap allocation and
+  enabling lifetime-tracking of the input origin.
+
+- **Focused sub-struct composition** — Group fields into focused sub-structs
+  (`InputCursor`, `OutputBuffer`, `BracketStack`, etc.) and give submodules access only
+  to the sub-structs they need.  A submodule (`number.rs`, `literal.rs`, `comment.rs`, …)
+  that does not use `state`, `brackets`, `error`, or `last_depth0_pos` must not have
+  those fields in scope.  Every `impl Repairer` block currently can access every field,
+  which creates invisible coupling.
+
+- **No `assert!` for input-driven errors** — `assert!` and `unwrap()` must not be used
+  for conditions that can arise from malformed user input.  Stack overflow
+  (`brackets_len < STACK_CAPACITY`), missing closing quotes, or unbalanced output should
+  return `Err` — not panic.  Reserve `assert!` / `debug_assert!` for invariants that are
+  true by construction (e.g. debug-only validation of the repairer's own output).
+
 ## Architecture
 
 ```

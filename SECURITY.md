@@ -38,6 +38,14 @@ additional `debug_assert!` guards (active in debug builds only).
 The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
 changes only; security posture is unchanged.
 
+**v0.4.2 / v0.3.0** adds:
+- **No new security features** — this release focuses on code structure:
+  focused sub-struct composition (P2), removing `state` from `Repairer`,
+  converting all sub-modules to free functions, and moving `ParserState` into
+  `string.rs` as a private enum. All security guarantees from v0.4.1+ /
+  v0.2.1+ preserved. Zero `unsafe` remains; all tests pass; clippy clean.
+- See [`CHANGELOG.md`](CHANGELOG.md) for full details.
+
 **v0.4.1 / v0.2.1** adds:
 - **No new security features** — this release eliminates the O(n)
   `is_output_balanced` output scan in favor of a live `bracket_depth: i32`

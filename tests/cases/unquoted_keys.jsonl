@@ -1,3 +1,4 @@
 {"input": "{key: 'value'}", "expected": {"key": "value"}}
 {"input": "{name: 'John', age: 30}", "expected": {"name": "John", "age": 30}}
 {"input": "{key: \"value\"}", "expected": {"key": "value"}}
+{"input": "{key\n: 1}", "expected": {"key": 1}}

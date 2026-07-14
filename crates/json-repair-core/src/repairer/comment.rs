@@ -1,41 +1,43 @@
-//! Inline and block comment removal (`//`, `/* … */`, `#`, `--`).
+use crate::repairer::InputCursor;
 
-use super::Repairer;
+/// Returns `true` when `ch` starts a comment (`//`, `/*`, `#`, `--`).
+#[inline]
+pub(super) fn is_comment_start(input: &InputCursor, ch: char) -> bool {
+    ch == '/' || ch == '#' || (ch == '-' && input.peek_is("--"))
+}
 
-impl Repairer {
-    /// Whether `ch` starts a recognized comment pattern (`//`, `/*`, `#`, `--`).
-    #[inline]
-    pub(super) fn is_comment_start(&self, ch: char) -> bool {
-        ch == '/' || ch == '#' || (ch == '-' && self.peek_is("--"))
-    }
-
-    /// Skip a comment starting at `self.i` (`//`, `/* … */`, `#`, `--`).
-    pub(super) fn skip_comment(&mut self) {
-        if self.peek_is("//") {
-            while self.i < self.n && self.cur() != '\n' {
-                self.i += self.cur().len_utf8();
-            }
-            if self.i < self.n {
-                self.i += 1;
-            }
-        } else if self.peek_is("/*") {
-            self.i += 2;
-            while self.i + 1 < self.n {
-                if self.text.as_bytes()[self.i..].starts_with(b"*/") {
-                    self.i += 2;
-                    return;
-                }
-                self.i += self.cur().len_utf8();
-            }
-        } else if self.cur() == '#' || self.peek_is("--") {
-            while self.i < self.n && self.cur() != '\n' {
-                self.i += self.cur().len_utf8();
-            }
-            if self.i < self.n {
-                self.i += 1;
-            }
-        } else {
-            self.i += 1;
+/// Skip past a comment sequence at the cursor position.
+/// Handles `//`, `/* ... */`, `#`, and `--` style comments.
+pub(super) fn skip_comment(input: &mut InputCursor) {
+    // C++-style // — skip to newline or EOF
+    if input.peek_is("//") {
+        while input.i < input.text.len() && input.cur() != '\n' {
+            input.i += input.cur().len_utf8();
         }
+        if input.i < input.text.len() {
+            input.i += 1;
+        }
+    // C-style /* ... */ — scan for */
+    } else if input.peek_is("/*") {
+        input.i += 2;
+        while input.i + 1 < input.text.len() {
+            if input.text.as_bytes()[input.i..].starts_with(b"*/") {
+                input.i += 2;
+                return;
+            }
+            input.i += input.cur().len_utf8();
+        }
+        // Unterminated /* accepted — no error, just consume
+        // Shell/SQL style # or -- line comment
+    } else if input.cur() == '#' || input.peek_is("--") {
+        while input.i < input.text.len() && input.cur() != '\n' {
+            input.i += input.cur().len_utf8();
+        }
+        if input.i < input.text.len() {
+            input.i += 1;
+        }
+    } else {
+        // Not actually a comment — `/` was the start of a regex-like token
+        input.i += 1;
     }
 }

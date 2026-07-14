@@ -6,3 +6,5 @@
 {"input": "{\"a\": b, \"c\": d}", "expected": {"a": "b", "c": "d"}}
 {"input": "{\"value\": hello_world}", "expected": {"value": "hello_world"}}
 {"input": "{\"name\": John \"Smith\"}", "expected": {"name": "John \"Smith\""}}
+{"input": "{\"name\": John\nSmith}", "expected": {"name": "John\nSmith"}}
+{"input": "{\"url\": https://example.com}", "expected": {"url": "https://example.com"}}

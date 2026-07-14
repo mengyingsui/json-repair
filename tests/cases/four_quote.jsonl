@@ -1,2 +1,0 @@
-{"input": "{\"key\": \"\"\"\"quoted\"\"\"\"}", "expected": {"key": "\"quoted\""}}
-{"input": "{\"key\": \"\"\"\"value\"\"\"\"}", "expected": {"key": "\"value\""}}

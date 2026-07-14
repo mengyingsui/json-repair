@@ -170,3 +170,11 @@ fn test_deeply_nested_brackets() {
         parsed.unwrap_err()
     );
 }
+#[test]
+fn test_debug_edge63() {
+    let input = "{\0\0\0\u{1a}}";
+    let result = json_repair_core::repair_json(input).unwrap();
+    println!("input bytes: {:02x?}", input.as_bytes());
+    println!("result: {:?}", result);
+    assert_eq!(result, "{\"\":null}");
+}
