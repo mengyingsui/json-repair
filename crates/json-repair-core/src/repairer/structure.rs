@@ -1,16 +1,14 @@
-use super::{
-    BracketStack, InputCursor, OutputBuffer, ParseFrame, Repairer, Stack, comment, keys, string,
-};
+use super::{BracketStack, InputCursor, OutputBuffer, ParseFrame, Repairer, comment, keys, string};
 
 // Characters that can start an object key (quoted or bareword).
 fn is_key_start(ch: char) -> bool {
     matches!(ch, '"' | '_' | '/' | '\'') || ch.is_ascii_alphabetic()
 }
 
-// Quick scan: does the text at `input.i + 1` look like a key
+// Quick scan: does the text at `input.pos() + 1` look like a key
 // (alphanumeric + underscore → optionally followed by `,` / `"` / `:`)?
 fn looks_like_key(input: &InputCursor) -> bool {
-    let mut j = input.i + 1;
+    let mut j = input.pos() + 1;
     loop {
         let ch = input.char_at(j);
         if !(ch.is_alphanumeric() || ch == '_') {
@@ -18,26 +16,26 @@ fn looks_like_key(input: &InputCursor) -> bool {
         }
         j += ch.len_utf8();
     }
-    while j < input.text.len() && matches!(input.char_at(j), ' ' | '\t' | '\r' | '\n') {
+    while j < input.len() && matches!(input.char_at(j), ' ' | '\t' | '\r' | '\n') {
         j += 1;
     }
-    j < input.text.len() && matches!(input.char_at(j), ',' | '"' | ':' | '}')
+    j < input.len() && matches!(input.char_at(j), ',' | '"' | ':' | '}')
 }
 
-// Walk through the value string at `input.i` and return `true`
+// Walk through the value string at `input.pos()` and return `true`
 // when its closing quote is followed by `:`, meaning the string is
 // actually a key and the preceding key should get an implicit null.
 fn peek_quoted_key_at(input: &InputCursor, brackets: &BracketStack) -> bool {
-    let mut i = input.i;
-    if i >= input.text.len() || input.char_at(i) != '"' {
+    let mut i = input.pos();
+    if i >= input.len() || input.char_at(i) != '"' {
         return false;
     }
     i += 1;
-    while i < input.text.len() {
+    while i < input.len() {
         let c = input.char_at(i);
         if c == '\\' {
             i += 1;
-            if i < input.text.len() {
+            if i < input.len() {
                 i += input.char_at(i).len_utf8();
             }
             continue;
@@ -46,11 +44,11 @@ fn peek_quoted_key_at(input: &InputCursor, brackets: &BracketStack) -> bool {
             let (is_closing, _) = string::check_closing_quote(input, i, false, brackets);
             if is_closing {
                 let mut k = i + 1;
-                if k < input.text.len() && input.char_at(k) == '"' {
+                if k < input.len() && input.char_at(k) == '"' {
                     k += 1;
                 }
                 k = input.skip_ws_at(k);
-                return k < input.text.len() && input.char_at(k) == ':';
+                return k < input.len() && input.char_at(k) == ':';
             }
             break;
         }
@@ -96,11 +94,11 @@ fn try_consume_mismatched_bracket(
             if brackets.is_empty() {
                 output.set_depth0_pos();
             }
-            input.i += 1;
+            input.advance(1);
             MismatchResult::Closed
         }
         _ => {
-            input.i += 1;
+            input.advance(1);
             MismatchResult::NoBracket
         }
     }
@@ -113,7 +111,7 @@ fn push_container(
     output: &mut OutputBuffer,
     brackets: &mut BracketStack,
     input: &mut InputCursor,
-    stack: &mut Stack,
+    stack: &mut Vec<ParseFrame>,
     ch: char,
     resume_frame: ParseFrame,
 ) {
@@ -121,14 +119,14 @@ fn push_container(
         '{' => {
             output.emit_char('{');
             brackets.push('}');
-            input.i += 1;
+            input.advance(1);
             stack.push(resume_frame);
             stack.push(ParseFrame::ObjectLoop(0));
         }
         '[' => {
             output.emit_char('[');
             brackets.push(']');
-            input.i += 1;
+            input.advance(1);
             stack.push(resume_frame);
             stack.push(ParseFrame::ArrayLoop(0));
         }
@@ -139,24 +137,24 @@ fn push_container(
 impl Repairer<'_> {
     // Main loop for parsing an object (`{…}`).
     // `count` is the number of key/value pairs seen so far.
-    pub(super) fn object_loop(&mut self, stack: &mut Stack, count: usize) {
+    pub(super) fn object_loop(&mut self, stack: &mut Vec<ParseFrame>, count: usize) {
         let mut expect_key = true;
         loop {
             self.input.skip_ws();
-            if self.input.i >= self.input.text.len() {
+            if self.input.pos() >= self.input.len() {
                 self.output.trim_trailing_comma();
                 break;
             }
             let ch = self.input.cur();
             // Skip redundant `{` and `:` inside the loop
             if expect_key && (ch == '{' || ch == ':') {
-                self.input.i += 1;
+                self.input.advance(1);
                 continue;
             }
             // Closing `}` — matched closer
             if ch == '}' {
                 close_bracket(&mut self.output, &mut self.brackets, '}');
-                self.input.i += 1;
+                self.input.advance(1);
                 return;
             }
             // Comma separator
@@ -164,7 +162,7 @@ impl Repairer<'_> {
                 if count > 0 && !self.output.ends_with(',') {
                     self.output.emit_char(',');
                 }
-                self.input.i += 1;
+                self.input.advance(1);
                 expect_key = true;
                 continue;
             }
@@ -174,11 +172,9 @@ impl Repairer<'_> {
             }
             // Lone `"` inside non-empty object — could be trailing comma artifact
             if ch == '"' && count > 0 {
-                let j = self.input.skip_ws_at(self.input.i + 1);
-                if j >= self.input.text.len()
-                    || matches!(self.input.char_at(j), '}' | ',' | ']' | ':')
-                {
-                    self.input.i += 1;
+                let j = self.input.skip_ws_at(self.input.pos() + 1);
+                if j >= self.input.len() || matches!(self.input.char_at(j), '}' | ',' | ']' | ':') {
+                    self.input.advance(1);
                     continue;
                 }
             }
@@ -209,11 +205,11 @@ impl Repairer<'_> {
                 keys::parse_key(&mut self.input, &mut self.output, &self.brackets);
                 self.input.skip_ws();
                 self.output.emit_char(':');
-                if self.input.i < self.input.text.len() && self.input.cur() == ':' {
-                    self.input.i += 1;
+                if self.input.pos() < self.input.len() && self.input.cur() == ':' {
+                    self.input.advance(1);
                 }
                 self.input.skip_ws();
-                if self.input.i >= self.input.text.len() {
+                if self.input.pos() >= self.input.len() {
                     // Truncated after `key:` — set up resume frames
                     stack.push(ParseFrame::ObjectLoop(count + 1));
                     stack.push(ParseFrame::Value);
@@ -233,7 +229,7 @@ impl Repairer<'_> {
                 }
                 if vch == '}' {
                     self.output.emit_str("null");
-                    self.input.i += 1;
+                    self.input.advance(1);
                     stack.push(ParseFrame::ObjectLoop(count + 1));
                     return;
                 }
@@ -248,16 +244,16 @@ impl Repairer<'_> {
             }
         }
         // Close the object if the bracket stack still expects `}`
-        if self.input.i < self.input.text.len() && self.brackets.last() == Some('}') {
+        if self.input.pos() < self.input.len() && self.brackets.last() == Some('}') {
             close_bracket(&mut self.output, &mut self.brackets, '}');
         }
     }
 
     // Main loop for parsing an array (`[…]`).
-    pub(super) fn array_loop(&mut self, stack: &mut Stack, count: usize) {
+    pub(super) fn array_loop(&mut self, stack: &mut Vec<ParseFrame>, count: usize) {
         loop {
             self.input.skip_ws();
-            if self.input.i >= self.input.text.len() {
+            if self.input.pos() >= self.input.len() {
                 self.output.trim_trailing_comma();
                 break;
             }
@@ -265,7 +261,7 @@ impl Repairer<'_> {
             // Closing `]` — matched closer
             if ch == ']' {
                 close_bracket(&mut self.output, &mut self.brackets, ']');
-                self.input.i += 1;
+                self.input.advance(1);
                 return;
             }
             // `}` inside array — could be mismatched or nested object
@@ -285,7 +281,7 @@ impl Repairer<'_> {
                 if count > 0 && !self.output.ends_with(',') {
                     self.output.emit_char(',');
                 }
-                self.input.i += 1;
+                self.input.advance(1);
                 continue;
             }
             if comment::is_comment_start(&self.input, ch) {
@@ -325,9 +321,9 @@ impl Repairer<'_> {
     // Implicit array loop for adjacent or comma-separated top-level values.
     // After detecting multiple JSON values (objects/numbers/strings etc.)
     // at the top level, wraps each as an array element.
-    pub(super) fn implicit_array_loop(&mut self, stack: &mut Stack, count: usize) {
+    pub(super) fn implicit_array_loop(&mut self, stack: &mut Vec<ParseFrame>, count: usize) {
         self.input.skip_ws();
-        if self.input.i >= self.input.text.len() {
+        if self.input.pos() >= self.input.len() {
             if count > 0 {
                 self.output.trim_trailing_comma();
             }
@@ -335,10 +331,10 @@ impl Repairer<'_> {
         }
         // Consume optional comma separator
         if count > 0 && self.input.cur() == ',' {
-            self.input.i += 1;
+            self.input.advance(1);
             self.input.skip_ws();
         }
-        if self.input.i >= self.input.text.len() {
+        if self.input.pos() >= self.input.len() {
             if count > 0 {
                 self.output.trim_trailing_comma();
             }

@@ -23,10 +23,10 @@ const LIT_NULLPTR: &str = "nullptr";
 // Used against LLM output which may capitalize or mix case.
 fn match_lit(input: &InputCursor, pat: &str) -> bool {
     let plen = pat.len();
-    if input.i + plen > input.text.len() {
+    if input.pos() + plen > input.len() {
         return false;
     }
-    input.text.as_bytes()[input.i..input.i + plen]
+    input.bytes()[input.pos()..input.pos() + plen]
         .iter()
         .zip(pat.bytes())
         .all(|(&a, b)| a.eq_ignore_ascii_case(&b))
@@ -52,10 +52,22 @@ pub(super) fn parse_literal(input: &mut InputCursor, output: &mut OutputBuffer) 
     for &(pat, emit) in ENTRIES {
         if match_lit(input, pat) {
             output.emit_str(emit);
-            input.i += pat.len();
+            input.advance(pat.len());
             return;
         }
     }
     // Not a recognizable literal — treat as an unquoted string value.
     keys::parse_unquoted_value(input, output);
+}
+
+/// Returns `true` if `ch` can start a JSON literal token (`true`, `false`,
+/// `null`, or their aliases like `Infinity`, `Undefined`, `NaN`, …).
+///
+/// Used by [`run_value`](super::Repairer::run_value) to dispatch to
+/// [`parse_literal`] without hard-coding a 10-character match arm.
+pub(super) fn is_literal_start(ch: char) -> bool {
+    matches!(
+        ch,
+        't' | 'f' | 'n' | 'T' | 'F' | 'N' | 'i' | 'I' | 'u' | 'U'
+    )
 }

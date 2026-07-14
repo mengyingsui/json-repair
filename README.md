@@ -4,7 +4,7 @@
 
 # json_repair
 
-[![Security: v0.4.3+](https://img.shields.io/badge/Security-v0.4.3%2B-2ea44f?labelColor=333)](SECURITY.md)
+[![Security: v0.4.4+](https://img.shields.io/badge/Security-v0.4.4%2B-2ea44f?labelColor=333)](SECURITY.md)
 
 Repair malformed JSON from LLM outputs — now powered by Rust.
 
@@ -155,6 +155,7 @@ All hot-path logic runs in native Rust, exposed to Python via PyO3.
 
 | Version    | Date       | Description                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 |------------|------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| v0.4.4 🔒  | 2026-07-14 | **Rust elegance overhaul & encapsulation hardening** — 7 structural improvements (predicate functions, `junk`→`sequence` rename, `Stack` wrapper removal, cfg simplification, `repair_json_debug` orphan-fix, `preprocess`/`string` module splits); `OutputBuffer`/`InputCursor` fields privatized with accessor methods; `.unwrap()`→`.expect()`; `char::from_u32().unwrap()`→`char::from()`; `peek_is` `assert!`→`debug_assert!`; `ParseFrame` `Debug` derive. See [`CHANGELOG.md`](CHANGELOG.md). |
 | v0.4.3 🔒  | 2026-07-14 | **Design rule #1 enforcement** — `bool`→`enum` for 3 side‑effect functions; `check_closing_quote` `pos` param; `peek_quoted_key_at` `&mut`→`&InputCursor`; `emit_unicode_escape` hex table→`char::from_digit`; no `as`/`unwrap` for type conversions; `InputCursor` `Debug` derive; `REPAIR_PHILOSOPHY.md`. See [`CHANGELOG.md`](CHANGELOG.md).                                                                                                             |
 | v0.4.2 🔒  | 2026-07-14 | **Focused sub‑struct composition (P2)** — all sub‑modules converted to free functions; `state: ParserState` removed from `Repairer` (now only `input`, `output`, `brackets`); `BooleanStack` 520→`Vec::new()`; `emit_unicode_escape` hex table; NUL bareword split. See [`CHANGELOG.md`](CHANGELOG.md).                                                                                                                                                   |
 | v0.4.1 🔒  | 2026-07-13 | **Eliminated `is_output_balanced` output scan** — `bracket_depth: i32` counter tracks bracket balance live; removed the only output‑pass from `repair()`. Implicit array `[` now goes through `brackets_push`/`brackets_pop` stack (LIFO order maintained). 6 input passes, 0 output passes. See [`CHANGELOG.md`](CHANGELOG.md).                                                                                                                          |

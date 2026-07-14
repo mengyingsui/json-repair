@@ -60,3 +60,62 @@ impl BracketStack {
         self.bracket_depth
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stack_is_empty() {
+        let s = BracketStack::new();
+        assert!(s.is_empty());
+        assert_eq!(s.depth(), 0);
+        assert_eq!(s.last(), None);
+    }
+
+    #[test]
+    fn push_pop_roundtrip() {
+        let mut s = BracketStack::new();
+        s.push('}');
+        assert!(!s.is_empty());
+        assert_eq!(s.depth(), 1);
+        assert_eq!(s.last(), Some('}'));
+        assert_eq!(s.pop(), Some('}'));
+        assert!(s.is_empty());
+        assert_eq!(s.depth(), 0);
+    }
+
+    #[test]
+    fn pop_empty_returns_none() {
+        let mut s = BracketStack::new();
+        assert_eq!(s.pop(), None);
+        assert_eq!(s.depth(), 0);
+    }
+
+    #[test]
+    fn nested_push_pop_preserves_order() {
+        let mut s = BracketStack::new();
+        s.push('}');
+        s.push(']');
+        assert_eq!(s.last(), Some(']'));
+        assert_eq!(s.depth(), 2);
+        assert_eq!(s.pop(), Some(']'));
+        assert_eq!(s.last(), Some('}'));
+        assert_eq!(s.depth(), 1);
+        assert_eq!(s.pop(), Some('}'));
+        assert_eq!(s.depth(), 0);
+    }
+
+    #[test]
+    fn depth_tracks_push_pop() {
+        let mut s = BracketStack::new();
+        for _ in 0..5 {
+            s.push('}');
+        }
+        assert_eq!(s.depth(), 5);
+        for expected in (0..5).rev() {
+            assert_eq!(s.pop(), Some('}'));
+            assert_eq!(s.depth(), expected);
+        }
+    }
+}

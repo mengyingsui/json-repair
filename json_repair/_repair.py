@@ -9,28 +9,39 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Literal, overload
+from typing import Literal, overload
 
 from ._rust_parse import py_repair_json as _repair_json
 
+# Surrogate code points U+D800–U+DFFF are invalid in Rust's &str.
+# Replace each with U+FFFD (REPLACEMENT CHARACTER) before the FFI call.
 _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
+_SURROGATE_TABLE = str.maketrans(dict.fromkeys(range(0xD800, 0xE000), "\ufffd"))
 
 
 def _strip_surrogates(text: str) -> str:
     """Replace all surrogate code points (U+D800-U+DFFF) with U+FFFD.
 
-    PyO3 cannot pass lone surrogates to Rust, so they are stripped before
-    the FFI call.
+    PyO3 cannot pass lone surrogates to Rust (``&str`` requires valid UTF-8),
+    so they are stripped before the FFI call.
+
+    Uses a fast-path regex check to avoid allocation when the input is clean,
+    then falls back to :meth:`str.translate` (C-level single-pass code point
+    replacement) which is faster than ``encode``/``decode`` round-tripping.
     """
     if _SURROGATE_RE.search(text) is None:
         return text
-    return text.encode("utf-8", errors="surrogatepass").decode(
-        "utf-8", errors="replace"
-    )
+    return text.translate(_SURROGATE_TABLE)
 
 
-JsonValue = dict[Any, Any] | list[Any] | str | int | float | bool | None
-"""Any JSON-deserializable Python value."""
+type JsonValue = (
+    dict[str, JsonValue] | list[JsonValue] | str | int | float | bool | None
+)
+"""Any JSON-deserializable Python value.
+
+Recursive type alias (PEP 695): JSON objects map ``str`` keys to ``JsonValue``,
+JSON arrays hold ``JsonValue`` elements, matching the RFC 8259 grammar.
+"""
 
 
 @overload

@@ -7,7 +7,7 @@ pub(super) fn parse_key(
     brackets: &BracketStack,
 ) {
     input.skip_ws();
-    if input.i >= input.text.len() {
+    if input.pos() >= input.len() {
         return;
     }
     let ch = input.cur();
@@ -30,18 +30,18 @@ fn emit_bare_word(
     output: &mut OutputBuffer,
     is_stop: impl Fn(char) -> bool,
 ) {
-    while input.i < input.text.len() {
+    while input.pos() < input.len() {
         let ch = input.cur();
         if is_stop(ch) {
             break;
         }
         let cv = u32::from(ch);
         if cv < 0x20 && !matches!(cv, 0x09 | 0x0A | 0x0D) {
-            input.i += ch.len_utf8();
+            input.advance(ch.len_utf8());
             continue;
         }
         string::emit_unquoted_char(input, output, ch);
-        input.i += ch.len_utf8();
+        input.advance(ch.len_utf8());
     }
 }
 
@@ -60,8 +60,8 @@ pub(super) fn parse_unquoted_key(input: &mut InputCursor, output: &mut OutputBuf
     });
     output.emit_char('"');
     // Consume a trailing `"` if present (from the original input)
-    if input.i < input.text.len() && input.cur() == '"' {
-        input.i += 1;
+    if input.pos() < input.len() && input.cur() == '"' {
+        input.advance(1);
     }
 }
 
@@ -73,15 +73,15 @@ pub(super) fn parse_unquoted_value(input: &mut InputCursor, output: &mut OutputB
     output.emit_char('"');
     loop {
         emit_bare_word(input, output, |ch| matches!(ch, ',' | '}' | ']'));
-        if input.i < input.text.len() && input.cur() == ']' {
-            let next = if input.i + 1 < input.text.len() {
-                input.text.as_bytes()[input.i + 1]
+        if input.pos() < input.len() && input.cur() == ']' {
+            let next = if input.pos() + 1 < input.len() {
+                input.bytes()[input.pos() + 1]
             } else {
                 0
             };
             if next.is_ascii_alphanumeric() || next == b'_' {
                 string::emit_unquoted_char(input, output, ']');
-                input.i += 1;
+                input.advance(1);
                 continue;
             }
         }

@@ -1,6 +1,8 @@
 //! Core library for repairing malformed JSON output from LLMs.
 //!
-//! The quickest way to repair JSON is [`repair_json`].
+//! The quickest way to repair JSON is [`repair_json`].  For tunable
+//! parameters (e.g. custom max parse depth), use
+//! [`repair_json_with`](crate::repair_json_with) with a [`RepairConfig`].
 //!
 //! This crate provides a single-pass streaming repairer that handles common
 //! JSON errors produced by large language models:
@@ -21,19 +23,27 @@
 //!   repair pass.
 #![deny(missing_docs)]
 
+/// Configuration for JSON repair.
+pub mod config;
+
 /// Errors produced during JSON repair.
+///
+/// Re-exports the [`error::JsonRepairError`] and [`error::JsonRepairErrorKind`]
+/// types for convenience.
 pub mod error;
 
 mod preprocess;
 mod repairer;
+mod util;
 
-use error::JsonRepairError;
-use repairer::Repairer;
+pub use config::{DEFAULT_MAX_PARSE_DEPTH, RepairConfig, repair_json_with};
+pub use error::{JsonRepairError, JsonRepairErrorKind};
 
 /// Repair a malformed JSON string and return valid JSON.
 ///
 /// This is the main entry point.  It returns `Ok(valid_json)` on success, or
 /// `Err(JsonRepairError)` if repair produced text that is still invalid JSON.
+/// Uses the default [`RepairConfig`] — see [`repair_json_with`] for tuning.
 ///
 /// # Example
 ///
@@ -50,19 +60,7 @@ use repairer::Repairer;
 /// Returns `JsonRepairError` if input is catastrophically malformed or the
 /// repair algorithm cannot produce valid JSON.
 pub fn repair_json(text: &str) -> Result<String, JsonRepairError> {
-    if text.trim().is_empty() {
-        return Ok(String::new());
-    }
-    let trimmed = text.trim_start();
-    if (trimmed.starts_with('{') || trimmed.starts_with('[')) && is_valid_json(text) {
-        return Ok(text.to_string());
-    }
-    let text = preprocess::preprocess_json(text);
-    let (text, start_i) = preprocess::normalize_preamble(text.as_ref());
-    let text = text.into_owned();
-    let mut repairer = Repairer::new(&text);
-    repairer.input.i = start_i;
-    repairer.repair()
+    repair_json_with(text, &RepairConfig::default())
 }
 
 /// Check if `text` is already valid JSON.
@@ -71,19 +69,22 @@ pub fn repair_json(text: &str) -> Result<String, JsonRepairError> {
 /// accurate validation.  When disabled, accepts all non-empty text — the
 /// repairer will handle validation during output emission.
 #[cfg(feature = "serde-validate")]
-fn is_valid_json(text: &str) -> bool {
+pub(crate) fn is_valid_json(text: &str) -> bool {
     serde_json::from_str::<serde_json::Value>(text).is_ok()
 }
 
 #[cfg(not(feature = "serde-validate"))]
-fn is_valid_json(_text: &str) -> bool {
+pub(crate) fn is_valid_json(_text: &str) -> bool {
     false
 }
 
-/// Debug wrapper around `repair_json` with extra validation.
+/// Debug wrapper around `repair_json` with an idempotence check.
 ///
-/// In debug builds, adds valid-JSON and idempotence checks.
-/// In release builds, identical to `repair_json`.
+/// In debug builds, verifies that repairing the output again yields the
+/// same string (i.e. the repair result is a fixed point).  Valid-JSON
+/// validation is already performed inside [`repair_json`] in debug builds,
+/// so this wrapper only adds the second-pass idempotence assertion.
+/// In release builds, identical to [`repair_json`].
 ///
 /// # Example
 ///
@@ -99,10 +100,6 @@ pub fn repair_json_debug(text: &str) -> Result<String, JsonRepairError> {
     #[cfg(debug_assertions)]
     if let Ok(ref r) = result {
         if !r.is_empty() {
-            debug_assert!(
-                serde_json::from_str::<serde_json::Value>(r).is_ok(),
-                "repair_json_debug: result is not valid JSON: {r}"
-            );
             match repair_json(r) {
                 Ok(second) => debug_assert_eq!(
                     second.as_str(),

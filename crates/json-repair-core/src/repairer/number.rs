@@ -1,18 +1,27 @@
 use crate::repairer::{InputCursor, OutputBuffer};
 
-/// Scan forward from `input.i` through characters legal in a JSON
+/// Returns `true` if `ch` can start a JSON number.
+///
+/// Covers leading digits and leading `.` (for `.5`-style numbers).
+/// The leading sign `-` is handled separately by [`run_value`](super::Repairer::run_value)
+/// because it may also start a `--` comment.
+pub(super) fn is_number_start(ch: char) -> bool {
+    matches!(ch, '0'..='9' | '.')
+}
+
+/// Scan forward from `input.pos()` through characters legal in a JSON
 /// number: digits, `.`, `e`/`E`, `-`.  `+` is legal only as the first
 /// character or immediately after `e`/`E`.  Returns the position past the
 /// last legal character (i.e. the first position that cannot belong to a
-/// number span).  Does NOT advance `input.i`.
+/// number span).  Does NOT advance `input.pos()`.
 pub(super) fn scan_number_span(input: &InputCursor) -> usize {
-    let bytes = input.text.as_bytes();
-    let mut j = input.i;
+    let bytes = input.bytes();
+    let mut j = input.pos();
     while j < bytes.len() {
         match bytes[j] {
             b'0'..=b'9' | b'.' | b'e' | b'E' | b'-' => j += 1,
             b'+' => {
-                if j == input.i || (j > 0 && matches!(bytes[j - 1], b'e' | b'E')) {
+                if j == input.pos() || (j > 0 && matches!(bytes[j - 1], b'e' | b'E')) {
                     j += 1;
                 } else {
                     break;
@@ -24,20 +33,20 @@ pub(super) fn scan_number_span(input: &InputCursor) -> usize {
     j
 }
 
-/// Consume the widest legal number span starting at `input.i`, then
+/// Consume the widest legal number span starting at `input.pos()`, then
 /// normalize leading zeros, leading `+`, leading `.`, trailing `.`,
 /// and validate before emitting.
 pub(super) fn parse_number(input: &mut InputCursor, output: &mut OutputBuffer) {
-    let start = input.i;
+    let start = input.pos();
     let end = scan_number_span(input);
-    input.i = end;
+    input.set_pos(end);
     // If the span is immediately followed by an alphabetic character
     // it is not a number (e.g. `123abc` → treat as bareword, emit `0`).
-    if input.i < input.text.len() && input.char_at(input.i).is_ascii_alphabetic() {
+    if input.pos() < input.len() && input.char_at(input.pos()).is_ascii_alphabetic() {
         output.emit_char('0');
         return;
     }
-    let raw = &input.text[start..input.i];
+    let raw = &input.text()[start..input.pos()];
     let mut num_str = String::with_capacity(raw.len() + 2);
     // Normalize edge cases that JSON rejects but LLMs produce:
     //   +.5 → 0.5,  +3 → 3,  -.5 → -0.5,  .5 → 0.5,  3. → 3.0
@@ -128,5 +137,128 @@ fn normalize_leading_zeros_inplace(s: &mut String) {
     let remove_to = start + zeros;
     if remove_to > remove_from {
         s.drain(remove_from..remove_to);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cursor(text: &str) -> InputCursor<'_> {
+        InputCursor::new(text)
+    }
+
+    // ── scan_number_span ────────────────────────────────────────────────
+
+    #[test]
+    fn scan_number_span_pure_digits() {
+        let input = cursor("12345abc");
+        assert_eq!(scan_number_span(&input), 5);
+    }
+
+    #[test]
+    fn scan_number_span_decimal_and_exponent() {
+        let input = cursor("-3.14e+10}");
+        assert_eq!(scan_number_span(&input), 9);
+    }
+
+    #[test]
+    fn scan_number_span_plus_only_after_e() {
+        // `+` at start is legal; `+` after non-e is a stop
+        let input = cursor("+5+5");
+        assert_eq!(scan_number_span(&input), 2);
+    }
+
+    #[test]
+    fn scan_number_span_empty_at_non_digit() {
+        let input = cursor("abc");
+        assert_eq!(scan_number_span(&input), 0);
+    }
+
+    #[test]
+    fn scan_number_span_trailing_dot_kept() {
+        // `.` is consumed by the span; caller decides validity
+        let input = cursor("5.");
+        assert_eq!(scan_number_span(&input), 2);
+    }
+
+    // ── has_excessive_separators ───────────────────────────────────────
+
+    #[test]
+    fn excessive_separators_single_dot_ok() {
+        assert!(!has_excessive_separators("1.5"));
+    }
+
+    #[test]
+    fn excessive_separators_two_dots() {
+        assert!(has_excessive_separators("1.2.3"));
+    }
+
+    #[test]
+    fn excessive_separators_two_e() {
+        assert!(has_excessive_separators("1e2e3"));
+    }
+
+    #[test]
+    fn excessive_separators_dot_and_e_ok() {
+        assert!(!has_excessive_separators("1.5e10"));
+    }
+
+    // ── normalize_leading_zeros_inplace ────────────────────────────────
+
+    #[test]
+    fn normalize_no_leading_zeros() {
+        let mut s = String::from("123");
+        normalize_leading_zeros_inplace(&mut s);
+        assert_eq!(s, "123");
+    }
+
+    #[test]
+    fn normalize_single_zero_kept() {
+        let mut s = String::from("0");
+        normalize_leading_zeros_inplace(&mut s);
+        assert_eq!(s, "0");
+    }
+
+    #[test]
+    fn normalize_leading_zeros_stripped() {
+        let mut s = String::from("007");
+        normalize_leading_zeros_inplace(&mut s);
+        assert_eq!(s, "7");
+    }
+
+    #[test]
+    fn normalize_negative_leading_zeros() {
+        let mut s = String::from("-007.5");
+        normalize_leading_zeros_inplace(&mut s);
+        assert_eq!(s, "-7.5");
+    }
+
+    #[test]
+    fn normalize_all_zeros_keep_one() {
+        let mut s = String::from("00");
+        normalize_leading_zeros_inplace(&mut s);
+        assert_eq!(s, "0");
+    }
+
+    #[test]
+    fn normalize_zero_before_decimal_kept() {
+        let mut s = String::from("0.5");
+        normalize_leading_zeros_inplace(&mut s);
+        assert_eq!(s, "0.5");
+    }
+
+    #[test]
+    fn normalize_zero_before_exponent_kept() {
+        let mut s = String::from("0e10");
+        normalize_leading_zeros_inplace(&mut s);
+        assert_eq!(s, "0e10");
+    }
+
+    #[test]
+    fn normalize_empty_string_noop() {
+        let mut s = String::new();
+        normalize_leading_zeros_inplace(&mut s);
+        assert!(s.is_empty());
     }
 }

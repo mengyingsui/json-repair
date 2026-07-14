@@ -1,4 +1,5 @@
 use crate::repairer::InputCursor;
+use crate::util::utf8_char_len;
 use memchr::memchr2;
 
 // Heuristic: input resembles an implicit object sequence
@@ -7,38 +8,24 @@ use memchr::memchr2;
 const IMPLICIT_SEQUENCE_MIN_LENGTH: usize = 128;
 const IMPLICIT_SEQUENCE_MIN_COUNT: usize = 2;
 
-// UTF-8 leading-byte → full character width for byte-length jumps
-// inside strings.  We avoid char decoding to stay in byte-index space.
-fn utf8_char_len(lead: u8) -> usize {
-    if lead < 0x80 {
-        1
-    } else if lead < 0xE0 {
-        2
-    } else if lead < 0xF0 {
-        3
-    } else {
-        4
-    }
-}
-
-// Scan forward from `input.i` (must point at `{`) to decide whether
+// Scan forward from `input.pos()` (must point at `{`) to decide whether
 // the input is a sequence of concatenated objects.  Returns `true`
 // when ≥2 top-level `{…}` blocks follow one another with only
 // optional commas/whitespace between them.
 pub(super) fn is_implicit_object_sequence(input: &InputCursor) -> bool {
-    if input.i >= input.text.len() || input.cur() != '{' {
+    if input.pos() >= input.len() || input.cur() != '{' {
         return false;
     }
-    let remaining = input.text.len() - input.i;
+    let remaining = input.len() - input.pos();
     if remaining < IMPLICIT_SEQUENCE_MIN_LENGTH {
         return false;
     }
-    let mut j = input.i;
+    let mut j = input.pos();
     let mut count = 0;
     let mut depth = 0usize;
     let mut in_string = false;
-    let bytes = input.text.as_bytes();
-    while j + 1 < input.text.len() {
+    let bytes = input.bytes();
+    while j + 1 < input.len() {
         // Fast-scan through string contents using memchr for '"' and '\'
         if in_string {
             match memchr2(b'"', b'\\', &bytes[j..]) {
@@ -46,7 +33,7 @@ pub(super) fn is_implicit_object_sequence(input: &InputCursor) -> bool {
                     j += off;
                     if bytes[j] == b'\\' {
                         j += 1;
-                        if j < input.text.len() {
+                        if j < input.len() {
                             let nb = bytes[j];
                             j += if nb.is_ascii() { 1 } else { utf8_char_len(nb) };
                         }
@@ -62,7 +49,7 @@ pub(super) fn is_implicit_object_sequence(input: &InputCursor) -> bool {
         let ch = input.char_at(j);
         if ch == '\\' {
             j += 1;
-            if j < input.text.len() {
+            if j < input.len() {
                 j += input.char_at(j).len_utf8();
             }
             continue;
@@ -84,10 +71,10 @@ pub(super) fn is_implicit_object_sequence(input: &InputCursor) -> bool {
         if ch == '}' && depth == 0 {
             let mut k = input.skip_ws_at(j + 1);
             // Consume optional comma separator
-            if k < input.text.len() && input.char_at(k) == ',' {
+            if k < input.len() && input.char_at(k) == ',' {
                 k = input.skip_ws_at(k + 1);
             }
-            if k < input.text.len() && input.char_at(k) == '{' {
+            if k < input.len() && input.char_at(k) == '{' {
                 count += 1;
                 if count >= IMPLICIT_SEQUENCE_MIN_COUNT {
                     return true;
@@ -106,9 +93,9 @@ pub(super) fn is_implicit_object_sequence(input: &InputCursor) -> bool {
 // Uses `{`/`}`/`[`/`]` depth tracking only (no string state), which
 // avoids false positives from embedded quotes inside strings.
 pub(super) fn is_comma_separated_object_list(input: &InputCursor) -> bool {
-    let bytes = input.text.as_bytes();
-    let n = input.text.len();
-    let mut i = input.i;
+    let bytes = input.bytes();
+    let n = input.len();
+    let mut i = input.pos();
     let mut depth: i32 = 0;
     while i < n {
         match bytes[i] {
@@ -132,14 +119,14 @@ pub(super) fn is_comma_separated_object_list(input: &InputCursor) -> bool {
 // brackets exist.  String tracking uses a simple toggle — sufficient
 // for clean non-bracket inputs without embedded quotes.
 pub(super) fn is_comma_separated_value_list(input: &InputCursor) -> bool {
-    let bytes = input.text.as_bytes();
-    let n = input.text.len();
+    let bytes = input.bytes();
+    let n = input.len();
     // Skip if any brackets exist — those cases use the object-specific
     // detection (which handles embedded quotes via bracket-only tracking).
-    if bytes[input.i..].iter().any(|&b| b == b'{' || b == b'[') {
+    if bytes[input.pos()..].iter().any(|&b| b == b'{' || b == b'[') {
         return false;
     }
-    let mut i = input.i;
+    let mut i = input.pos();
     let mut in_string = false;
     while i < n {
         if in_string {

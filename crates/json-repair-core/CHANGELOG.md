@@ -1,5 +1,31 @@
 # Changelog — json-repair-core
 
+## v0.3.2 (2026-07-14)
+
+### Changed
+- **Structural elegance** — 7 improvements:
+  - `run_value` uses `is_literal_start`/`is_number_start` predicate functions
+    instead of inline character-literal lists.
+  - `junk.rs` → `sequence.rs` (name matches responsibility).
+  - `Stack` wrapper removed; `Vec<ParseFrame>` used directly.
+  - `validate_serde_json` cfg simplified to nested `#[cfg(debug_assertions)]`
+    + inner `#[cfg(feature)]`.
+  - `repair_json_debug` `debug-validate` feature gate removed; idempotence
+    check always compiles; `tests/debug_api.rs` added.
+  - `preprocess.rs` split into `preprocess/{preamble,quote_fix}.rs`;
+    `char_at` moved to `util.rs`.
+  - `string.rs` split into `string/{closing,escape}.rs`.
+- **Encapsulation** — `OutputBuffer` and `InputCursor` fields privatized;
+  accessor methods added (`pop()`, `trim_trailing_whitespace()`, `text()`,
+  `bytes()`, `pos()`, `set_pos()`, `advance()`, `len()`); 72 call sites updated.
+- **`Repairer` fields** — `pub` → `pub(crate)` (consistency with sub-structs).
+- **`.unwrap()` → `.expect()`** — `emit_unicode_escape` (4×) and `util::char_at`.
+- **`char::from_u32(…).unwrap()` → `char::from(…)`** in `quote_fix.rs` (2×).
+- **`peek_is`** — `assert!` → `debug_assert!` + runtime guard (no panic on
+  non-ASCII user input).
+- **`ParseFrame`** — `#[derive(Debug)]` added.
+- **Stale doc** — `repairer.rs` module doc: `junk` → `sequence`.
+
 ## v0.3.1 (2026-07-14)
 
 ### Changed

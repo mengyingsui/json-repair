@@ -25,7 +25,8 @@ Starting with **v0.3.4** (Python) / **v0.1.4** (Rust),
 | **json-repair-core** (Python) | 0.4.x   | :white_check_mark: |
 |                               | 0.3.x   | :white_check_mark: |
 |                               | < 0.3   | :x:                |
-| **json-repair-core** (Rust)   | 0.2.x   | :white_check_mark: |
+| **json-repair-core** (Rust)   | 0.3.x   | :white_check_mark: |
+|                               | 0.2.x   | :white_check_mark: |
 |                               | 0.1.x   | :white_check_mark: |
 |                               | < 0.1   | :x:                |
 
@@ -37,6 +38,17 @@ additional `debug_assert!` guards (active in debug builds only).
 
 The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
 changes only; security posture is unchanged.
+
+**v0.4.4 / v0.3.2** adds:
+- **No new security features** — this release is a Rust elegance overhaul
+  and encapsulation hardening: 7 structural improvements (module splits,
+  predicate functions, cfg simplification), full field privatization on
+  `OutputBuffer`/`InputCursor` with accessor methods, `.unwrap()`→`.expect()`,
+  `char::from_u32().unwrap()`→`char::from()`, and `peek_is` `assert!`→
+  `debug_assert!` (no panic on non-ASCII user input). All security guarantees
+  from v0.4.3+ / v0.3.1+ preserved. Zero `unsafe` remains; all 176 tests
+  pass; clippy clean.
+- See [`CHANGELOG.md`](CHANGELOG.md) for full details.
 
 **v0.4.3 / v0.3.1** adds:
 - **No new security features** — this release enforces design rule #1

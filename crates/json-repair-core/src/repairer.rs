@@ -8,22 +8,22 @@
 //! - `bracket_stack` — bracket depth tracking and matching
 //! - `comment` — inline and block comment removal
 //! - `input_cursor` — read-only cursor over the input text
-//! - `junk` — trailing/comma junk handling
 //! - `keys` — unquoted key parsing
 //! - `literal` — unquoted `true`/`false`/`null` / `Infinity` / `NaN`
 //! - `number` — number parsing and normalization
 //! - `output_buffer` — output string builder with depth tracking
+//! - `sequence` — top-level implicit-array and comma-separated list detection
 //! - `string` — string parsing with embedded-quote detection
 //! - `structure` — object/array frame management
 
 mod bracket_stack;
 mod comment;
 mod input_cursor;
-mod junk;
 mod keys;
 mod literal;
 mod number;
 mod output_buffer;
+mod sequence;
 mod string;
 mod structure;
 
@@ -33,17 +33,19 @@ pub(crate) use output_buffer::OutputBuffer;
 
 use crate::error::JsonRepairError;
 
-/// Maximum nesting depth for objects/arrays before the repairer gives up.
-const MAX_PARSE_DEPTH: usize = 512;
-
 /// Pre-allocate capacity for the parse-frame stack.
-const STACK_CAPACITY: usize = MAX_PARSE_DEPTH + 8;
+///
+/// Sized for the default maximum parse depth (see
+/// [`DEFAULT_MAX_PARSE_DEPTH`](crate::DEFAULT_MAX_PARSE_DEPTH)).  A larger
+/// `max_depth` passed to [`repair`](Self::repair) simply causes the stack
+/// to grow beyond this initial capacity — `Vec` handles it transparently.
+const STACK_CAPACITY: usize = crate::DEFAULT_MAX_PARSE_DEPTH + 8;
 
 /// Stack frame for the iterative (non-recursive) parse loop.
 ///
 /// Each variant carries only the state needed to resume when the frame is
 /// popped — no global flags on `Repairer` are consulted or mutated.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum ParseFrame {
     /// Parse a fresh value (the entry point for any JSON value).
     Value,
@@ -65,9 +67,9 @@ pub(crate) enum ParseFrame {
 /// - [`OutputBuffer`] — output string builder with depth tracking
 /// - [`BracketStack`] — bracket depth tracking and matching
 pub(crate) struct Repairer<'a> {
-    pub input: InputCursor<'a>,
-    pub output: OutputBuffer,
-    pub brackets: BracketStack,
+    pub(crate) input: InputCursor<'a>,
+    pub(crate) output: OutputBuffer,
+    pub(crate) brackets: BracketStack,
 }
 
 impl<'a> Repairer<'a> {
@@ -89,12 +91,12 @@ impl<'a> Repairer<'a> {
         self.output.set_depth0_pos();
     }
 
-    /// Peek ahead: does the number span starting at `self.input.i` end
+    /// Peek ahead: does the number span starting at `self.input.pos()` end
     /// with `:` immediately after?  If so, the digit sequence is part of a
     /// time value (e.g. `10:30`) and should be parsed as an unquoted string.
     fn peek_colon_after_number(&self) -> bool {
         let end = number::scan_number_span(&self.input);
-        end < self.input.text.len() && self.input.text.as_bytes()[end] == b':'
+        end < self.input.len() && self.input.bytes()[end] == b':'
     }
 
     /// Parse one value (primitive, string, number, object, array).
@@ -103,9 +105,9 @@ impl<'a> Repairer<'a> {
     /// `ArrayLoop`) and return — they are **not** processed recursively.
     /// Structural closers/separators (`}`/`]`/`,`) at a value position are
     /// orphans and produce `null`.
-    fn run_value(&mut self, stack: &mut Stack) {
+    fn run_value(&mut self, stack: &mut Vec<ParseFrame>) {
         self.input.skip_ws();
-        if self.input.i >= self.input.text.len() {
+        if self.input.pos() >= self.input.len() {
             self.output.emit_str("null");
             return;
         }
@@ -115,18 +117,18 @@ impl<'a> Repairer<'a> {
             '{' => {
                 self.output.emit_char('{');
                 self.brackets.push('}');
-                self.input.i += 1;
+                self.input.advance(1);
                 stack.push(ParseFrame::ObjectLoop(0));
             }
             '[' => {
                 self.output.emit_char('[');
                 self.brackets.push(']');
-                self.input.i += 1;
+                self.input.advance(1);
                 stack.push(ParseFrame::ArrayLoop(0));
             }
             '"' => {
                 if self.input.peek_is("\"\"\"")
-                    && self.input.text[self.input.i + 3..].contains("\"\"\"")
+                    && self.input.text()[self.input.pos() + 3..].contains("\"\"\"")
                 {
                     string::parse_triple_string(&mut self.input, &mut self.output, &self.brackets);
                     return;
@@ -138,7 +140,7 @@ impl<'a> Repairer<'a> {
                 &mut self.output,
                 &self.brackets,
             ),
-            't' | 'f' | 'n' | 'T' | 'F' | 'N' | 'i' | 'I' | 'u' | 'U' => {
+            ch if literal::is_literal_start(ch) => {
                 literal::parse_literal(&mut self.input, &mut self.output)
             }
             '-' => {
@@ -151,7 +153,7 @@ impl<'a> Repairer<'a> {
                     number::parse_number(&mut self.input, &mut self.output);
                 }
             }
-            '.' | '0'..='9' => {
+            ch if number::is_number_start(ch) => {
                 if self.peek_colon_after_number() {
                     keys::parse_unquoted_value(&mut self.input, &mut self.output);
                 } else {
@@ -164,13 +166,13 @@ impl<'a> Repairer<'a> {
             }
             '}' | ']' | ',' => {
                 self.output.emit_str("null");
-                self.input.i += 1;
+                self.input.advance(1);
             }
             _ => {
                 if ch.is_ascii_alphabetic() || ch == '_' {
                     keys::parse_unquoted_value(&mut self.input, &mut self.output);
                 } else {
-                    self.input.i += ch.len_utf8();
+                    self.input.advance(ch.len_utf8());
                     stack.push(ParseFrame::Value);
                 }
             }
@@ -185,16 +187,16 @@ impl<'a> Repairer<'a> {
     /// Returns `Ok(valid_json)` on success, or `Err` if the input is
     /// catastrophically malformed (e.g. parse depth exceeded).  In debug
     /// builds, the result is additionally validated as parseable JSON.
-    pub(crate) fn repair(&mut self) -> Result<String, JsonRepairError> {
+    pub(crate) fn repair(&mut self, max_depth: usize) -> Result<String, JsonRepairError> {
         if self.input.is_empty() {
             return Ok(String::new());
         }
 
-        let mut stack = Stack::new();
+        let mut stack: Vec<ParseFrame> = Vec::with_capacity(STACK_CAPACITY);
 
-        if junk::is_implicit_object_sequence(&self.input)
-            || junk::is_comma_separated_object_list(&self.input)
-            || junk::is_comma_separated_value_list(&self.input)
+        if sequence::is_implicit_object_sequence(&self.input)
+            || sequence::is_comma_separated_object_list(&self.input)
+            || sequence::is_comma_separated_value_list(&self.input)
         {
             self.output.emit_char('[');
             self.brackets.push(']');
@@ -205,14 +207,13 @@ impl<'a> Repairer<'a> {
 
         while let Some(frame) = stack.pop() {
             let current_depth = stack.len() + 1;
-            if current_depth > MAX_PARSE_DEPTH {
-                return Err(JsonRepairError {
-                    message: format!(
-                        "max parse depth of {MAX_PARSE_DEPTH} exceeded at position {}",
-                        self.input.i
-                    ),
-                    position: Some(self.input.i),
-                });
+            if current_depth > max_depth {
+                return Err(JsonRepairError::new(
+                    crate::error::JsonRepairErrorKind::DepthExceeded {
+                        max: max_depth,
+                        position: self.input.pos(),
+                    },
+                ));
             }
 
             match frame {
@@ -227,10 +228,9 @@ impl<'a> Repairer<'a> {
         self.output.trim_suffix_junk();
         let out = self.output.take();
         if self.brackets.depth() != 0 {
-            return Err(JsonRepairError {
-                message: "repaired output has unbalanced brackets".to_string(),
-                position: None,
-            });
+            return Err(JsonRepairError::new(
+                crate::error::JsonRepairErrorKind::UnbalancedBrackets,
+            ));
         }
         Self::debug_validate_output(&out)?;
         Ok(out)
@@ -255,11 +255,12 @@ impl Repairer<'_> {
     /// When `serde-validate` is enabled, parse the output with serde_json
     /// as a sanity check (triggers a panic in debug builds on failure).
     /// Only compiled in debug builds — release mode uses the no-op stub.
-    #[cfg(all(feature = "serde-validate", debug_assertions))]
+    #[cfg(debug_assertions)]
     fn validate_serde_json(out: &str) {
         const MAX_VALIDATION_DEPTH: usize = 100;
         let bracket_depth = out.chars().filter(|&c| c == '{' || c == '[').count();
         if bracket_depth <= MAX_VALIDATION_DEPTH {
+            #[cfg(feature = "serde-validate")]
             if let Err(e) = serde_json::from_str::<serde_json::Value>(out) {
                 debug_assert!(
                     false,
@@ -267,40 +268,14 @@ impl Repairer<'_> {
                     bracket_depth, e, out
                 );
             }
+            #[cfg(not(feature = "serde-validate"))]
+            {
+                let _ = out;
+            }
         }
     }
 
-    /// Stub when serde-validate is disabled.
-    #[cfg(not(feature = "serde-validate"))]
+    /// Release-mode stub (no validation).
+    #[cfg(not(debug_assertions))]
     fn validate_serde_json(_out: &str) {}
-}
-
-/// Stack of parse frames.
-pub(super) struct Stack {
-    frames: Vec<ParseFrame>,
-}
-
-impl Stack {
-    fn new() -> Self {
-        Stack {
-            frames: Vec::with_capacity(STACK_CAPACITY),
-        }
-    }
-
-    /// Pushes a parse frame onto the stack.
-    pub(super) fn push(&mut self, frame: ParseFrame) {
-        self.frames.push(frame);
-    }
-
-    /// Pops the top parse frame from the stack.
-    ///
-    /// Returns `None` when the stack is empty.
-    pub(super) fn pop(&mut self) -> Option<ParseFrame> {
-        self.frames.pop()
-    }
-
-    /// Returns the number of frames currently on the stack.
-    pub(super) fn len(&self) -> usize {
-        self.frames.len()
-    }
 }

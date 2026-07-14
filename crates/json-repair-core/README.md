@@ -7,10 +7,11 @@ Core Rust library for repairing malformed JSON from LLM outputs. Used by the [`j
 - Single-pass state machine — linear time, no backtracking
 - Single-pass preprocessor (`preprocess_json`) — fused mixed-quote + colon-in-key transforms
 - Heuristic string-closing logic tuned for LLM natural-language embedded quotes
-- Modular architecture: `repairer/` submodules (`string`, `number`, `literal`, `keys`, `structure`, `comment`, `junk`)
-- Cargo feature `serde-validate` (`--no-default-features` to make `serde_json` optional)
+- Modular architecture: `repairer/` submodules (`string`, `number`, `literal`, `keys`, `structure`, `comment`, `sequence`)
+- Cargo feature: `serde-validate` *(default)* — fast-path already-valid JSON via `serde_json`
+- Configurable via [`RepairConfig`] — override max parse depth, etc.
+- Typed errors via [`JsonRepairErrorKind`] — programmatically match failure modes
 - Runtime validation for bracket balance (returns `Err` on imbalance, never panics)
-- `repair_json_debug` API with extra assertions (zero-cost in release)
 
 ## Usage
 
@@ -25,13 +26,45 @@ fn main() {
 }
 ```
 
+### Custom configuration
+
+```rust
+use json_repair_core::{repair_json_with, RepairConfig};
+
+// Allow deeper nesting than the default 512
+let config = RepairConfig::default().with_max_depth(1024);
+let repaired = repair_json_with("[[[[1]]]]", &config).unwrap();
+```
+
+### Typed error matching
+
+```rust
+use json_repair_core::{repair_json, error::JsonRepairErrorKind};
+
+let deep = format!("{}{}", "[".repeat(600), "]".repeat(600));
+match repair_json(&deep) {
+    Err(e) => match e.kind() {
+        JsonRepairErrorKind::DepthExceeded { max, position } => {
+            println!("too deep: max={max}, at byte {position}");
+        }
+        JsonRepairErrorKind::UnbalancedBrackets => {
+            println!("brackets could not be balanced");
+        }
+        _ => unreachable!("non-exhaustive enum"),
+    }
+    Ok(json) => println!("{json}"),
+}
+```
+
 ## API
 
-| Function                  | Description                                                           |
-|---------------------------|-----------------------------------------------------------------------|
-| `repair_json(text)`       | Repair malformed JSON, returns `Ok(String)` or `Err(JsonRepairError)` |
-| `repair_json_debug(text)` | Like `repair_json` with extra assertions (zero-cost in release)       |
-| *(preprocessor)*          | `preprocess_json` (internal) — single-pass mixed-quote + colon-in-key |
+| Function                          | Description                                                           |
+|-----------------------------------|-----------------------------------------------------------------------|
+| `repair_json(text)`               | Repair malformed JSON, returns `Ok(String)` or `Err(JsonRepairError)` |
+| `repair_json_with(text, &cfg)`    | Like `repair_json` with a custom [`RepairConfig`]                     |
+| `repair_json_debug(text)`         | Like `repair_json` with a debug-build idempotence check              |
+| `RepairConfig::default()`         | Default config (max depth 512); use `.with_max_depth(n)` to override  |
+| *(preprocessor)*                  | `preprocess_json` (internal) — single-pass mixed-quote + colon-in-key |
 
 ## Architecture
 

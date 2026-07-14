@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.4.4 🔒 (2026-07-14)
+
+### Changed
+- **Rust elegance overhaul** — 7 structural improvements to `json-repair-core`:
+  - `run_value` match arms use predicate functions `is_literal_start`/`is_number_start`
+    instead of inline 10-character literal lists.
+  - `junk.rs` renamed to `sequence.rs` (name reflects "structure-sequence detection",
+    not "junk handling").
+  - `Stack` wrapper removed; `Vec<ParseFrame>` used directly, eliminating a
+    meaningless indirection layer.
+  - `validate_serde_json` cfg combination simplified from dual-branch
+    `#[cfg(all(feature, debug_assertions))]` to nested `#[cfg(debug_assertions)]`
+    with inner `#[cfg(feature)]`.
+  - `repair_json_debug` orphan-fix: removed `debug-validate` feature gate;
+    the unique idempotence check now always compiles; `tests/debug_api.rs` added.
+  - `preprocess.rs` split into `preprocess.rs` + `preprocess/{preamble,quote_fix}.rs`;
+    `char_at` moved to `util.rs` (generic utility, not a preprocess concern).
+  - `string.rs` (555 lines) split into `string.rs` + `string/{closing,escape}.rs`
+    (escape: 143 lines, closing: 405 lines, mod: 144 lines).
+- **Encapsulation hardening** — `OutputBuffer.out` and `last_depth0_pos`,
+  `InputCursor.text` and `i` fields all privatized; new accessor methods
+  (`pop()`, `trim_trailing_whitespace()`, `text()`, `bytes()`, `pos()`,
+  `set_pos()`, `advance()`, `len()`); 72 access points updated across all submodules.
+- **`Repairer` field visibility** — `pub` → `pub(crate)` for consistency with
+  the sub-struct fields.
+- **`.unwrap()` → `.expect()`** — `emit_unicode_escape` 4× `.unwrap()` →
+  `.expect("4-bit nibble is 0-15")`; `util::char_at` `.unwrap()` →
+  `.expect("pos must be a valid char boundary")`.
+- **`char::from_u32(…).unwrap()` → `char::from(…)`** in two `quote_fix.rs` call
+  sites (matches the earlier fix in `util.rs` and `string.rs`).
+- **`peek_is` input-safety** — `assert!(s.is_ascii())` (panic on user input)
+  → `debug_assert!` + `s.is_ascii() &&` runtime guard.
+- **`ParseFrame`** — added `#[derive(Debug)]` (std convention: all pub(crate)
+  enums derive `Debug`).
+- **Stale doc comment** — `repairer.rs` module doc removed reference to
+  non-existent `junk` module; replaced with `sequence`.
+
+### Python
+- `json-repair-core` bumped to **v0.4.4**.
+
+### Rust
+- Workspace `json-repair-core` bumped to **v0.3.2**.
+
 ## v0.4.3 🔒 (2026-07-14)
 
 ### Changed
