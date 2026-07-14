@@ -129,7 +129,7 @@ jobs:
         run: uv run pyright json_repair/
 
       - name: pip-audit (dependency vulnerabilities)
-        run: uv run pip-audit
+        run: uv run pip-audit .
 
   # ── Build wheels (tagged releases only) ──────────────────────────────────
   wheels:
