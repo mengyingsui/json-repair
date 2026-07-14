@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use memchr::memchr2;
 
 /// Fast character-at-position without decoding the entire string.  ASCII
-/// bytes map directly; multi-byte sequences fall back to the slow path.
+/// bytes map directly; multibyte sequences fall back to the slow path.
 pub(crate) fn char_at(text: &str, pos: usize) -> char {
     if text.as_bytes()[pos].is_ascii() {
         char::from_u32(u32::from(text.as_bytes()[pos])).unwrap()
@@ -15,7 +15,6 @@ pub(crate) fn char_at(text: &str, pos: usize) -> char {
 // Detect `',bareword":` pattern inside mixed‑quote sections.
 // E.g. `'foo','bar":"baz"` — the `'bar":` is the key for the next value.
 // Returns `(bare_start, k)` spanning the bareword.
-#[inline]
 fn try_mixed_quote_boundary(bytes: &[u8], n: usize, pos: usize) -> Option<(usize, usize)> {
     if pos + 2 < n && bytes[pos] == b'\'' && bytes[pos + 1] == b',' && bytes[pos + 2] == b'\'' {
         let bare_start = pos + 3;
@@ -37,7 +36,6 @@ fn try_mixed_quote_boundary(bytes: &[u8], n: usize, pos: usize) -> Option<(usize
 
 // Emit the transformed token for a mixed‑quote boundary:
 // `'","bareword":"`  (closing `'`, comma, opening `"`, bare key, `":"`)
-#[inline]
 fn emit_mixed_quote_boundary(out: &mut String, text: &str, bare_start: usize, k: usize) {
     out.push('"');
     out.push(',');
@@ -48,7 +46,6 @@ fn emit_mixed_quote_boundary(out: &mut String, text: &str, bare_start: usize, k:
 
 // Fix colons that appear *inside* a key string by escaping the
 // relevant characters.  Handles patterns like `"key:": value`.
-#[inline]
 fn try_fix_colon_in_key(
     content: &str,
     end: usize,

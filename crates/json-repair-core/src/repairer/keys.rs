@@ -25,7 +25,6 @@ pub(super) fn parse_key(
 // Silently skips control characters that cannot appear in JSON at all
 // (U+0000-U+0008, U+000B-U+000C, U+000E-U+001F) but preserves `\n`,
 // `\r`, and `\t` which are valid JSON string content.
-#[inline]
 fn emit_bare_word(
     input: &mut InputCursor,
     output: &mut OutputBuffer,
@@ -68,8 +67,25 @@ pub(super) fn parse_unquoted_key(input: &mut InputCursor, output: &mut OutputBuf
 
 // Parse an unquoted value (e.g. bareword after `:` that is not a
 // literal or number).  Only stops at structural separators.
+// `]` is a stop only when the next byte is NOT alphanumeric (i.e.
+// the `]` is structural, not part of the value content).
 pub(super) fn parse_unquoted_value(input: &mut InputCursor, output: &mut OutputBuffer) {
     output.emit_char('"');
-    emit_bare_word(input, output, |ch| matches!(ch, ',' | '}' | ']'));
+    loop {
+        emit_bare_word(input, output, |ch| matches!(ch, ',' | '}' | ']'));
+        if input.i < input.text.len() && input.cur() == ']' {
+            let next = if input.i + 1 < input.text.len() {
+                input.text.as_bytes()[input.i + 1]
+            } else {
+                0
+            };
+            if next.is_ascii_alphanumeric() || next == b'_' {
+                string::emit_unquoted_char(input, output, ']');
+                input.i += 1;
+                continue;
+            }
+        }
+        break;
+    }
     output.emit_char('"');
 }

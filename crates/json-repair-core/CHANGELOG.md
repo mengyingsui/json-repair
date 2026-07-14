@@ -1,9 +1,28 @@
 # Changelog — json-repair-core
 
+## v0.3.1 (2026-07-14)
+
+### Changed
+- **Design rule #1 enforcement** — `handle_double_quote_escape`, `try_split_bareword_after_value`,
+  `try_consume_mismatched_bracket` now return named enums (`DoubleQuoteAction`/`SplitResult`/`MismatchResult`)
+  instead of `bool`, encoding side effects in the return type.
+- **`check_closing_quote`** (`string.rs`) — `pos: usize` parameter replaces ambient `input.i` reference;
+  `peek_quoted_key_at` uses a local cursor variable so the signature is `&InputCursor` (not `&mut`).
+- **`emit_unicode_escape`** (`output_buffer.rs`) — hex-lookup table replaced with `char::from_digit`
+  (AGENTS.md: no `as` type conversions).
+- **`try_split_bareword_after_value`** (`string.rs`) — `char::from_u32(...).unwrap()` replaced with
+  `char::from(byte)` (AGENTS.md: no `as`/`unwrap` for type conversions).
+- **`InputCursor`** (`input_cursor.rs`) — added `#[derive(Debug)]`.
+- **`REPAIR_PHILOSOPHY.md`** — new document documenting all heuristic repair rules.
+
+### Fixed
+- `peek_quoted_key_at` no longer takes `&mut InputCursor` with save/restore pattern;
+  signature now accurately reflects zero persistent mutation.
+
 ## v0.3.0 (2026-07-14)
 
 ### Changed
-- **Focused sub-struct composition** (P2) — sub-modules `comment.rs`, `junk.rs`,
+- **Focused sub-struct composition** (P2) — submodules `comment.rs`, `junk.rs`,
   `number.rs`, `string.rs`, `keys.rs`, `literal.rs` converted from `impl Repairer`
   to free functions with explicit parameters. `ParserState` moved into `string.rs`
   as a private enum.

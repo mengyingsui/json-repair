@@ -68,7 +68,6 @@ pub(super) fn parse_number(input: &mut InputCursor, output: &mut OutputBuffer) {
 }
 
 // Quick reject: more than one `.` or `e/E` → always invalid.
-#[inline]
 fn has_excessive_separators(s: &str) -> bool {
     let mut dot = 0u8;
     let mut exp = 0u8;

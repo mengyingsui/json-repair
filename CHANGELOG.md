@@ -1,9 +1,27 @@
 # Changelog
 
+## v0.4.3 🔒 (2026-07-14)
+
+### Changed
+- **Design rule #1 enforcement** — `handle_double_quote_escape`, `try_split_bareword_after_value`,
+  `try_consume_mismatched_bracket` return enums (`DoubleQuoteAction`/`SplitResult`/`MismatchResult`)
+  instead of `bool`, encoding side effects in the return type.
+- **`check_closing_quote`** (`string.rs`) — `pos: usize` parameter replaces ambient `input.i`.
+  `peek_quoted_key_at` uses local cursor → `&InputCursor` instead of `&mut InputCursor`.
+- **`emit_unicode_escape`** (`output_buffer.rs`) — hex-lookup table → `char::from_digit`
+  (AGENTS.md: no `as` type conversions).
+- **`try_split_bareword_after_value`** — `char::from_u32(...).unwrap()` → `char::from(byte)`.
+- **`InputCursor`** (`input_cursor.rs`) — added `#[derive(Debug)]`.
+- **`REPAIR_PHILOSOPHY.md`** — new document documenting all heuristic repair rules.
+
+### Fixed
+- `peek_quoted_key_at` no longer takes `&mut InputCursor` with save/restore;
+  signature accurately reflects zero net mutation.
+
 ## v0.4.2 🔒 (2026-07-14)
 
 ### Changed
-- **Focused sub-struct composition** (P2) — sub-modules `comment.rs`, `junk.rs`,
+- **Focused sub-struct composition** (P2) — submodules `comment.rs`, `junk.rs`,
   `number.rs`, `string.rs`, `keys.rs`, `literal.rs` converted from `impl Repairer`
   to free functions with explicit parameters, eliminating ambient access to
   `Repairer` fields. `ParserState` moved into `string.rs` as a private enum.

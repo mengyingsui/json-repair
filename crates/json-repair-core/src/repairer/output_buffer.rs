@@ -37,14 +37,18 @@ impl OutputBuffer {
 
     /// Writes a `\uXXXX` escape sequence for the given Unicode code point,
     /// using lowercase hexadecimal digits.
+    ///
+    /// The 4-bit nibble extracts are always 0–15, so `char::from_digit`
+    /// with radix 16 always returns `Some`.
     pub fn emit_unicode_escape(&mut self, code: u32) {
-        const HEX: &[u8; 16] = b"0123456789abcdef";
         self.out.push_str("\\u");
         self.out
-            .push(char::from(HEX[((code >> 12) & 0xF) as usize]));
-        self.out.push(char::from(HEX[((code >> 8) & 0xF) as usize]));
-        self.out.push(char::from(HEX[((code >> 4) & 0xF) as usize]));
-        self.out.push(char::from(HEX[(code & 0xF) as usize]));
+            .push(char::from_digit((code >> 12) & 0xF, 16).unwrap());
+        self.out
+            .push(char::from_digit((code >> 8) & 0xF, 16).unwrap());
+        self.out
+            .push(char::from_digit((code >> 4) & 0xF, 16).unwrap());
+        self.out.push(char::from_digit(code & 0xF, 16).unwrap());
     }
 
     /// Removes a trailing `,` if present.

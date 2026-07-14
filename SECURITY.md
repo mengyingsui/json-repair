@@ -20,14 +20,14 @@ Starting with **v0.3.4** (Python) / **v0.1.4** (Rust),
 
 ## Supported Versions
 
-| Package                     | Version | Supported          |
-|-----------------------------|---------|--------------------|
+| Package                       | Version | Supported          |
+|-------------------------------|---------|--------------------|
 | **json-repair-core** (Python) | 0.4.x   | :white_check_mark: |
-|                             | 0.3.x   | :white_check_mark: |
-|                             | < 0.3   | :x:                |
-| **json-repair-core** (Rust) | 0.2.x   | :white_check_mark: |
-|                             | 0.1.x   | :white_check_mark: |
-|                             | < 0.1   | :x:                |
+|                               | 0.3.x   | :white_check_mark: |
+|                               | < 0.3   | :x:                |
+| **json-repair-core** (Rust)   | 0.2.x   | :white_check_mark: |
+|                               | 0.1.x   | :white_check_mark: |
+|                               | < 0.1   | :x:                |
 
 Security guarantees in the declaration above apply to **Python v0.3.4+** / **Rust v0.1.4+**.
 
@@ -37,6 +37,15 @@ additional `debug_assert!` guards (active in debug builds only).
 
 The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
 changes only; security posture is unchanged.
+
+**v0.4.3 / v0.3.1** adds:
+- **No new security features** — this release enforces design rule #1
+  (signature reflects side effects) across the entire crate: 3 `bool`-returning
+  functions converted to named enums; `check_closing_quote` takes explicit
+  `pos: usize`; `peek_quoted_key_at` signature changed from `&mut` to
+  `&InputCursor`. All security guarantees from v0.4.2+ / v0.3.0+ preserved.
+  Zero `unsafe` remains; all tests pass; clippy clean.
+- See [`CHANGELOG.md`](CHANGELOG.md) for full details.
 
 **v0.4.2 / v0.3.0** adds:
 - **No new security features** — this release focuses on code structure:

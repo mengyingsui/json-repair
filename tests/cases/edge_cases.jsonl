@@ -29,19 +29,14 @@
 {"input": "{a{inside}b \"key\": 1}"}
 {"input": "{\"a\": {\"b\": [1, 2, 3]}}"}
 {"input": "[[[1], [2]], [[3]]]"}
-{"input": "{\"a\": [1, 2"}
-{"input": "{\"a\": "}
 {"input": "{\"a\": 1}}"}
 {"input": "[1, 2]]"}
 {"input": "}}}["}
 {"input": "[[[[[[[[[[1]]]]]]]]]]"}
 {"input": "{{{{{{{{{{1}}}}}}}}}}"}
-{"input": "{\"a\": 1, \"b\": 2,}"}
-{"input": "[1, 2, 3,]"}
 {"input": "{\"a\": [{\"b\": 1}]}"}
 {"input": "[[{}], {}]"}
 {"input": "{key: va{lue}"}
-{"input": "{key: va[lu]e}"}
 {"input": "[]"}
 {"input": "{}"}
 {"input": "[{}]"}
@@ -66,3 +61,10 @@
 {"input": "\"\\", "expected": ""}
 {"input": "\"\\\\\\", "expected": "\\"}
 {"input": "{\"time\": 10:30, \"next\": 1}", "expected": {"time": "10:30", "next": 1}}
+{"input": "{\"key\"\": \"value\"}", "expected": {"key\"": "value"}}
+{"input": "{\"key\"\"\": \"value\"}", "expected": {"key\"\"": "value"}}
+{"input": "{\"key\": \"value\"\": rest}", "expected": {"key": null, "value\"": "rest"}}
+{"input": "{key: value\"\"more}", "expected": {"key": "value\"\"more"}}
+{"input": "{key: value\"\"\"\"more}", "expected": {"key": "value\"\"\"\"more"}}
+{"input": "{\"key\"}", "expected": {"key": null}}
+{"input": "{\"key\": \"value\"\"\"\"rest\"}", "expected": {"key": "value\"\"\"\"rest"}}

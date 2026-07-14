@@ -1,7 +1,6 @@
 use crate::repairer::InputCursor;
 
 /// Returns `true` when `ch` starts a comment (`//`, `/*`, `#`, `--`).
-#[inline]
 pub(super) fn is_comment_start(input: &InputCursor, ch: char) -> bool {
     ch == '/' || ch == '#' || (ch == '-' && input.peek_is("--"))
 }

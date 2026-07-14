@@ -12,6 +12,7 @@ use crate::preprocess::char_at;
 /// `text` is the full input; `i` is the current byte offset (always on a
 /// UTF-8 character boundary).  Methods that advance `i` (`skip_ws`) are
 /// the only mutation — the text itself is never altered.
+#[derive(Debug)]
 pub(crate) struct InputCursor<'a> {
     pub text: &'a str,
     pub i: usize,

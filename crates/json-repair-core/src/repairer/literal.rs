@@ -21,7 +21,6 @@ const LIT_NULLPTR: &str = "nullptr";
 
 // ASCII case-insensitive match at cursor position.
 // Used against LLM output which may capitalize or mix case.
-#[inline]
 fn match_lit(input: &InputCursor, pat: &str) -> bool {
     let plen = pat.len();
     if input.i + plen > input.text.len() {

@@ -9,7 +9,6 @@ const IMPLICIT_SEQUENCE_MIN_COUNT: usize = 2;
 
 // UTF-8 leading-byte → full character width for byte-length jumps
 // inside strings.  We avoid char decoding to stay in byte-index space.
-#[inline]
 fn utf8_char_len(lead: u8) -> usize {
     if lead < 0x80 {
         1

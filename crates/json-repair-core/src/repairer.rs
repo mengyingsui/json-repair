@@ -80,14 +80,6 @@ impl<'a> Repairer<'a> {
         }
     }
 
-    /// Record the last depth-0 position when the bracket stack empties.
-    #[inline]
-    fn update_depth0(&mut self) {
-        if self.brackets.is_empty() {
-            self.output.set_depth0_pos();
-        }
-    }
-
     /// Pop and emit all remaining open brackets (close truncated containers).
     fn close_brackets(&mut self) {
         while let Some(b) = self.brackets.pop() {
@@ -296,7 +288,6 @@ impl Stack {
     }
 
     /// Pushes a parse frame onto the stack.
-    #[inline]
     pub(super) fn push(&mut self, frame: ParseFrame) {
         self.frames.push(frame);
     }
@@ -304,13 +295,11 @@ impl Stack {
     /// Pops the top parse frame from the stack.
     ///
     /// Returns `None` when the stack is empty.
-    #[inline]
     pub(super) fn pop(&mut self) -> Option<ParseFrame> {
         self.frames.pop()
     }
 
     /// Returns the number of frames currently on the stack.
-    #[inline]
     pub(super) fn len(&self) -> usize {
         self.frames.len()
     }

@@ -18,7 +18,6 @@ const SURROGATE_LO: u32 = 0xD800;
 const SURROGATE_HI: u32 = 0xDFFF;
 
 // Characters that JSON allows as short escapes (\n, \t, \\, etc.).
-#[inline]
 fn is_valid_escape(ch: char) -> bool {
     matches!(ch, '"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't')
 }
@@ -80,7 +79,6 @@ fn handle_escaped(
 
 // Emit a character for an unquoted (bare) key/value body.
 // Escapes `\`, `"`, newlines, tabs, and other control characters.
-#[inline]
 pub(super) fn emit_unquoted_char(_input: &mut InputCursor, output: &mut OutputBuffer, ch: char) {
     match ch {
         '\\' => output.emit_str("\\\\"),
@@ -97,7 +95,6 @@ pub(super) fn emit_unquoted_char(_input: &mut InputCursor, output: &mut OutputBu
 
 // Emit one character of a string body, tracking `\`-escape state.
 // Control chars and newlines are replaced with standard JSON escapes.
-#[inline]
 fn emit_string_body_char(
     input: &mut InputCursor,
     output: &mut OutputBuffer,
@@ -138,21 +135,24 @@ fn emit_string_body_char(
     }
 }
 
-// Heuristic: does `"` at `input.i` close the string or is it an
-// embedded (unescaped) quote?  Returns `(is_closing, bareword_pos)`.
+// Heuristic: does `"` at byte position `pos` close the string or is it
+// an embedded (unescaped) quote?  Uses explicit `pos` instead of
+// `input.i` so callers (like `peek_quoted_key_at`) can probe at
+// arbitrary positions without mutating the cursor.
+// Returns `(is_closing, bareword_pos)`.
 //
 // `bareword_pos` is set when a `bareword":` pattern is found after
 // the quote — used by `try_split_bareword_after_value`.
 pub(super) fn check_closing_quote(
     input: &InputCursor,
+    pos: usize,
     is_key: bool,
     brackets: &BracketStack,
 ) -> (bool, Option<usize>) {
-    // For values, scan backward: if a `{` or `[` appears before any
-    // other visible char, the quote is the start of a string, not a
-    // closer — defer to the caller.
+    // For values, scan backward: if `{` or `[` appears before any other
+    // visible char, the quote is the start of a string, not a closer.
     if !is_key {
-        let mut p = input.i;
+        let mut p = pos;
         while p > 0 {
             p -= 1;
             let byte = input.text.as_bytes()[p];
@@ -165,7 +165,7 @@ pub(super) fn check_closing_quote(
         }
     }
     // Look ahead past horizontal whitespace
-    let mut j = input.i + 1;
+    let mut j = pos + 1;
     while j < input.text.len() && matches!(input.char_at(j), ' ' | '\t' | '\r') {
         j += 1;
     }
@@ -191,8 +191,8 @@ pub(super) fn check_closing_quote(
                 }
             }
         }
-        // `]`/`}` after a quote: check whether it is an embedded
-        // quote inside an array/object element.
+        // `]`/`}` after a quote: check whether it's an embedded
+        // bracket-inside-string, not the container closer.
         if (nc == ']' || nc == '}') && is_embedded_bracket_quote(input, j, nc, brackets) {
             return (false, None);
         }
@@ -206,15 +206,14 @@ pub(super) fn check_closing_quote(
     if is_key && matches!(nc, ':' | '{' | '[') {
         return (true, None);
     }
-    // Value context with `:` after quote: the string may actually
-    // be a key.  Only close when the char before `"` is a typical
-    // key-end character (printable non-whitespace); control chars
-    // like `\r` in a corrupt value body keep the string open.
+    // Value context with `:` after quote: the string may actually be a
+    // key.  Only close when the char before `"` is printable non-ws;
+    // control chars like `\r` in corrupt value body keep the string open.
     // Additionally scan backward: if `{` or `[` appears before any
-    // structural separator (`,`, `}`, `]`, `:`), the quote opens a
-    // nested key inside an embedded JSON structure — treat as embedded.
+    // structural separator (`,`, `}`, `]`, `:`), the quote opens a nested
+    // key inside an embedded JSON structure — treat as embedded.
     if !is_key && nc == ':' {
-        let mut p = input.i;
+        let mut p = pos;
         while p > 0 {
             p -= 1;
             match input.text.as_bytes()[p] {
@@ -223,8 +222,8 @@ pub(super) fn check_closing_quote(
                 _ => {}
             }
         }
-        if input.i > 0 {
-            let prev = input.text.as_bytes()[input.i - 1];
+        if pos > 0 {
+            let prev = input.text.as_bytes()[pos - 1];
             if prev.is_ascii_graphic() || prev == b' ' || prev == b'_' || prev == b'"' {
                 return (true, None);
             }
@@ -254,7 +253,7 @@ pub(super) fn check_closing_quote(
                 // entire span is one key with embedded quotes — don't
                 // close here.  E.g. `"step"valxt":` → key is `step"valxt`.
                 if is_key {
-                    let mut p = input.i + 1;
+                    let mut p = pos + 1;
                     let mut has_sep = false;
                     while p < k {
                         let c = input.char_at(p);
@@ -349,29 +348,33 @@ fn is_embedded_bracket_quote(
     false
 }
 
-// Handle `""` (doubled double-quote) — a common LLM pattern for
-// escaping.  Emit `\"` and check whether the next non-whitespace
-// is structural to decide if we consumed the closing quote.
-fn handle_double_quote_escape(input: &mut InputCursor, output: &mut OutputBuffer) -> bool {
+/// Outcome of [`handle_double_quote_escape`].
+enum DoubleQuoteAction {
+    /// A `""` byte pair was consumed — `\"` was emitted, cursor advanced.
+    Consumed,
+    /// No double-quote pattern at the current position.
+    NotDoubleQuote,
+}
+
+fn handle_double_quote_escape(
+    input: &mut InputCursor,
+    output: &mut OutputBuffer,
+) -> DoubleQuoteAction {
     if input.i + 1 >= input.text.len() || input.text.as_bytes()[input.i + 1] != b'"' {
-        return false;
+        return DoubleQuoteAction::NotDoubleQuote;
     }
     output.emit_str("\\\"");
     input.i += 1;
-    let mut j = input.i + 1;
-    while j < input.text.len() && matches!(input.char_at(j), ' ' | '\t' | '\r') {
-        j += 1;
-    }
-    if j < input.text.len() && matches!(input.char_at(j), ',' | '}' | ']' | ':' | '\n') {
-        return true;
-    }
-    input.i += 1;
-    // Another `"` follows → treat third quote as closer
-    if input.i < input.text.len() && input.cur() == '"' {
-        output.emit_str("\\\"");
-        input.i += 1;
-    }
-    true
+    DoubleQuoteAction::Consumed
+}
+
+/// Outcome of [`try_split_bareword_after_value`].
+enum SplitResult {
+    /// The value was split — the closing quote was undone and re-emitted,
+    /// leaving the bareword as part of an upcoming key.
+    Split,
+    /// No split was performed.
+    NoSplit,
 }
 
 // When a `"` is followed by a bareword and then another `":`,
@@ -384,13 +387,13 @@ fn try_split_bareword_after_value(
     output: &mut OutputBuffer,
     state: &mut ParserState,
     bareword_quote_pos: Option<usize>,
-) -> bool {
+) -> SplitResult {
     if input.i + 1 >= input.text.len() {
-        return false;
+        return SplitResult::NoSplit;
     }
-    let nc = char::from_u32(u32::from(input.text.as_bytes()[input.i + 1])).unwrap();
+    let nc = char::from(input.text.as_bytes()[input.i + 1]);
     if !(nc.is_ascii_alphabetic() || nc == '_') {
-        return false;
+        return SplitResult::NoSplit;
     }
     let k = bareword_quote_pos.unwrap_or_else(|| {
         let mut k = input.i + 1;
@@ -404,9 +407,8 @@ fn try_split_bareword_after_value(
         input.skip_ws_at(k)
     });
     if k >= input.text.len() || input.char_at(k) != '"' {
-        return false;
+        return SplitResult::NoSplit;
     }
-    // Undo the closing quote we just emitted, plus trailing whitespace/comma
     let _ = output.out.pop();
     let trimmed = output
         .out
@@ -418,11 +420,10 @@ fn try_split_bareword_after_value(
     output.trim_trailing_comma();
     output.emit_char('"');
     *state = ParserState::Normal;
-    true
+    SplitResult::Split
 }
 
 // EOF while parsing string body — close the string.
-#[inline]
 fn ensure_closing_quote(output: &mut OutputBuffer, state: &mut ParserState) {
     *state = ParserState::Normal;
     output.emit_char('"');
@@ -442,15 +443,17 @@ pub(super) fn parse_string(
     while input.i < input.text.len() {
         let ch = input.cur();
         if ch == '"' {
-            if handle_double_quote_escape(input, output) {
-                continue;
+            match handle_double_quote_escape(input, output) {
+                DoubleQuoteAction::Consumed => continue,
+                DoubleQuoteAction::NotDoubleQuote => {}
             }
-            let (is_closing, bareword_pos) = check_closing_quote(input, is_key, brackets);
+            let (is_closing, bareword_pos) = check_closing_quote(input, input.i, is_key, brackets);
             if is_closing {
                 output.emit_char('"');
                 state = ParserState::Normal;
-                if try_split_bareword_after_value(input, output, &mut state, bareword_pos) {
-                    return;
+                match try_split_bareword_after_value(input, output, &mut state, bareword_pos) {
+                    SplitResult::Split => return,
+                    SplitResult::NoSplit => {}
                 }
                 input.i += 1;
                 debug_assert!(
@@ -459,21 +462,18 @@ pub(super) fn parse_string(
                 );
                 return;
             } else {
-                // Embedded quote — escape it
                 output.emit_str("\\\"");
                 input.i += 1;
                 continue;
             }
         }
-        // NUL byte in key context: emit `\u0000`, close the string,
-        // and return so `:` is treated as a key-value separator.
-        // Raw NUL is never intentional JSON content.
         if is_key && ch == '\0' {
             output.emit_unicode_escape(0);
             input.i += 1;
             output.emit_char('"');
-            if try_split_bareword_after_value(input, output, &mut state, None) {
-                return;
+            match try_split_bareword_after_value(input, output, &mut state, None) {
+                SplitResult::Split => return,
+                SplitResult::NoSplit => {}
             }
             return;
         }

@@ -8,3 +8,5 @@
 {"input": "{\"name\": John \"Smith\"}", "expected": {"name": "John \"Smith\""}}
 {"input": "{\"name\": John\nSmith}", "expected": {"name": "John\nSmith"}}
 {"input": "{\"url\": https://example.com}", "expected": {"url": "https://example.com"}}
+{"input": "{key: va[lu]e}", "expected": {"key": "va[lu]e"}}
+{"input": "{key: va]lue}", "expected": {"key": "va]lue"}}

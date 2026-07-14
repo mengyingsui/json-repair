@@ -79,6 +79,17 @@ tests/
 - All functional and fuzz testing lives in Rust. **No Python functional tests** — `tests/python/` has only `test_performance.py` for benchmarks.
 - Default feature `serde-validate` uses serde_json to fast-path already-valid JSON. Disable with `--no-default-features` to remove the dependency.
 
+### Quote escaping
+
+Inside string content every `"` is escaped individually as `\"` — there is no CSV-style
+`""` → `"` interpretation.  `handle_double_quote_escape` only checks for the `""` byte
+pattern, emits `\"`, advances past the first `"`, and returns.  The next iteration
+sees the second `"` and `check_closing_quote` decides if it is the string closer or
+another embedded quote.
+
+`peek_quoted_key_at` may skip one `"` after a closing quote before checking for `:`,
+since that `"` is the opening of the next string (key), not an escape pattern.
+
 ## Tests
 
 All Rust tests: `cargo test -p json-repair-core`
@@ -138,7 +149,7 @@ Every version bump (especially breaking) touches these files — check each:
 |------------------------|-------------------------------------------------------------|
 | Rust workspace version | `Cargo.toml` (`workspace.package.version`)                  |
 | Python package version | `pyproject.toml`                                            |
-| Lock files             | `uv.lock` (search for `json-repair-core` version)             |
+| Lock files             | `uv.lock` (search for `json-repair-core` version)           |
 | Root changelog         | `CHANGELOG.md`                                              |
 | Core changelog         | `crates/json-repair-core/CHANGELOG.md`                      |
 | Version table          | `README.md` (add row + update security badge if applicable) |
