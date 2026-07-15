@@ -1,13 +1,13 @@
-#![allow(dead_code)]
-
 use std::fs;
 use std::path::Path;
 
+#[allow(dead_code)]
 pub fn roundtrip(text: &str) -> serde_json::Value {
     let repaired = json_repair_core::repair_json(text).unwrap();
     serde_json::from_str(&repaired).unwrap()
 }
 
+#[allow(dead_code)]
 pub fn collect_cases(dir: &Path) -> Vec<(String, String, usize, Option<serde_json::Value>)> {
     let mut cases = Vec::new();
     let mut entries: Vec<_> = fs::read_dir(dir)
@@ -48,6 +48,7 @@ pub fn collect_cases(dir: &Path) -> Vec<(String, String, usize, Option<serde_jso
     cases
 }
 
+#[allow(dead_code)]
 pub fn collect_inputs(dir: &Path, name: &str) -> Vec<String> {
     let path = dir.join(format!("{name}.jsonl"));
     let content = fs::read_to_string(&path).unwrap();

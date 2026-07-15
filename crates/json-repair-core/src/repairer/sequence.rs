@@ -1,4 +1,10 @@
-use crate::repairer::InputCursor;
+//! Top-level implicit-array detection.
+//!
+//! Heuristically decides whether a sequence of concatenated objects or
+//! comma-separated values should be wrapped in an outer `[...]` array
+//! before the main repair pass begins.
+
+use crate::repairer::{InputCursor, Tracer};
 use crate::util::utf8_char_len;
 use memchr::memchr2;
 
@@ -12,8 +18,9 @@ const IMPLICIT_SEQUENCE_MIN_COUNT: usize = 2;
 // the input is a sequence of concatenated objects.  Returns `true`
 // when ≥2 top-level `{…}` blocks follow one another with only
 // optional commas/whitespace between them.
-pub(super) fn is_implicit_object_sequence(input: &InputCursor) -> bool {
-    if input.pos() >= input.len() || input.cur() != '{' {
+pub(super) fn is_implicit_object_sequence(input: &InputCursor, tracer: &mut Tracer) -> bool {
+    let _ = tracer;
+    if input.cur() != Some('{') {
         return false;
     }
     let remaining = input.len() - input.pos();
@@ -46,11 +53,14 @@ pub(super) fn is_implicit_object_sequence(input: &InputCursor) -> bool {
             }
             continue;
         }
-        let ch = input.char_at(j);
+        let ch = match input.char_at(j) {
+            Some(c) => c,
+            None => break,
+        };
         if ch == '\\' {
             j += 1;
-            if j < input.len() {
-                j += input.char_at(j).len_utf8();
+            if let Some(esc) = input.char_at(j) {
+                j += esc.len_utf8();
             }
             continue;
         }
@@ -71,12 +81,18 @@ pub(super) fn is_implicit_object_sequence(input: &InputCursor) -> bool {
         if ch == '}' && depth == 0 {
             let mut k = input.skip_ws_at(j + 1);
             // Consume optional comma separator
-            if k < input.len() && input.char_at(k) == ',' {
+            if matches!(input.char_at(k), Some(',')) {
                 k = input.skip_ws_at(k + 1);
             }
-            if k < input.len() && input.char_at(k) == '{' {
+            if matches!(input.char_at(k), Some('{')) {
                 count += 1;
                 if count >= IMPLICIT_SEQUENCE_MIN_COUNT {
+                    emit_trace!(
+                        tracer,
+                        crate::trace::TraceEvent::ImplicitArrayDetected {
+                            reason: "adjacent_objects",
+                        }
+                    );
                     return true;
                 }
                 j = k;
@@ -92,7 +108,8 @@ pub(super) fn is_implicit_object_sequence(input: &InputCursor) -> bool {
 // objects that are too short for `is_implicit_object_sequence`.
 // Uses `{`/`}`/`[`/`]` depth tracking only (no string state), which
 // avoids false positives from embedded quotes inside strings.
-pub(super) fn is_comma_separated_object_list(input: &InputCursor) -> bool {
+pub(super) fn is_comma_separated_object_list(input: &InputCursor, tracer: &mut Tracer) -> bool {
+    let _ = tracer;
     let bytes = input.bytes();
     let n = input.len();
     let mut i = input.pos();
@@ -104,6 +121,12 @@ pub(super) fn is_comma_separated_object_list(input: &InputCursor) -> bool {
             b',' if depth == 0 => {
                 let k = input.skip_ws_at(i + 1);
                 if k < n && bytes[k] == b'{' {
+                    emit_trace!(
+                        tracer,
+                        crate::trace::TraceEvent::ImplicitArrayDetected {
+                            reason: "comma_separated_objects",
+                        }
+                    );
                     return true;
                 }
             }
@@ -118,7 +141,8 @@ pub(super) fn is_comma_separated_object_list(input: &InputCursor) -> bool {
 // `1, 2, 3` or `"hello", "world"`).  Only triggers when no `{` or `[`
 // brackets exist.  String tracking uses a simple toggle — sufficient
 // for clean non-bracket inputs without embedded quotes.
-pub(super) fn is_comma_separated_value_list(input: &InputCursor) -> bool {
+pub(super) fn is_comma_separated_value_list(input: &InputCursor, tracer: &mut Tracer) -> bool {
+    let _ = tracer;
     let bytes = input.bytes();
     let n = input.len();
     // Skip if any brackets exist — those cases use the object-specific
@@ -151,6 +175,12 @@ pub(super) fn is_comma_separated_value_list(input: &InputCursor) -> bool {
         if bytes[i] == b'"' {
             in_string = true;
         } else if bytes[i] == b',' {
+            emit_trace!(
+                tracer,
+                crate::trace::TraceEvent::ImplicitArrayDetected {
+                    reason: "comma_separated_values",
+                }
+            );
             return true;
         }
         i += 1;

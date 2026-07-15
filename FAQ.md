@@ -46,10 +46,10 @@ these cases. Without `return_object`, the string is returned as-is and may
 or may not be valid JSON — the caller should validate with `json.loads()`
 if they need guarantees.
 
-In Rust, `repair_json` always returns `Ok(String)` (the repairer always
-produces *some* output), but the output may not pass
-`serde_json::from_str::<serde_json::Value>()`. The caller should validate
-the result if required.
+In Rust, `repair_json` returns `Result<String, JsonRepairError>` — it
+returns `Err` for catastrophically malformed input or when repair
+cannot produce valid JSON (e.g. parse depth exceeded, unbalanced
+brackets). The output on `Ok` is always syntactically valid JSON.
 
 ### Does it handle streaming / partial output?
 
@@ -148,14 +148,18 @@ key colons), but the common patterns are now safe.
 ### How fast is it?
 
 Single-pass, O(n) character-by-character in Rust. A 100 KB input
-typically completes in under 1 ms on modern hardware.
+typically completes in under 1 ms on modern hardware. The repairer
+makes 6 input passes (trim + serde_json fast-path, preprocess,
+preamble normalization, implicit-sequence detection, main loop,
+bracket close) and 0 output passes (bracket balance is tracked live
+via an O(1) `bracket_depth` counter).
 
-Both Python and Rust benchmarks now read from the same shared data file
+Both Python and Rust benchmarks read from the same shared data file
 `tests/cases/bench_data.jsonl` (20 cases covering fixable and unfixable
 inputs of varying sizes). Run:
 
     cargo bench -p json-repair-core              # Rust (criterion)
-    pytest tests/python/test_performance.py --benchmark-only   # Python (pytest-benchmark)
+    uv run pytest tests/python/test_performance.py --benchmark-only   # Python (pytest-benchmark)
 
 ### Why not use a parser-based approach (e.g. serde_json fallback)?
 
@@ -169,8 +173,8 @@ that the state machine fixes in one pass.
 
 1. Add logic to the appropriate submodule in `crates/json-repair-core/src/repairer/`
    (`string.rs`, `number.rs`, `literal.rs`, `keys.rs`, `structure.rs`, `comment.rs`,
-   `junk.rs`) or the module entry at `repairer/mod.rs`.
-2. Wire it into `parse_value()` or `parse_string()` in the relevant submodule at the right priority.
+   `sequence.rs`) or the module entry at `repairer.rs`.
+2. Wire it into `run_value()` or `parse_string()` in the relevant submodule at the right priority.
 3. Add a `.jsonl` test data file under `tests/cases/` (one JSON object per line
    with `input` and optionally `expected` keys).
 4. If `expected` is provided, add a parametrized Rust integration test in

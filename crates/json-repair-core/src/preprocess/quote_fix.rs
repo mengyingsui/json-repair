@@ -11,7 +11,7 @@
 
 use std::borrow::Cow;
 
-use crate::util::char_at;
+use memchr::{memchr2, memchr3};
 
 // Detect `',bareword":` pattern inside mixed-quote sections.
 // E.g. `'foo','bar":"baz"` — the `'bar":` is the key for the next value.
@@ -96,38 +96,66 @@ pub(crate) fn preprocess_json(text: &str) -> Cow<'_, str> {
     let mut modified = false;
 
     while i < n {
-        // Check for mixed-quote boundary at current position
-        if let Some((bare_start, k)) = try_mixed_quote_boundary(bytes, n, i) {
-            modified = true;
-            emit_mixed_quote_boundary(&mut out, text, bare_start, k);
-            i = k + 3;
+        // Jump to the next quote candidate. Everything before it is
+        // unchanged and can be copied as a single slice.
+        let pos = match memchr2(b'"', b'\'', &bytes[i..n]) {
+            None => {
+                out.push_str(&text[i..]);
+                break;
+            }
+            Some(off) => i + off,
+        };
+        if pos > i {
+            out.push_str(&text[i..pos]);
+            i = pos;
+        }
+
+        // Mixed-quote boundary starts with a single quote.
+        if bytes[i] == b'\'' {
+            if let Some((bare_start, k)) = try_mixed_quote_boundary(bytes, n, i) {
+                modified = true;
+                emit_mixed_quote_boundary(&mut out, text, bare_start, k);
+                i = k + 3;
+                continue;
+            }
+            // Not a boundary — preserve the quote and keep scanning.
+            out.push('\'');
+            i += 1;
             continue;
         }
 
-        // Inside a quoted string — scan for mixed-quote boundaries and
-        // colons-in-keys
-        if bytes[i] == b'"' {
-            let string_start = i;
-            let mut j = i + 1;
-            let mut has_colon = false;
+        // Inside a double-quoted string — jump between ", ', and : candidates
+        // in a single scan.
+        let string_start = i;
+        let mut j = i + 1;
+        let mut has_colon = false;
+        let mut processed = false;
 
-            let mut processed = false;
-            while j < n {
-                if let Some((bare_start, k)) = try_mixed_quote_boundary(bytes, n, j) {
-                    modified = true;
-                    out.push_str(&text[string_start..j]);
-                    emit_mixed_quote_boundary(&mut out, text, bare_start, k);
-                    i = k + 3;
-                    processed = true;
-                    break;
-                }
+        while j < n {
+            let pos = match memchr3(b'"', b'\'', b':', &bytes[j..n]) {
+                None => break,
+                Some(off) => j + off,
+            };
 
-                if bytes[j] == b':' {
+            match bytes[pos] {
+                b':' => {
                     has_colon = true;
+                    j = pos + 1;
                 }
-                if bytes[j] == b'"' {
-                    let content_end = j;
-                    let end = j + 1;
+                b'\'' => {
+                    if let Some((bare_start, k)) = try_mixed_quote_boundary(bytes, n, pos) {
+                        modified = true;
+                        out.push_str(&text[string_start..pos]);
+                        emit_mixed_quote_boundary(&mut out, text, bare_start, k);
+                        i = k + 3;
+                        processed = true;
+                        break;
+                    }
+                    j = pos + 1;
+                }
+                _ => {
+                    let content_end = pos;
+                    let end = pos + 1;
 
                     if has_colon {
                         let content = &text[string_start + 1..content_end];
@@ -146,25 +174,13 @@ pub(crate) fn preprocess_json(text: &str) -> Cow<'_, str> {
                     processed = true;
                     break;
                 }
-
-                j += 1;
             }
-
-            // Unclosed string — copy the rest literally
-            if !processed {
-                out.push_str(&text[string_start..]);
-                break;
-            }
-            continue;
         }
 
-        if bytes[i].is_ascii() {
-            out.push(char::from(bytes[i]));
-            i += 1;
-        } else {
-            let ch = char_at(text, i);
-            out.push(ch);
-            i += ch.len_utf8();
+        // Unclosed string — copy the rest literally.
+        if !processed {
+            out.push_str(&text[string_start..]);
+            break;
         }
     }
 

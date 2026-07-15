@@ -32,12 +32,15 @@ Starting with **v0.3.4** (Python) / **v0.1.4** (Rust),
 
 Security guarantees in the declaration above apply to **Python v0.3.4+** / **Rust v0.1.4+**.
 
-The module refactoring in v0.3.5 / v0.1.5 adds no new security features but
-preserves all existing guarantees — the same safe‑Rust state machine with
-additional `debug_assert!` guards (active in debug builds only).
-
-The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
-changes only; security posture is unchanged.
+**v0.4.5 / v0.3.3 / v0.2.0** adds:
+- **No new security features** — this release is a tooling, formatting, and
+  observability release: Miri-compatible test gating, structured `arbitrary`-based
+  fuzz target, standalone `format_json` pretty-printer, JS `Infinity`/`NaN`
+  literals normalized to `null` in all value positions, and an optional `tracing`
+  feature exposed to Python via `repair_json(..., traced=True)`. All security
+  guarantees from v0.4.4+ / v0.3.2+ / v0.2.0+ preserved. Zero `unsafe` remains;
+  all tests pass; clippy clean.
+- See [`CHANGELOG.md`](CHANGELOG.md) for full details.
 
 **v0.4.4 / v0.3.2** adds:
 - **No new security features** — this release is a Rust elegance overhaul
@@ -49,6 +52,13 @@ changes only; security posture is unchanged.
   from v0.4.3+ / v0.3.1+ preserved. Zero `unsafe` remains; all 176 tests
   pass; clippy clean.
 - See [`CHANGELOG.md`](CHANGELOG.md) for full details.
+
+The module refactoring in v0.3.5 / v0.1.5 adds no new security features but
+preserves all existing guarantees — the same safe‑Rust state machine with
+additional `debug_assert!` guards (active in debug builds only).
+
+The Cargo.lock tracking and CI updates in v0.3.6 / v0.1.6 are operational
+changes only; security posture is unchanged.
 
 **v0.4.3 / v0.3.1** adds:
 - **No new security features** — this release enforces design rule #1

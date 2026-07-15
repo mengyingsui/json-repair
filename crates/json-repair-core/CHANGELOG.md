@@ -1,5 +1,43 @@
 # Changelog — json-repair-core
 
+## v0.3.3 (2026-07-15)
+
+### Added
+- **`format_json`** — standalone pretty-print formatter with configurable
+  indentation.
+- **`Infinity` / `NaN` / `+Infinity` / `-Infinity` handling** — JS literals are
+  now normalized to `null` in any value position.
+- **Unclosed `/*` block comment tests** — regression coverage for block comments
+  missing their closing `*/`.
+- **Structured fuzz target** — `arbitrary`-driven JSON AST fuzzer replaces the
+  old byte-level target; malformed renderings are repaired and validated with
+  `serde_json`.
+- **Miri support** — file-reading integration tests skip under Miri so unit
+  tests can run under `cargo +nightly miri test`.
+
+### Changed
+- **`InputCursor::cur()` / `char_at()`** — return `Option<char>` instead of a
+  `'\0'` EOF sentinel, following standard-library conventions.
+- **`BracketStack`** — removed redundant `bracket_depth: i32` field; `depth()`
+  now reports `brackets.len()`.
+- **`OutputBuffer`** — removed the 256 KiB hard capacity limit.
+- **`config.rs`** — unified `Cow::Borrowed` / `Cow::Owned` handling via
+  `text.as_ref()`.
+- **`helpers.rs`** — replaced file-level `#[allow(dead_code)]` with per-function
+  annotations.
+
+### Fixed
+- **User-input panics in `comment.rs` / `preamble.rs`** — replaced `expect()`
+  calls with byte-level logic.
+- **`utf8_char_len` duplication** — deleted in favor of `char::len_utf8()`.
+- **Validation stub dead code** — merged `debug_validate_output` and
+  `validate_serde_json` into one function.
+
+### Python bindings
+- **`py_repair_json_with_trace`** — exposes the `tracing` feature to Python;
+  `repair_json(..., traced=True)` returns both repaired JSON and a trace log.
+- `json-repair-python` bumped to **v0.2.0**.
+
 ## v0.3.2 (2026-07-14)
 
 ### Changed

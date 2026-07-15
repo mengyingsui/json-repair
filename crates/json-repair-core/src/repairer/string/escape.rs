@@ -39,7 +39,7 @@ pub(super) fn emit_escape(input: &mut InputCursor, output: &mut OutputBuffer, ch
         let mut hex_val: u32 = 0;
         let mut all_hex = true;
         for k in 1..=4 {
-            if let Some(d) = input.char_at(input.pos() + k).to_digit(16) {
+            if let Some(d) = input.char_at(input.pos() + k).and_then(|c| c.to_digit(16)) {
                 hex_val = (hex_val << 4) | d;
             } else {
                 all_hex = false;
@@ -86,16 +86,19 @@ fn handle_escaped(
 
 // Emit a character for an unquoted (bare) key/value body.
 // Escapes `\`, `"`, newlines, tabs, and other control characters.
-pub(crate) fn emit_unquoted_char(_input: &mut InputCursor, output: &mut OutputBuffer, ch: char) {
+pub(crate) fn emit_unquoted_char(output: &mut OutputBuffer, ch: char) {
     match ch {
+        // JSON must-escape characters in bare key/value content.
         '\\' => output.emit_str("\\\\"),
         '"' => output.emit_str("\\\""),
         '\n' => output.emit_str("\\n"),
         '\r' => output.emit_str("\\r"),
         '\t' => output.emit_str("\\t"),
+        // Other control characters: use the generic \uXXXX form.
         c if u32::from(c) < CONTROL_CHAR_MAX => {
             output.emit_unicode_escape(u32::from(c));
         }
+        // Anything else is safe to emit literally.
         _ => output.emit_char(ch),
     }
 }
@@ -119,6 +122,7 @@ pub(super) fn emit_string_body_char(
         return;
     }
     match ch {
+        // Line ending / tab: emit the short JSON escape name.
         '\n' => {
             output.emit_str("\\n");
             input.advance(1);
@@ -131,10 +135,12 @@ pub(super) fn emit_string_body_char(
             output.emit_str("\\t");
             input.advance(1);
         }
+        // Other control characters require the generic \uXXXX escape.
         c if u32::from(c) < CONTROL_CHAR_MAX => {
             output.emit_unicode_escape(u32::from(c));
             input.advance(1);
         }
+        // Normal character: copy through and advance by its UTF-8 width.
         _ => {
             output.emit_char(ch);
             input.advance(ch.len_utf8());
@@ -145,10 +151,6 @@ pub(super) fn emit_string_body_char(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn cursor(text: &str) -> InputCursor<'_> {
-        InputCursor::new(text)
-    }
 
     // ── emit_unicode_escape ────────────────────────────────────────────
 
@@ -178,40 +180,35 @@ mod tests {
     #[test]
     fn emit_unquoted_char_backslash() {
         let mut out = OutputBuffer::new(64);
-        let mut input = cursor("");
-        emit_unquoted_char(&mut input, &mut out, '\\');
+        emit_unquoted_char(&mut out, '\\');
         assert_eq!(out.take(), "\\\\");
     }
 
     #[test]
     fn emit_unquoted_char_double_quote() {
         let mut out = OutputBuffer::new(64);
-        let mut input = cursor("");
-        emit_unquoted_char(&mut input, &mut out, '"');
+        emit_unquoted_char(&mut out, '"');
         assert_eq!(out.take(), "\\\"");
     }
 
     #[test]
     fn emit_unquoted_char_newline() {
         let mut out = OutputBuffer::new(64);
-        let mut input = cursor("");
-        emit_unquoted_char(&mut input, &mut out, '\n');
+        emit_unquoted_char(&mut out, '\n');
         assert_eq!(out.take(), "\\n");
     }
 
     #[test]
     fn emit_unquoted_char_plain_ascii() {
         let mut out = OutputBuffer::new(64);
-        let mut input = cursor("");
-        emit_unquoted_char(&mut input, &mut out, 'A');
+        emit_unquoted_char(&mut out, 'A');
         assert_eq!(out.take(), "A");
     }
 
     #[test]
     fn emit_unquoted_char_control_char() {
         let mut out = OutputBuffer::new(64);
-        let mut input = cursor("");
-        emit_unquoted_char(&mut input, &mut out, '\x01');
+        emit_unquoted_char(&mut out, '\x01');
         assert_eq!(out.take(), "\\u0001");
     }
 

@@ -162,3 +162,6 @@ crates/json-repair-core/fuzz/corpus
 
 # OpenCode
 .opencode/
+
+# Trae
+.trae/

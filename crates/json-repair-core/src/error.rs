@@ -41,6 +41,15 @@ pub enum JsonRepairErrorKind {
     /// valid JSON document (e.g. orphan closers, mismatched brackets
     /// that could not be reconciled).
     UnbalancedBrackets,
+
+    /// The input is not valid JSON.
+    ///
+    /// Used by [`format_json`](crate::format_json) when the caller asks it
+    /// to pretty-print text that is not structurally valid JSON.
+    InvalidJson,
+
+    /// Repair tracing was requested but not enabled in the provided config.
+    TracingDisabled,
 }
 
 /// Error type for JSON repair failures.
@@ -85,7 +94,9 @@ impl JsonRepairError {
     pub fn position(&self) -> Option<usize> {
         match self.kind {
             JsonRepairErrorKind::DepthExceeded { position, .. } => Some(position),
-            JsonRepairErrorKind::UnbalancedBrackets => None,
+            JsonRepairErrorKind::UnbalancedBrackets
+            | JsonRepairErrorKind::InvalidJson
+            | JsonRepairErrorKind::TracingDisabled => None,
         }
     }
 }
@@ -101,6 +112,15 @@ impl fmt::Display for JsonRepairError {
                 write!(
                     f,
                     "JSON repair error: repaired output has unbalanced brackets"
+                )
+            }
+            JsonRepairErrorKind::InvalidJson => {
+                write!(f, "JSON repair error: input is not valid JSON")
+            }
+            JsonRepairErrorKind::TracingDisabled => {
+                write!(
+                    f,
+                    "JSON repair error: tracing was requested but `RepairConfig::with_tracing(true)` was not set"
                 )
             }
         }

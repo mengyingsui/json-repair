@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.4.5 🔒 (2026-07-15)
+
+### Added
+- **`format_json`** — standalone pretty-print formatter (Rust + Python);
+  indentation is configured at the call site and does not require `RepairConfig`.
+- **`Infinity` / `NaN` / `+Infinity` / `-Infinity` handling** — these JS literals
+  are now recognized as `null` in any value position, not only at the top level.
+- **Unclosed `/*` block comment tests** — regression coverage for `/*` without a
+  matching `*/`.
+- **Structured fuzz target** — replaced byte-level fuzzing with an
+  `arbitrary`-driven JSON AST generator that renders intentionally malformed
+  inputs and validates repaired output with `serde_json`.
+- **Miri support** — all file-reading integration tests are gated with
+  `#![cfg(not(miri))]` so `cargo +nightly miri test` can run the unit-test suite.
+
+### Changed
+- **`InputCursor::cur()` / `char_at()`** — return `Option<char>` instead of using
+  `'\0'` as an EOF sentinel, matching `Iterator::next()` and eliminating a
+  class of sentinel-value bugs.
+- **`BracketStack`** — removed the redundant `bracket_depth: i32` field;
+  `depth()` now delegates to `len()` / `brackets.len()`.
+- **`OutputBuffer`** — removed the 256 KiB hard capacity limit.
+- **`config.rs`** — collapsed `Cow::Borrowed` / `Cow::Owned` branches via
+  `text.as_ref()`.
+- **`helpers.rs`** — narrowed `#![allow(dead_code)]` scope to individual
+  functions instead of the whole file.
+
+### Fixed
+- **Potential panics in `comment.rs` / `preamble.rs`** — replaced `expect()` on
+  user-controlled input with byte-level operations.
+- **`utf8_char_len` duplication** — removed in favor of `char::len_utf8()`.
+- **`validate_serde_json` dead code** — merged `debug_validate_output` and
+  `validate_serde_json` stubs to avoid release-profile warnings.
+
+### Python
+- **`repair_json(..., traced=True)`** — new `traced` parameter enables the Rust
+  `tracing` feature and returns a repair trace log alongside the repaired JSON.
+- `json-repair-core` bumped to **v0.4.5**.
+
+### Rust
+- Workspace `json-repair-core` bumped to **v0.3.3**.
+- `json-repair-python` bumped to **v0.2.0**.
+
 ## v0.4.4 🔒 (2026-07-14)
 
 ### Changed

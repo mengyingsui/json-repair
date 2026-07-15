@@ -178,3 +178,56 @@ fn test_debug_edge63() {
     println!("result: {:?}", result);
     assert_eq!(result, "{\"\":null}");
 }
+
+#[test]
+fn test_infinity_nan_in_all_value_positions() {
+    // Unsigned Infinity/NaN should already work; this guards regression.
+    assert_eq!(json_repair_core::repair_json("Infinity").unwrap(), "null");
+    assert_eq!(json_repair_core::repair_json("NaN").unwrap(), "null");
+    assert_eq!(
+        json_repair_core::repair_json("[Infinity, NaN]").unwrap(),
+        "[null,null]"
+    );
+    assert_eq!(
+        json_repair_core::repair_json(r#"{"a": Infinity, "b": NaN}"#).unwrap(),
+        r#"{"a":null,"b":null}"#
+    );
+
+    // Signed variants must also be recognized in value positions.
+    assert_eq!(json_repair_core::repair_json("+Infinity").unwrap(), "null");
+    assert_eq!(json_repair_core::repair_json("-Infinity").unwrap(), "null");
+    assert_eq!(
+        json_repair_core::repair_json("[+Infinity, -Infinity]").unwrap(),
+        "[null,null]"
+    );
+    assert_eq!(
+        json_repair_core::repair_json(r#"{"pos": +Infinity, "neg": -Infinity}"#).unwrap(),
+        r#"{"pos":null,"neg":null}"#
+    );
+}
+
+#[test]
+fn test_format_json_after_repair() {
+    let repaired = json_repair_core::repair_json(r#"{"a":1,"b":[1,2]}"#).unwrap();
+    let pretty = json_repair_core::format_json(&repaired, 2).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&pretty).unwrap();
+    assert_eq!(parsed, serde_json::json!({"a": 1, "b": [1, 2]}));
+    assert!(pretty.contains("\n  \"a\": 1"));
+}
+
+#[test]
+fn test_unterminated_block_comment_produces_valid_json() {
+    // Top-level unterminated block comment should yield `null`.
+    let result = json_repair_core::repair_json("/* foo").unwrap();
+    assert_eq!(result, "null");
+
+    // Array with trailing unterminated block comment.
+    let result = json_repair_core::repair_json("[1, /* bar").unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    assert_eq!(parsed, serde_json::json!([1]));
+
+    // Object with trailing unterminated block comment.
+    let result = json_repair_core::repair_json(r#"{"a": 1, /* baz"#).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    assert_eq!(parsed, serde_json::json!({"a": 1}));
+}

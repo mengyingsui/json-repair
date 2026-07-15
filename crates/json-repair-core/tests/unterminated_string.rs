@@ -1,3 +1,5 @@
+#![cfg(not(miri))]
+
 const INPUT: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/cases/unterminated_string.jsonl"

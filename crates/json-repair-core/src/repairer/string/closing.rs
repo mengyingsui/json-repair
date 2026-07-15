@@ -5,7 +5,7 @@
 //! mutating the cursor, so they can be called from both the main parse
 //! loop ([`super`]) and lookahead helpers in `structure.rs`.
 
-use crate::repairer::{BracketStack, InputCursor, OutputBuffer};
+use crate::repairer::{InputCursor, OutputBuffer, Tracer};
 
 use super::escape::ParserState;
 
@@ -21,8 +21,10 @@ pub(crate) fn check_closing_quote(
     input: &InputCursor,
     pos: usize,
     is_key: bool,
-    brackets: &BracketStack,
+    brackets: &[char],
+    tracer: &mut Tracer,
 ) -> (bool, Option<usize>) {
+    let _ = tracer;
     // For values, scan backward: if `{` or `[` appears before any other
     // visible char, the quote is the start of a string, not a closer.
     if !is_key {
@@ -31,6 +33,13 @@ pub(crate) fn check_closing_quote(
             p -= 1;
             let byte = input.bytes()[p];
             if byte == b'{' || byte == b'[' {
+                emit_trace!(
+                    tracer,
+                    crate::trace::TraceEvent::StringSplit {
+                        position: pos,
+                        reason: "embedded_quote",
+                    }
+                );
                 return (false, None);
             }
             if !matches!(byte, b' ' | b'\t' | b'\r' | b'\n') {
@@ -40,44 +49,86 @@ pub(crate) fn check_closing_quote(
     }
     // Look ahead past horizontal whitespace
     let mut j = pos + 1;
-    while j < input.len() && matches!(input.char_at(j), ' ' | '\t' | '\r') {
+    while input
+        .char_at(j)
+        .is_some_and(|c| matches!(c, ' ' | '\t' | '\r'))
+    {
         j += 1;
     }
     // EOF → closing (truncated string completion)
-    if j >= input.len() {
+    let Some(nc) = input.char_at(j) else {
+        emit_trace!(
+            tracer,
+            crate::trace::TraceEvent::StringSplit {
+                position: pos,
+                reason: "closing_quote",
+            }
+        );
         return (true, None);
-    }
-    let nc = input.char_at(j);
+    };
     // Succeeded by structural char → likely a closing quote
     if matches!(nc, ',' | '}' | ']' | '\n') {
         // Comma is ambiguous: check that the char after the comma
         // is a valid value-starter — otherwise the quote was embedded.
         if nc == ',' && !is_key {
             let k = input.skip_ws_at(j + 1);
-            if k < input.len() {
-                let after = input.char_at(k);
-                if !matches!(
+            if input.char_at(k).is_some_and(|after| {
+                !matches!(
                     after,
                     '"' | '{' | '[' | 't' | 'f' | 'n' | '-' | '}' | ']' | ','
                 ) && !after.is_ascii_digit()
-                {
-                    return (false, None);
-                }
+            }) {
+                emit_trace!(
+                    tracer,
+                    crate::trace::TraceEvent::StringSplit {
+                        position: pos,
+                        reason: "embedded_quote",
+                    }
+                );
+                return (false, None);
             }
         }
         // `]`/`}` after a quote: check whether it's an embedded
         // bracket-inside-string, not the container closer.
         if (nc == ']' || nc == '}') && is_embedded_bracket_quote(input, j, nc, brackets) {
+            emit_trace!(
+                tracer,
+                crate::trace::TraceEvent::StringSplit {
+                    position: pos,
+                    reason: "embedded_quote",
+                }
+            );
             return (false, None);
         }
+        emit_trace!(
+            tracer,
+            crate::trace::TraceEvent::StringSplit {
+                position: pos,
+                reason: "closing_quote",
+            }
+        );
         return (true, None);
     }
     // Another `"` immediately → closing (doubled `""` is a quote).
     if nc == '"' {
+        emit_trace!(
+            tracer,
+            crate::trace::TraceEvent::StringSplit {
+                position: pos,
+                reason: "closing_quote",
+            }
+        );
         return (true, None);
     }
     // Key-specific: `:`, `{`, `[` after quote → closing
     if is_key && matches!(nc, ':' | '{' | '[') {
+        emit_trace!(
+            tracer,
+            crate::trace::TraceEvent::StringSplit {
+                position: pos,
+                reason: "closing_quote",
+            }
+        );
         return (true, None);
     }
     // Value context with `:` after quote: the string may actually be a
@@ -91,7 +142,16 @@ pub(crate) fn check_closing_quote(
         while p > 0 {
             p -= 1;
             match input.bytes()[p] {
-                b'{' | b'[' => return (false, None),
+                b'{' | b'[' => {
+                    emit_trace!(
+                        tracer,
+                        crate::trace::TraceEvent::StringSplit {
+                            position: pos,
+                            reason: "embedded_quote",
+                        }
+                    );
+                    return (false, None);
+                }
                 b',' | b'}' | b']' | b':' => break,
                 _ => {}
             }
@@ -99,28 +159,41 @@ pub(crate) fn check_closing_quote(
         if pos > 0 {
             let prev = input.bytes()[pos - 1];
             if prev.is_ascii_graphic() || prev == b' ' || prev == b'_' || prev == b'"' {
+                emit_trace!(
+                    tracer,
+                    crate::trace::TraceEvent::StringSplit {
+                        position: pos,
+                        reason: "closing_quote",
+                    }
+                );
                 return (true, None);
             }
         }
+        emit_trace!(
+            tracer,
+            crate::trace::TraceEvent::StringSplit {
+                position: pos,
+                reason: "embedded_quote",
+            }
+        );
         return (false, None);
     }
     // Bareword after quote: could be `key":value` (split point) or
     // a continuation of an unquoted string.
     if nc.is_ascii_alphabetic() || nc == '_' {
         let mut k = j;
-        loop {
-            let ch = input.char_at(k);
+        while let Some(ch) = input.char_at(k) {
             if !(ch.is_alphanumeric() || ch == '_') {
                 break;
             }
             k += ch.len_utf8();
         }
         k = input.skip_ws_at(k);
-        if k < input.len() && input.char_at(k) == '"' {
+        if matches!(input.char_at(k), Some('"')) {
             let bp = Some(k);
             k += 1;
             k = input.skip_ws_at(k);
-            if k < input.len() && input.char_at(k) == ':' {
+            if matches!(input.char_at(k), Some(':')) {
                 // In key context, scan between this quote and the
                 // bareword's ending `"`.  If no structural separator
                 // (`,`, `}`, `]`, `:`, `\n`) exists in that span, the
@@ -130,7 +203,7 @@ pub(crate) fn check_closing_quote(
                     let mut p = pos + 1;
                     let mut has_sep = false;
                     while p < k {
-                        let c = input.char_at(p);
+                        let Some(c) = input.char_at(p) else { break };
                         if matches!(c, ',' | '}' | ']' | ':' | '\n') {
                             has_sep = true;
                             break;
@@ -138,13 +211,34 @@ pub(crate) fn check_closing_quote(
                         p += c.len_utf8();
                     }
                     if !has_sep {
+                        emit_trace!(
+                            tracer,
+                            crate::trace::TraceEvent::StringSplit {
+                                position: pos,
+                                reason: "embedded_quote",
+                            }
+                        );
                         return (false, None);
                     }
                 }
+                emit_trace!(
+                    tracer,
+                    crate::trace::TraceEvent::StringSplit {
+                        position: pos,
+                        reason: "bareword_split",
+                    }
+                );
                 return (true, bp);
             }
         }
     }
+    emit_trace!(
+        tracer,
+        crate::trace::TraceEvent::StringSplit {
+            position: pos,
+            reason: "embedded_quote",
+        }
+    );
     (false, None)
 }
 
@@ -153,25 +247,22 @@ pub(crate) fn check_closing_quote(
 // E.g. `["]}]` — the `]` and `}` are inside the string value.
 //
 // Returns `true` when the bracket is "embedded" (i.e. not structural).
-fn is_embedded_bracket_quote(
-    input: &InputCursor,
-    j: usize,
-    nc: char,
-    brackets: &BracketStack,
-) -> bool {
+fn is_embedded_bracket_quote(input: &InputCursor, j: usize, nc: char, brackets: &[char]) -> bool {
     // Skip past any consecutive brackets
     let mut k = j;
-    while k < input.len() && matches!(input.char_at(k), ']' | '}') {
+    while input.char_at(k).is_some_and(|c| matches!(c, ']' | '}')) {
         k += 1;
     }
     k = input.skip_ws_at(k);
     // If the run ends at EOF or another structural char, not embedded
-    let structural = k >= input.len() || matches!(input.char_at(k), ',' | '}' | ']');
+    let structural = input
+        .char_at(k)
+        .is_none_or(|c| matches!(c, ',' | '}' | ']'));
     if structural {
         return false;
     }
     // If the bracket doesn't match the stack top, it's embedded
-    let matches_top = brackets.last() == Some(nc);
+    let matches_top = brackets.last().copied() == Some(nc);
     if !matches_top {
         return true;
     }
@@ -180,16 +271,19 @@ fn is_embedded_bracket_quote(
     let open_bracket = if nc == ']' { '[' } else { '{' };
     let mut p = k;
     while p < input.len() {
-        if input.char_at(p) == '"' {
+        if matches!(input.char_at(p), Some('"')) {
             let q = input.skip_ws_at(p + 1);
-            if q < input.len() && matches!(input.char_at(q), ',' | '}' | ']') {
-                let need_colon = nc == '}' && input.char_at(q) == ',';
+            if input
+                .char_at(q)
+                .is_some_and(|c| matches!(c, ',' | '}' | ']'))
+            {
+                let need_colon = nc == '}' && matches!(input.char_at(q), Some(','));
                 let mut r = q;
                 let mut in_str = false;
                 let mut depth: i32 = 1;
                 let mut saw_colon = false;
                 while r < input.len() {
-                    let rc = input.char_at(r);
+                    let Some(rc) = input.char_at(r) else { break };
                     if in_str {
                         if rc == '"' {
                             in_str = false;
@@ -217,7 +311,8 @@ fn is_embedded_bracket_quote(
                 break;
             }
         }
-        p += input.char_at(p).len_utf8();
+        let Some(pc) = input.char_at(p) else { break };
+        p += pc.len_utf8();
     }
     false
 }
@@ -261,7 +356,9 @@ pub(super) fn try_split_bareword_after_value(
     output: &mut OutputBuffer,
     state: &mut ParserState,
     bareword_quote_pos: Option<usize>,
+    tracer: &mut Tracer,
 ) -> SplitResult {
+    let _ = tracer;
     if input.pos() + 1 >= input.len() {
         return SplitResult::NoSplit;
     }
@@ -271,8 +368,7 @@ pub(super) fn try_split_bareword_after_value(
     }
     let k = bareword_quote_pos.unwrap_or_else(|| {
         let mut k = input.pos() + 1;
-        loop {
-            let kc = input.char_at(k);
+        while let Some(kc) = input.char_at(k) {
             if !(kc.is_alphanumeric() || kc == '_') {
                 break;
             }
@@ -280,7 +376,7 @@ pub(super) fn try_split_bareword_after_value(
         }
         input.skip_ws_at(k)
     });
-    if k >= input.len() || input.char_at(k) != '"' {
+    if input.char_at(k) != Some('"') {
         return SplitResult::NoSplit;
     }
     // Undo the closing quote we just emitted, plus any trailing whitespace.
@@ -289,6 +385,13 @@ pub(super) fn try_split_bareword_after_value(
     output.trim_trailing_comma();
     output.emit_char('"');
     *state = ParserState::Normal;
+    emit_trace!(
+        tracer,
+        crate::trace::TraceEvent::StringSplit {
+            position: input.pos(),
+            reason: "value_bareword_split",
+        }
+    );
     SplitResult::Split
 }
 
@@ -299,6 +402,7 @@ pub(super) fn ensure_closing_quote(output: &mut OutputBuffer, state: &mut Parser
 }
 
 #[cfg(test)]
+#[allow(clippy::let_unit_value, clippy::unused_unit)]
 mod tests {
     use super::*;
 
@@ -306,8 +410,29 @@ mod tests {
         InputCursor::new(text)
     }
 
-    fn empty_brackets() -> BracketStack {
-        BracketStack::new()
+    fn empty_brackets() -> Vec<char> {
+        Vec::new()
+    }
+
+    fn tracer() -> Tracer<'static> {
+        #[cfg(feature = "tracing")]
+        {
+            None
+        }
+        #[cfg(not(feature = "tracing"))]
+        {
+            ()
+        }
+    }
+
+    fn check_q(
+        input: &InputCursor,
+        pos: usize,
+        is_key: bool,
+        brackets: &[char],
+    ) -> (bool, Option<usize>) {
+        let mut t = tracer();
+        check_closing_quote(input, pos, is_key, brackets, &mut t)
     }
 
     // ── check_closing_quote: value context (is_key=false) ──────────────
@@ -316,7 +441,7 @@ mod tests {
     fn closing_quote_value_eof() {
         // `"value"` at EOF → closing
         let input = cursor(r#""value""#);
-        let (is_closing, _) = check_closing_quote(&input, 7, false, &empty_brackets());
+        let (is_closing, _) = check_q(&input, 7, false, &empty_brackets());
         assert!(is_closing);
     }
 
@@ -324,7 +449,7 @@ mod tests {
     fn closing_quote_value_followed_by_comma() {
         // `"value",` → closing (comma + value starter `"`)
         let input = cursor(r#""value", "next""#);
-        let (is_closing, _) = check_closing_quote(&input, 6, false, &empty_brackets());
+        let (is_closing, _) = check_q(&input, 6, false, &empty_brackets());
         assert!(is_closing);
     }
 
@@ -332,7 +457,7 @@ mod tests {
     fn closing_quote_value_followed_by_close_brace() {
         // `"value"}` → closing
         let input = cursor(r#""value"}"#);
-        let (is_closing, _) = check_closing_quote(&input, 6, false, &empty_brackets());
+        let (is_closing, _) = check_q(&input, 6, false, &empty_brackets());
         assert!(is_closing);
     }
 
@@ -340,7 +465,7 @@ mod tests {
     fn closing_quote_value_followed_by_close_bracket() {
         // `"value"]` → closing
         let input = cursor(r#""value"]"#);
-        let (is_closing, _) = check_closing_quote(&input, 6, false, &empty_brackets());
+        let (is_closing, _) = check_q(&input, 6, false, &empty_brackets());
         assert!(is_closing);
     }
 
@@ -348,7 +473,7 @@ mod tests {
     fn closing_quote_value_followed_by_newline() {
         // `"value"\n` → closing
         let input = cursor("\"value\"\n");
-        let (is_closing, _) = check_closing_quote(&input, 6, false, &empty_brackets());
+        let (is_closing, _) = check_q(&input, 6, false, &empty_brackets());
         assert!(is_closing);
     }
 
@@ -357,7 +482,8 @@ mod tests {
         // `"say "hello"` — `"` followed by `hello` → embedded
         let input = cursor(r#"{"msg":"say "hello""}"#);
         let pos = input.text().find(r#""hello"#).unwrap();
-        let (is_closing, _) = check_closing_quote(&input, pos, false, &empty_brackets());
+        let mut t = tracer();
+        let (is_closing, _) = check_closing_quote(&input, pos, false, &empty_brackets(), &mut t);
         assert!(!is_closing, "quote before `hello` should be embedded");
     }
 
@@ -365,7 +491,8 @@ mod tests {
     fn closing_quote_value_doubled_quote() {
         // `""` → closing (the second `"` closes an empty string)
         let input = cursor(r#"""#);
-        let (is_closing, _) = check_closing_quote(&input, 0, false, &empty_brackets());
+        let mut t = tracer();
+        let (is_closing, _) = check_closing_quote(&input, 0, false, &empty_brackets(), &mut t);
         assert!(is_closing);
     }
 
@@ -375,7 +502,7 @@ mod tests {
     fn closing_quote_key_followed_by_colon() {
         // `"key":` → closing in key context
         let input = cursor(r#""key":"#);
-        let (is_closing, _) = check_closing_quote(&input, 4, true, &empty_brackets());
+        let (is_closing, _) = check_q(&input, 4, true, &empty_brackets());
         assert!(is_closing);
     }
 
@@ -383,7 +510,7 @@ mod tests {
     fn closing_quote_key_followed_by_open_brace() {
         // `"key"{` → closing in key context
         let input = cursor(r#""key"{"#);
-        let (is_closing, _) = check_closing_quote(&input, 4, true, &empty_brackets());
+        let (is_closing, _) = check_q(&input, 4, true, &empty_brackets());
         assert!(is_closing);
     }
 
@@ -393,7 +520,7 @@ mod tests {
     fn closing_quote_value_then_bareword_then_quote_colon() {
         // `"value"key":` → first `"` closes, bareword becomes next key
         let input = cursor(r#""value"key":"#);
-        let (is_closing, bareword_pos) = check_closing_quote(&input, 6, false, &empty_brackets());
+        let (is_closing, bareword_pos) = check_q(&input, 6, false, &empty_brackets());
         assert!(is_closing);
         assert!(bareword_pos.is_some(), "should detect bareword split point");
     }

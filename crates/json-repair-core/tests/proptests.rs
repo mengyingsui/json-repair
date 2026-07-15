@@ -1,3 +1,5 @@
+#![cfg(not(miri))]
+
 use std::path::Path;
 
 use proptest::collection::{hash_map, vec};

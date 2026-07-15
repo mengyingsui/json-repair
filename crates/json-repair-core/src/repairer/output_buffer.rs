@@ -16,11 +16,13 @@ pub(crate) struct OutputBuffer {
 }
 
 impl OutputBuffer {
-    /// Creates a new `OutputBuffer` with capacity capped at 256 KiB.
+    /// Creates a new `OutputBuffer` with the given initial capacity.
+    ///
+    /// `capacity` is passed directly to `String::with_capacity`.  The buffer
+    /// grows transparently via reallocation if the output exceeds this hint.
     pub fn new(capacity: usize) -> Self {
-        let cap = capacity.min(256 * 1024);
         OutputBuffer {
-            out: String::with_capacity(cap),
+            out: String::with_capacity(capacity),
             last_depth0_pos: 0,
         }
     }
@@ -255,12 +257,6 @@ mod tests {
         assert_eq!(b.take(), "\\u0041");
         b.emit_unicode_escape(0xFF);
         assert_eq!(b.take(), "\\u00ff");
-    }
-
-    #[test]
-    fn capacity_capped_at_256kib() {
-        let b = OutputBuffer::new(10 * 1024 * 1024);
-        assert!(b.capacity() <= 256 * 1024 + 16); // +16 for slack
     }
 
     #[test]

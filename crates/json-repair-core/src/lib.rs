@@ -23,6 +23,24 @@
 //!   repair pass.
 #![deny(missing_docs)]
 
+/// Emit a trace event when the `tracing` feature is enabled.
+#[cfg(feature = "tracing")]
+#[macro_export]
+macro_rules! emit_trace {
+    ($tracer:expr, $event:expr) => {
+        if let Some(t) = $tracer {
+            t.push($event);
+        }
+    };
+}
+
+/// No-op trace emission when the `tracing` feature is disabled.
+#[cfg(not(feature = "tracing"))]
+#[macro_export]
+macro_rules! emit_trace {
+    ($tracer:expr, $event:expr) => {};
+}
+
 /// Configuration for JSON repair.
 pub mod config;
 
@@ -32,12 +50,25 @@ pub mod config;
 /// types for convenience.
 pub mod error;
 
+/// Pretty-printing for already-valid JSON strings.
+pub mod format;
+
 mod preprocess;
 mod repairer;
 mod util;
 
+/// Optional repair trace events and collection type.
+#[cfg(feature = "tracing")]
+pub mod trace;
+
+#[cfg(feature = "tracing")]
+pub use trace::{CommentStyle, RepairTrace, TraceEvent};
+
+#[cfg(feature = "tracing")]
+pub use config::repair_json_with_trace;
 pub use config::{DEFAULT_MAX_PARSE_DEPTH, RepairConfig, repair_json_with};
 pub use error::{JsonRepairError, JsonRepairErrorKind};
+pub use format::format_json;
 
 /// Repair a malformed JSON string and return valid JSON.
 ///

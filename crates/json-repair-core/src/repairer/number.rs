@@ -1,4 +1,10 @@
-use crate::repairer::{InputCursor, OutputBuffer};
+//! JSON number scanning and normalization.
+//!
+//! Detects numeric tokens, stops at the first non-number character, and
+//! emits a normalized representation.  Time-like tokens (`10:30`) are
+//! left for the key parser by checking for a trailing `:`.
+
+use crate::repairer::{InputCursor, OutputBuffer, Tracer};
 
 /// Returns `true` if `ch` can start a JSON number.
 ///
@@ -36,13 +42,21 @@ pub(super) fn scan_number_span(input: &InputCursor) -> usize {
 /// Consume the widest legal number span starting at `input.pos()`, then
 /// normalize leading zeros, leading `+`, leading `.`, trailing `.`,
 /// and validate before emitting.
-pub(super) fn parse_number(input: &mut InputCursor, output: &mut OutputBuffer) {
+pub(super) fn parse_number(
+    input: &mut InputCursor,
+    output: &mut OutputBuffer,
+    tracer: &mut Tracer,
+) {
+    let _ = tracer;
     let start = input.pos();
     let end = scan_number_span(input);
     input.set_pos(end);
     // If the span is immediately followed by an alphabetic character
     // it is not a number (e.g. `123abc` → treat as bareword, emit `0`).
-    if input.pos() < input.len() && input.char_at(input.pos()).is_ascii_alphabetic() {
+    if input
+        .char_at(input.pos())
+        .is_some_and(|c| c.is_ascii_alphabetic())
+    {
         output.emit_char('0');
         return;
     }
@@ -82,8 +96,11 @@ fn has_excessive_separators(s: &str) -> bool {
     let mut exp = 0u8;
     for &b in s.as_bytes() {
         match b {
+            // Decimal point: count it to reject multiple dots.
             b'.' => dot += 1,
+            // Exponent marker: count it to reject multiple exponents.
             b'e' | b'E' => exp += 1,
+            // Any other byte does not affect separator validation.
             _ => {}
         }
         if dot > 1 || exp > 1 {

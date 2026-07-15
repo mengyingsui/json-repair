@@ -1,3 +1,5 @@
+#![cfg(not(miri))]
+
 mod helpers;
 
 use helpers::collect_cases;

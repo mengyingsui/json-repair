@@ -11,7 +11,7 @@ mod escape;
 pub(crate) use closing::check_closing_quote;
 pub(crate) use escape::emit_unquoted_char;
 
-use crate::repairer::{BracketStack, InputCursor, OutputBuffer};
+use crate::repairer::{InputCursor, OutputBuffer, Tracer};
 
 use closing::{
     DoubleQuoteAction, SplitResult, ensure_closing_quote, handle_double_quote_escape,
@@ -24,25 +24,31 @@ use escape::{ParserState, emit_string_body_char};
 pub(super) fn parse_string(
     input: &mut InputCursor,
     output: &mut OutputBuffer,
-    brackets: &BracketStack,
+    brackets: &[char],
     is_key: bool,
+    tracer: &mut Tracer,
 ) {
     let mut state = ParserState::InString;
     output.emit_char('"');
     input.advance(1);
-    while input.pos() < input.len() {
-        let ch = input.cur();
+    while let Some(ch) = input.cur() {
         if ch == '"' {
             match handle_double_quote_escape(input, output) {
                 DoubleQuoteAction::Consumed => continue,
                 DoubleQuoteAction::NotDoubleQuote => {}
             }
             let (is_closing, bareword_pos) =
-                check_closing_quote(input, input.pos(), is_key, brackets);
+                check_closing_quote(input, input.pos(), is_key, brackets, tracer);
             if is_closing {
                 output.emit_char('"');
                 state = ParserState::Normal;
-                match try_split_bareword_after_value(input, output, &mut state, bareword_pos) {
+                match try_split_bareword_after_value(
+                    input,
+                    output,
+                    &mut state,
+                    bareword_pos,
+                    tracer,
+                ) {
                     SplitResult::Split => return,
                     SplitResult::NoSplit => {}
                 }
@@ -58,11 +64,13 @@ pub(super) fn parse_string(
                 continue;
             }
         }
+        // Null byte inside a key string — emit as \u0000 and close.
+        // (EOF is handled by the `while let Some` loop condition, not here.)
         if is_key && ch == '\0' {
             output.emit_unicode_escape(0);
             input.advance(1);
             output.emit_char('"');
-            match try_split_bareword_after_value(input, output, &mut state, None) {
+            match try_split_bareword_after_value(input, output, &mut state, None, tracer) {
                 SplitResult::Split => return,
                 SplitResult::NoSplit => {}
             }
@@ -78,22 +86,22 @@ pub(super) fn parse_string(
 pub(super) fn parse_triple_string(
     input: &mut InputCursor,
     output: &mut OutputBuffer,
-    _brackets: &BracketStack,
+    tracer: &mut Tracer,
 ) {
+    let _ = tracer;
     let mut state = ParserState::InString;
     input.advance(3);
     output.emit_char('"');
-    while input.pos() < input.len() {
+    while let Some(ch) = input.cur() {
         if input.peek_is("\"\"\"") {
             let after = input.pos() + 3;
             // Avoid false match on `""""` (four quotes)
-            if !(after < input.len() && input.char_at(after) == '"') {
+            if input.char_at(after) != Some('"') {
                 input.advance(3);
                 output.emit_char('"');
                 return;
             }
         }
-        let ch = input.cur();
         if ch == '"' {
             output.emit_str("\\\"");
             input.advance(1);
@@ -110,19 +118,26 @@ pub(super) fn parse_triple_string(
 pub(super) fn parse_single_quoted_string(
     input: &mut InputCursor,
     output: &mut OutputBuffer,
-    _brackets: &BracketStack,
+    tracer: &mut Tracer,
 ) {
+    let _ = tracer;
     let mut state = ParserState::InString;
     output.emit_char('"');
     input.advance(1);
-    while input.pos() < input.len() {
-        let ch = input.cur();
+    while let Some(ch) = input.cur() {
         if ch == '\'' {
             let mut j = input.pos() + 1;
-            while j < input.len() && matches!(input.char_at(j), ' ' | '\t' | '\r') {
+            while input
+                .char_at(j)
+                .is_some_and(|c| matches!(c, ' ' | '\t' | '\r'))
+            {
                 j += 1;
             }
-            if j >= input.len() || matches!(input.char_at(j), ',' | '}' | ']' | ':' | '\n') {
+            // EOF or structural char after the quote → treat as closer
+            if input
+                .char_at(j)
+                .is_none_or(|c| matches!(c, ',' | '}' | ']' | ':' | '\n'))
+            {
                 output.emit_char('"');
                 input.advance(1);
                 return;

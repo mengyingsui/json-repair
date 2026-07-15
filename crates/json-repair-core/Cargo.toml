@@ -13,6 +13,7 @@ categories = ["parser-implementations", "text-processing"]
 [features]
 default = ["serde-validate"]
 serde-validate = ["dep:serde", "dep:serde_json"]
+tracing = []
 
 [dependencies]
 serde = { version = "1", optional = true }
